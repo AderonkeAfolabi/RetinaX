@@ -229,6 +229,73 @@ fn test_paillier_key_update_invalidates_data() {
 }
 
 #[test]
+fn test_trend_accuracy_with_missing_data_points() {
+    let (env, client, _admin, aggregator) = setup();
+    let kind = symbol_short!("TREND");
+    let region = Some(symbol_short!("EU"));
+    let age_band = None;
+    let condition = None;
+
+    let mut records = Vec::new(&env);
+    records.push_back(client.encrypt(&4));
+    let populated = MetricDimensions {
+        region: region.clone(),
+        age_band: None,
+        condition: None,
+        time_bucket: 10,
+    };
+    client.aggregate_records(&aggregator, &kind, &populated, &records);
+
+    let trend = client.get_trend(&kind, &region, &age_band, &condition, &8, &12);
+    assert_eq!(trend.len(), 5);
+    assert_eq!(trend.get(0).unwrap().value.count, 0);
+    assert_eq!(trend.get(2).unwrap().value.count, 1);
+    assert_eq!(trend.get(4).unwrap().value.count, 0);
+}
+
+#[test]
+fn test_trend_time_series_boundaries() {
+    let (env, client, _admin, aggregator) = setup();
+    let kind = symbol_short!("BOUND");
+    let dims = None;
+
+    let empty = client.get_trend(&kind, &dims, &dims, &dims, &50, &49);
+    assert_eq!(empty.len(), 0);
+
+    let one = client.get_trend(&kind, &dims, &dims, &dims, &u64::MAX, &u64::MAX);
+    assert_eq!(one.len(), 1);
+    assert_eq!(one.get(0).unwrap().time_bucket, u64::MAX);
+}
+
+#[test]
+fn test_aggregated_output_does_not_expose_patient_identifiers() {
+    let (env, client, _admin, aggregator) = setup();
+    let kind = symbol_short!("PRIV");
+    let dims = MetricDimensions {
+        region: Some(symbol_short!("US")),
+        age_band: Some(symbol_short!("A18_39")),
+        condition: None,
+        time_bucket: 42,
+    };
+    let mut records = Vec::new(&env);
+    records.push_back(client.encrypt(&1));
+    records.push_back(client.encrypt(&1));
+
+    client.aggregate_records(&aggregator, &kind, &dims, &records);
+    let value = client.get_metric(&kind, &dims);
+
+    assert_eq!(value.count, 2);
+    assert_eq!(
+        value,
+        MetricValue {
+            count: 2,
+            sum: value.sum,
+            version: 1,
+        }
+    );
+}
+
+#[test]
 #[should_panic]
 fn test_unauthorized_dependency_update() {
     let env = Env::default();

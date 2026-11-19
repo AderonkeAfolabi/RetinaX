@@ -340,6 +340,16 @@ impl VisionRecordsContract {
         Ok(())
     }
 
+    /// Removes an expired consent grant for one patient/grantee pair.
+    pub fn purge_expired_consent(env: Env, patient: Address, grantee: Address) -> bool {
+        consent_management::purge_expired_consent(&env, &patient, &grantee)
+    }
+
+    /// Compatibility name for bulk cleanup calls.
+    pub fn purge_expired_consents(env: Env, patient: Address, grantee: Address) -> bool {
+        consent_management::purge_expired_consent(&env, &patient, &grantee)
+    }
+
     /// Revoke access
     pub fn revoke_access(
         env: Env,

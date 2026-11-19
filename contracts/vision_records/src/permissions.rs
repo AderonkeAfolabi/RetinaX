@@ -101,6 +101,16 @@ impl VisionRecordsContract {
         Self::has_permission_unified(&env, &user, &permission)
     }
 
+    /// Removes an expired role assignment for a user.
+    pub fn purge_expired_role_assignment(env: Env, user: Address) -> bool {
+        rbac::purge_expired_role_assignment(&env, &user)
+    }
+
+    /// Removes an expired role assignment for a user.
+    pub fn purge_expired_role_assignments(env: Env, user: Address) -> bool {
+        rbac::purge_expired_role_assignment(&env, &user)
+    }
+
     /// Sets the standalone AccessControl micro-contract address.
     pub fn set_access_control(
         env: Env,
