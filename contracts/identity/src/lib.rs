@@ -18,7 +18,7 @@ pub mod recovery;
 use credential::CredentialError;
 use recovery::{RecoveryError, RecoveryRequest};
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, Symbol, Vec,
+    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, String, Symbol, Vec,
 };
 
 /// Preparation data for two-phase commit (2PC) guardian addition.
@@ -66,11 +66,22 @@ pub struct PrepareThresholdChange {
     pub timestamp: u64,
 }
 
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DidDocument {
+    pub did: String,
+    pub controller: Address,
+    pub credential_ids: Vec<BytesN<32>>,
+    pub deactivated: bool,
+    pub updated_at: u64,
+}
+
 // ── Storage keys ─────────────────────────────────────────────────────────────
 
 const ADMIN: Symbol = symbol_short!("ADMIN");
 const INITIALIZED: Symbol = symbol_short!("INIT");
 const HOLDER_BIND_PREFIX: &str = "HLD_BIND";
+const DID_PREFIX: &str = "DID_DOC";
 
 /// Re-export credential error for downstream consumers.
 pub use credential::CredentialError as CredentialVerificationError;
@@ -94,6 +105,114 @@ impl IdentityContract {
         events::emit_owner_status_changed(&env, owner, true);
 
         Ok(())
+    }
+
+    /// Create a RetinaX DID document for an active identity owner.
+    pub fn create_did(env: Env, owner: Address, did: String) -> Result<(), RecoveryError> {
+        owner.require_auth();
+        Self::require_active_owner(&env, &owner)?;
+        if !Self::valid_retinax_did(&env, &did) {
+            return Err(RecoveryError::InvalidInput);
+        }
+
+        let did_key = (Symbol::new(&env, DID_PREFIX), did.clone());
+        if env.storage().persistent().has(&did_key) {
+            return Err(RecoveryError::AlreadyExists);
+        }
+        let owner_key = (Symbol::new(&env, DID_PREFIX), owner.clone());
+        if env.storage().persistent().has(&owner_key) {
+            return Err(RecoveryError::AlreadyExists);
+        }
+
+        let cred_key = (Symbol::new(&env, HOLDER_BIND_PREFIX), owner.clone());
+        let credentials: Vec<BytesN<32>> = env
+            .storage()
+            .persistent()
+            .get(&cred_key)
+            .unwrap_or_else(|| Vec::new(&env));
+        let document = DidDocument {
+            did: did.clone(),
+            controller: owner.clone(),
+            credential_ids: credentials,
+            deactivated: false,
+            updated_at: env.ledger().timestamp(),
+        };
+        env.storage().persistent().set(&did_key, &document);
+        env.storage().persistent().set(&owner_key, &document);
+        Ok(())
+    }
+
+    /// Resolve a `did:retinax:*` DID to its DID document.
+    pub fn resolve_did(env: Env, did: String) -> Option<DidDocument> {
+        if !Self::valid_retinax_did(&env, &did) {
+            return None;
+        }
+        env.storage()
+            .persistent()
+            .get(&(Symbol::new(&env, DID_PREFIX), did))
+    }
+
+    /// Update DID document credentials and metadata. Controller authorization is required.
+    pub fn update_did(env: Env, owner: Address, did: String) -> Result<(), RecoveryError> {
+        owner.require_auth();
+        Self::require_active_owner(&env, &owner)?;
+        let did_key = (Symbol::new(&env, DID_PREFIX), did.clone());
+        let mut document: DidDocument = env
+            .storage()
+            .persistent()
+            .get(&did_key)
+            .ok_or(RecoveryError::RecordNotFound)?;
+        if document.controller != owner {
+            return Err(RecoveryError::Unauthorized);
+        }
+        if document.deactivated {
+            return Err(RecoveryError::OwnerDeactivated);
+        }
+        let cred_key = (Symbol::new(&env, HOLDER_BIND_PREFIX), owner.clone());
+        document.credential_ids = env
+            .storage()
+            .persistent()
+            .get(&cred_key)
+            .unwrap_or_else(|| Vec::new(&env));
+        document.updated_at = env.ledger().timestamp();
+        env.storage().persistent().set(&did_key, &document);
+        let owner_key = (Symbol::new(&env, DID_PREFIX), owner);
+        env.storage().persistent().set(&owner_key, &document);
+        Ok(())
+    }
+
+    /// Deactivate a DID document.
+    pub fn deactivate_did(env: Env, owner: Address, did: String) -> Result<(), RecoveryError> {
+        owner.require_auth();
+        let did_key = (Symbol::new(&env, DID_PREFIX), did);
+        let mut document: DidDocument = env
+            .storage()
+            .persistent()
+            .get(&did_key)
+            .ok_or(RecoveryError::RecordNotFound)?;
+        if document.controller != owner {
+            return Err(RecoveryError::Unauthorized);
+        }
+        if document.deactivated {
+            return Err(RecoveryError::OwnerDeactivated);
+        }
+        document.deactivated = true;
+        document.updated_at = env.ledger().timestamp();
+        env.storage().persistent().set(&did_key, &document);
+        let owner_key = (Symbol::new(&env, DID_PREFIX), owner);
+        env.storage().persistent().set(&owner_key, &document);
+        Ok(())
+    }
+
+    fn valid_retinax_did(_env: &Env, did: &String) -> bool {
+        const PREFIX: &[u8] = b"did:retinax:";
+        if did.len() as usize <= PREFIX.len() {
+            return false;
+        }
+        let mut bytes = [0u8; 128];
+        let len = (did.len() as usize).min(bytes.len());
+        did.copy_into_slice(&mut bytes[..len]);
+        &bytes[..PREFIX.len()] == PREFIX
     }
 
     /// Add a guardian address for social recovery (max 5).

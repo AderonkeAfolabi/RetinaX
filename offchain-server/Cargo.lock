@@ -929,6 +929,7 @@ dependencies = [
  "async-trait",
  "axum",
  "chrono",
+ "hex",
  "http-body-util",
  "serde",
  "serde_json",

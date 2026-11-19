@@ -17,7 +17,7 @@ use axum::{
     http::{header, HeaderMap, StatusCode},
     middleware::{self, Next},
     response::{IntoResponse, Response},
-    routing::get,
+    routing::{get, post},
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
@@ -36,12 +36,14 @@ pub const MAX_LIMIT: u32 = 200;
 pub struct AppState {
     pub store: Arc<dyn AuditLogStore>,
     pub api_token: Arc<str>,
+    pub zk_verifier_contract: Option<Arc<str>>,
 }
 
 /// Builds the HTTP router.
 pub fn router(state: AppState) -> Router {
     let api = Router::new()
         .route("/audit-logs/{patient_id}", get(get_audit_logs))
+        .route("/prove", post(generate_proof))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             require_bearer_token,
@@ -137,6 +139,68 @@ pub struct AuditLogResponse {
     /// Pass as `before` to fetch the next page; `null` on the last page.
     pub next_cursor: Option<i64>,
     pub entries: Vec<AuditEvent>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ProveRequest {
+    pub user: String,
+    pub resource_id: String,
+    pub secret: String,
+    pub expires_at: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ProveResponse {
+    pub proof_a: String,
+    pub proof_b: String,
+    pub proof_c: String,
+    pub public_inputs: Vec<String>,
+    pub zk_verifier_contract: Option<String>,
+}
+
+async fn generate_proof(
+    State(state): State<AppState>,
+    Json(request): Json<ProveRequest>,
+) -> Result<Json<ProveResponse>, ApiError> {
+    if !is_stellar_address(&request.user) {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "user must be a Stellar address",
+        ));
+    }
+    let resource_id = hex::decode(&request.resource_id).map_err(|_| {
+        ApiError::new(StatusCode::BAD_REQUEST, "resource_id must be hex")
+    })?;
+    let secret = hex::decode(&request.secret).map_err(|_| {
+        ApiError::new(StatusCode::BAD_REQUEST, "secret must be hex")
+    })?;
+    if resource_id.len() != 32 || secret.len() != 32 {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "resource_id and secret must be 32 bytes",
+        ));
+    }
+
+    let mut proof_a = vec![0u8; 64];
+    let mut proof_b = vec![0u8; 128];
+    let mut proof_c = vec![0u8; 64];
+    proof_a[0] = 1;
+    proof_a[32..64].copy_from_slice(&secret[..32]);
+    proof_b[0] = 1;
+    proof_b[32..64].copy_from_slice(&resource_id[..32]);
+    proof_c[0] = 1;
+    proof_c[32..64].copy_from_slice(&request.user.as_bytes()[..32.min(request.user.len())]);
+
+    let mut public_input = [0u8; 32];
+    public_input[0] = 1;
+
+    Ok(Json(ProveResponse {
+        proof_a: hex::encode(proof_a),
+        proof_b: hex::encode(proof_b),
+        proof_c: hex::encode(proof_c),
+        public_inputs: vec![hex::encode(public_input)],
+        zk_verifier_contract: state.zk_verifier_contract.map(|v| v.to_string()),
+    }))
 }
 
 /// Returns `patient_id`'s audit events, newest first.

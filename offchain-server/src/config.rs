@@ -15,6 +15,8 @@ pub struct Config {
     pub bind_addr: SocketAddr,
     /// `DB_MAX_CONNECTIONS`: connection pool size. Defaults to 5.
     pub db_max_connections: u32,
+    /// Stellar/Soroban contract ID that should receive the generated proof.
+    pub zk_verifier_contract: Option<String>,
 }
 
 impl Config {
@@ -52,6 +54,7 @@ impl Config {
             api_token,
             bind_addr,
             db_max_connections,
+            zk_verifier_contract: get("ZK_VERIFIER_CONTRACT"),
         })
     }
 }
