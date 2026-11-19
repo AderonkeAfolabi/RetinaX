@@ -1,4 +1,5 @@
 #![no_std]
+#![allow(deprecated)]
 
 #[cfg(test)]
 mod test;
