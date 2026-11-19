@@ -27,6 +27,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = router(AppState {
         store: Arc::new(PgStore::new(pool)),
         api_token: config.api_token.into(),
+        zk_verifier_contract: config.zk_verifier_contract.map(Arc::from),
     });
 
     let listener = tokio::net::TcpListener::bind(config.bind_addr).await?;

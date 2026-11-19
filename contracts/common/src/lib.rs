@@ -35,6 +35,7 @@ pub(crate) fn soroban_str_to_std(s: &soroban_sdk::String) -> alloc::string::Stri
 #[allow(clippy::enum_variant_names)]
 pub mod admin_tiers;
 pub mod concurrency;
+#[cfg(feature = "policy")]
 pub mod conflict_resolver;
 #[cfg(feature = "std")]
 pub mod consent;

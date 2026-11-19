@@ -41,6 +41,7 @@ fn app_with(store: impl AuditLogStore + 'static) -> Router {
     router(AppState {
         store: Arc::new(store),
         api_token: TOKEN.into(),
+        zk_verifier_contract: None,
     })
 }
 

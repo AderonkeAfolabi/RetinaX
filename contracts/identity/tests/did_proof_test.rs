@@ -4,7 +4,7 @@
 use identity::{IdentityContract, IdentityContractClient};
 use soroban_sdk::{
     testutils::{Address as _, Ledger},
-    Address, Bytes, BytesN, Env, Vec,
+    Address, Bytes, BytesN, Env, String, Vec,
 };
 use zk_verifier::vk::{G1Point, G2Point, VerificationKey};
 use zk_verifier::{ZkVerifierContract, ZkVerifierContractClient};
@@ -193,4 +193,25 @@ fn test_invalid_proof_rejected_with_error() {
 
     assert!(result.is_err());
     // Identity re-exports CredentialError::CredentialExpired as 104
+}
+
+#[test]
+fn test_did_document_crud_resolution() {
+    let env = Env::default();
+    let (identity_client, _, owner, _) = setup(&env);
+    let did = String::from_str(&env, "did:retinax:owner-1");
+
+    identity_client.create_did(&owner, &did);
+    let created = identity_client.resolve_did(&did).unwrap();
+    assert_eq!(created.did, did);
+    assert_eq!(created.controller, owner);
+    assert!(!created.deactivated);
+
+    identity_client.update_did(&owner, &did);
+    let updated = identity_client.resolve_did(&did).unwrap();
+    assert_eq!(updated.did, did);
+
+    identity_client.deactivate_did(&owner, &did);
+    let deactivated = identity_client.resolve_did(&did).unwrap();
+    assert!(deactivated.deactivated);
 }

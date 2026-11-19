@@ -97,6 +97,14 @@ impl StateChannelContract {
         channel::rebalance(&env, channel_id, new_capacity, patient_sig, provider_sig)
     }
 
+    /// Return the accumulated penalty for fraudulent dispute submissions.
+    pub fn get_fraud_penalty(env: Env, channel_id: u64) -> u64 {
+        env.storage()
+            .persistent()
+            .get(&(symbol_short!("FRD_PEN"), channel_id))
+            .unwrap_or(0)
+    }
+
     pub fn open_multi_hop(
         env: Env,
         patient: Address,

@@ -8,8 +8,9 @@ Today it does one job: it serves the audit trail that an indexer copies from the
 |-------|------|---------|
 | `GET /health` | none | Liveness check, including the database connection |
 | `GET /api/audit-logs/{patient_id}` | bearer token | A patient's audit events, newest first |
+| `POST /api/prove` | bearer token | Generate a verifier-shaped mock proof payload |
 
-> **Proof generation is not served yet.** The prover logic lives in [`sdk/zk_prover`](../sdk/zk_prover) as a Rust library, and it currently produces mock proofs shaped for the `zk_verifier` contract's checks. An HTTP proving endpoint (`POST /api/prove`) is planned but not part of this server.
+> Proof generation is provided by `POST /api/prove`. The scaffold currently produces the same mock proof shape used by [`sdk/zk_prover`](../sdk/zk_prover) and includes the optional `ZK_VERIFIER_CONTRACT` target for on-chain submission.
 
 ---
 
