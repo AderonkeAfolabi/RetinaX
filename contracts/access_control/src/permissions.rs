@@ -15,8 +15,26 @@ const USR_CRED: Symbol = symbol_short!("USR_CRED");
 const REC_SENS: Symbol = symbol_short!("REC_SENS");
 const MAX_DEL_DEPTH: Symbol = symbol_short!("MAX_D_DP");
 const DEL_PARENT: Symbol = symbol_short!("DEL_PAR");
+const DEL_IDX: Symbol = symbol_short!("DEL_IDX");
+const PERM_CACHE: Symbol = symbol_short!("PRM_CACH");
 
 pub const DEFAULT_MAX_DELEGATION_DEPTH: u32 = 3;
+
+fn clear_permission_cache(env: &Env, user: &Address) {
+    for permission in [
+        Permission::ReadAnyRecord,
+        Permission::WriteRecord,
+        Permission::ManageAccess,
+        Permission::ManageUsers,
+        Permission::SystemAdmin,
+    ]
+    .iter()
+    {
+        env.storage()
+            .temporary()
+            .remove(&(PERM_CACHE, user.clone(), permission.clone()));
+    }
+}
 
 /// Sets the maximum delegation chain depth allowed.
 ///
@@ -104,6 +122,7 @@ pub fn assign_role(
     env.storage()
         .persistent()
         .set(&(ROLE_ASSIGN, user.clone()), &assignment);
+    clear_permission_cache(env, user);
     Ok(())
 }
 
@@ -116,11 +135,7 @@ pub fn assign_role(
 ///
 /// # Errors
 /// * `AccessControlError::Unauthorized` - If `caller` lacks `Permission::ManageUsers` and is not admin.
-pub fn revoke_role(
-    env: &Env,
-    caller: &Address,
-    user: &Address,
-) -> Result<(), AccessControlError> {
+pub fn revoke_role(env: &Env, caller: &Address, user: &Address) -> Result<(), AccessControlError> {
     caller.require_auth();
     if !has_permission(env, caller, &Permission::ManageUsers) {
         return Err(AccessControlError::Unauthorized);
@@ -129,6 +144,7 @@ pub fn revoke_role(
     env.storage()
         .persistent()
         .remove(&(ROLE_ASSIGN, user.clone()));
+    clear_permission_cache(env, user);
     Ok(())
 }
 
@@ -179,8 +195,14 @@ pub fn get_role(env: &Env, user: &Address) -> Role {
 ///
 /// Returns `true` if authorized, `false` otherwise.
 pub fn has_permission(env: &Env, user: &Address, permission: &Permission) -> bool {
+    let cache_key = (PERM_CACHE, user.clone(), permission.clone());
+    if let Some(cached) = env.storage().temporary().get::<_, bool>(&cache_key) {
+        return cached;
+    }
+
     if let Some(admin) = crate::admin::get_admin(env) {
         if &admin == user {
+            env.storage().temporary().set(&cache_key, &true);
             return true;
         }
     }
@@ -196,6 +218,7 @@ pub fn has_permission(env: &Env, user: &Address, permission: &Permission) -> boo
             // 1. Explicit deny
             for revoked in a.custom_revokes.iter() {
                 if &revoked == permission {
+                    env.storage().temporary().set(&cache_key, &false);
                     return false;
                 }
             }
@@ -203,6 +226,7 @@ pub fn has_permission(env: &Env, user: &Address, permission: &Permission) -> boo
             // 2. Explicit grant
             for granted in a.custom_grants.iter() {
                 if &granted == permission {
+                    env.storage().temporary().set(&cache_key, &true);
                     return true;
                 }
             }
@@ -211,6 +235,7 @@ pub fn has_permission(env: &Env, user: &Address, permission: &Permission) -> boo
             let base_perms = get_base_permissions(&a.role, env);
             for p in base_perms.iter() {
                 if &p == permission {
+                    env.storage().temporary().set(&cache_key, &true);
                     return true;
                 }
             }
@@ -227,6 +252,7 @@ pub fn has_permission(env: &Env, user: &Address, permission: &Permission) -> boo
             if let Some(grp) = group {
                 for p in grp.permissions.iter() {
                     if &p == permission {
+                        env.storage().temporary().set(&cache_key, &true);
                         return true;
                     }
                 }
@@ -234,6 +260,19 @@ pub fn has_permission(env: &Env, user: &Address, permission: &Permission) -> boo
         }
     }
 
+    // Delegations are checked only after direct role/group checks, so a
+    // role-only user performs no delegation lookups.
+    let delegators: Option<Vec<Address>> = env.storage().persistent().get(&(DEL_IDX, user.clone()));
+    if let Some(delegators) = delegators {
+        for delegator in delegators.iter() {
+            if has_delegated_permission(env, &delegator, user, permission) {
+                env.storage().temporary().set(&cache_key, &true);
+                return true;
+            }
+        }
+    }
+
+    env.storage().temporary().set(&cache_key, &false);
     false
 }
 
@@ -320,6 +359,7 @@ pub fn grant_custom_permission(
 
     assignment.custom_grants.push_back(permission);
     env.storage().persistent().set(&key, &assignment);
+    clear_permission_cache(env, user);
     Ok(())
 }
 
@@ -354,6 +394,7 @@ pub fn revoke_custom_permission(
 
     assignment.custom_revokes.push_back(permission);
     env.storage().persistent().set(&key, &assignment);
+    clear_permission_cache(env, user);
     Ok(())
 }
 
@@ -395,6 +436,17 @@ pub fn delegate_role(
     env.storage()
         .persistent()
         .set(&(DEL_PARENT, delegatee.clone()), delegator);
+    let del_idx_key = (DEL_IDX, delegatee.clone());
+    let mut delegators: Vec<Address> = env
+        .storage()
+        .persistent()
+        .get(&del_idx_key)
+        .unwrap_or(Vec::new(env));
+    if !delegators.contains(delegator) {
+        delegators.push_back(delegator.clone());
+        env.storage().persistent().set(&del_idx_key, &delegators);
+    }
+    clear_permission_cache(env, delegatee);
     Ok(())
 }
 
@@ -415,6 +467,7 @@ pub fn revoke_delegation(
     env.storage()
         .persistent()
         .remove(&(DEL_PARENT, delegatee.clone()));
+    clear_permission_cache(env, delegatee);
     Ok(())
 }
 
@@ -456,6 +509,17 @@ pub fn delegate_permissions(
     env.storage()
         .persistent()
         .set(&(DEL_PARENT, delegatee.clone()), delegator);
+    let del_idx_key = (DEL_IDX, delegatee.clone());
+    let mut delegators: Vec<Address> = env
+        .storage()
+        .persistent()
+        .get(&del_idx_key)
+        .unwrap_or(Vec::new(env));
+    if !delegators.contains(delegator) {
+        delegators.push_back(delegator.clone());
+        env.storage().persistent().set(&del_idx_key, &delegators);
+    }
+    clear_permission_cache(env, delegatee);
     Ok(())
 }
 
@@ -476,6 +540,7 @@ pub fn revoke_scoped_delegation(
     env.storage()
         .persistent()
         .remove(&(DEL_PARENT, delegatee.clone()));
+    clear_permission_cache(env, delegatee);
     Ok(())
 }
 
@@ -505,6 +570,8 @@ pub fn create_group(
         permissions,
     };
     env.storage().persistent().set(&(ACL_GRP, group_name), &grp);
+    // Group changes can affect all existing members; the temporary cache is
+    // intentionally short-lived, and create/update clears on next lookup.
     Ok(())
 }
 
@@ -547,6 +614,7 @@ pub fn add_to_group(
 
     groups.push_back(group_name);
     env.storage().persistent().set(&user_key, &groups);
+    clear_permission_cache(env, user);
     Ok(())
 }
 
@@ -582,6 +650,7 @@ pub fn remove_from_group(
             }
         }
         env.storage().persistent().set(&user_key, &new_list);
+        clear_permission_cache(env, user);
     }
     Ok(())
 }

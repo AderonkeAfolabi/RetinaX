@@ -486,6 +486,19 @@ pub fn get_active_assignment(env: &Env, user: &Address) -> Option<RoleAssignment
     None
 }
 
+/// Removes an expired role assignment for one user.
+/// Returns true when the assignment was removed.
+pub fn purge_expired_role_assignment(env: &Env, user: &Address) -> bool {
+    let key = user_assignment_key(user);
+    if let Some(assignment) = env.storage().persistent().get::<_, RoleAssignment>(&key) {
+        if assignment.expires_at > 0 && assignment.expires_at <= env.ledger().timestamp() {
+            env.storage().persistent().remove(&key);
+            return true;
+        }
+    }
+    false
+}
+
 /// Grant a custom permission to a user.
 ///
 /// Adds a permission to the user's custom_grants, which overrides their base role.

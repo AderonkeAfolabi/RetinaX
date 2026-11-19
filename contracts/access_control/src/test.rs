@@ -277,3 +277,26 @@ fn test_abac_policy() {
 
     assert!(client.evaluate_access_policy(&policy_id, &doctor, &101, &1700000000));
 }
+
+#[test]
+fn test_permission_cache_and_delegation_counts() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(AccessControlContract, ());
+    let client = AccessControlContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+
+    let delegatee = Address::generate(&env);
+    client.assign_role(&admin, &delegatee, &Role::Staff, &0);
+    assert!(client.has_permission(&delegatee, &Permission::ManageUsers));
+    assert!(client.has_permission(&delegatee, &Permission::ManageUsers));
+
+    for _ in 0..10 {
+        let delegator = Address::generate(&env);
+        client.assign_role(&admin, &delegator, &Role::Ophthalmologist, &0);
+        client.delegate_role(&delegator, &delegatee, &Role::Ophthalmologist, &0);
+        assert!(client.has_permission(&delegatee, &Permission::WriteRecord));
+    }
+}

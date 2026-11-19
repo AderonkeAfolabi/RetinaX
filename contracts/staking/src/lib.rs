@@ -1398,7 +1398,7 @@ impl StakingContract {
     /// Flush the global reward-per-token accumulator without touching any
     /// user-specific state.  Called at the start of every admin mutation that
     /// changes the emission rate.
-    fn update_global_reward(env: &Env) {
+    fn update_global_reward(env: &Env) -> i128 {
         let total_staked: i128 = env.storage().instance().get(&TOTAL_STAKED).unwrap_or(0);
         let reward_rate: i128 = env.storage().instance().get(&REWARD_RATE).unwrap_or(0);
         let stored_rpt: i128 = env.storage().instance().get(&REWARD_PER_TOKEN).unwrap_or(0);
@@ -1412,6 +1412,7 @@ impl StakingContract {
 
         env.storage().instance().set(&REWARD_PER_TOKEN, &new_rpt);
         env.storage().instance().set(&LAST_UPDATE, &now);
+        new_rpt
     }
 
     /// Full per-user reward flush.
@@ -1420,9 +1421,7 @@ impl StakingContract {
     /// 2. Compute everything the user has earned since their last snapshot.
     /// 3. Store the updated snapshot so the user's next interaction starts fresh.
     fn update_reward(env: &Env, user: &Address) {
-        Self::update_global_reward(env);
-
-        let current_rpt: i128 = env.storage().instance().get(&REWARD_PER_TOKEN).unwrap_or(0);
+        let current_rpt = Self::update_global_reward(env);
 
         let staked: i128 = env
             .storage()
