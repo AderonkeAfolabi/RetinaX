@@ -77,10 +77,10 @@ fn confirmed_evidence_refunds_bond_and_can_be_appealed() {
     client.resolve_appeal(&admin, &appeal_id, &200);
     assert_eq!(client.get_staked(&validator), 800);
 
-    assert_eq!(
+    assert!(matches!(
         client.try_confirm_evidence(&admin, &evidence_id),
         Err(Ok(ContractError::EvidenceNotPending))
-    );
+    ));
     assert_eq!(client.get_staked(&validator), 800);
 }
 
@@ -97,14 +97,14 @@ fn rejection_forfeits_bond_and_never_slashes() {
     let token = TokenClient::new(&env, &stake_token);
     assert_eq!(token.balance(&reporter), 150);
     assert_eq!(token.balance(&admin), 50);
-    assert_eq!(
+    assert!(matches!(
         client.try_reject_evidence(&admin, &evidence_id),
         Err(Ok(ContractError::EvidenceNotPending))
-    );
-    assert_eq!(
+    ));
+    assert!(matches!(
         client.try_confirm_evidence(&admin, &evidence_id),
         Err(Ok(ContractError::EvidenceNotPending))
-    );
+    ));
 }
 
 #[test]
@@ -114,14 +114,14 @@ fn only_governance_can_review_submissions() {
     let outsider = Address::generate(&env);
     let evidence_id = client.submit_evidence(&reporter, &validator, &hash, &300, &50);
 
-    assert_eq!(
+    assert!(matches!(
         client.try_confirm_evidence(&outsider, &evidence_id),
         Err(Ok(ContractError::Unauthorized))
-    );
-    assert_eq!(
+    ));
+    assert!(matches!(
         client.try_reject_evidence(&outsider, &evidence_id),
         Err(Ok(ContractError::Unauthorized))
-    );
+    ));
     assert_eq!(client.get_evidence(&evidence_id).status, EvidenceStatus::Pending);
 }
 
@@ -131,24 +131,24 @@ fn validates_amount_bond_validator_and_unknown_evidence() {
     let (validator, reporter, hash) = prepare(&env, &client, &stake_token);
     let unstaked = Address::generate(&env);
 
-    assert_eq!(
+    assert!(matches!(
         client.try_submit_evidence(&reporter, &validator, &hash, &0, &10),
         Err(Ok(ContractError::InvalidInput))
-    );
-    assert_eq!(
+    ));
+    assert!(matches!(
         client.try_submit_evidence(&reporter, &validator, &hash, &100, &0),
         Err(Ok(ContractError::EvidenceBondInvalid))
-    );
-    assert_eq!(
+    ));
+    assert!(matches!(
         client.try_submit_evidence(&reporter, &unstaked, &hash, &100, &10),
         Err(Ok(ContractError::InsufficientBalance))
-    );
-    assert_eq!(
+    ));
+    assert!(matches!(
         client.try_get_evidence(&99),
         Err(Ok(ContractError::EvidenceNotFound))
-    );
-    assert_eq!(
+    ));
+    assert!(matches!(
         client.try_confirm_evidence(&admin, &99),
         Err(Ok(ContractError::EvidenceNotFound))
-    );
+    ));
 }
