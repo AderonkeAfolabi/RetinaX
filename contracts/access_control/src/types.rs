@@ -22,6 +22,8 @@ pub enum AccessControlError {
     AlreadyExists = 6,
     /// Contract is already initialized.
     AlreadyInitialized = 7,
+    /// Delegation depth exceeds maximum allowed limit.
+    DelegationDepthExceeded = 8,
 }
 
 /// Core permissions in the RetinaX access control system.

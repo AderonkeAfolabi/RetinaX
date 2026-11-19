@@ -1,324 +1,249 @@
+//! Clinical records contract for RetinaX.
+//!
+//! Stores eye examinations (visual acuity, intraocular pressure, slit lamp findings,
+//! visual field, retinal imaging and fundus photography) and vision correction
+//! prescriptions. Writes and reads are authorized either by the `access_control`
+//! contract, when one is configured, or by the `vision_records` contract and the
+//! admin otherwise.
+
 #![no_std]
+#![allow(clippy::too_many_arguments, clippy::large_enum_variant)]
 
-use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, symbol_short, Address, Env, String, Symbol,
-    Vec,
-};
+extern crate alloc;
 
-const ADMIN: Symbol = symbol_short!("ADMIN");
-const INITIALIZED: Symbol = symbol_short!("INIT");
-const VISION_RECORDS: Symbol = symbol_short!("V_REC");
-const EXAM_KEY: Symbol = symbol_short!("EXAM");
-const PRESCRIPTION_KEY: Symbol = symbol_short!("RX");
-const RX_COUNTER: Symbol = symbol_short!("RX_CTR");
+pub mod admin;
+pub mod errors;
+pub mod events;
+pub mod examination;
+pub mod fhir;
+pub mod migration;
+pub mod prescription;
+pub mod session;
+pub mod terminology;
+pub mod types;
 
-#[contracterror]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-pub enum ContractError {
-    AlreadyInitialized = 1,
-    NotInitialized = 2,
-    Unauthorized = 3,
-    InvalidInput = 4,
-    InvalidRecordType = 5,
-    RecordNotFound = 6,
-    InvalidPhase = 7,
-}
+#[cfg(test)]
+mod test;
 
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PhysicalMeasurement {
-    pub left_eye: String,
-    pub right_eye: String,
-}
+pub use common::progressive_auth::AuthLevel;
+pub use errors::ContractError;
+pub use session::ClinicalSession;
+pub use types::*;
 
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum OptPhysicalMeasurement {
-    None,
-    Some(PhysicalMeasurement),
-}
+use examination::{EXAM_KEY, EXAM_VERSION_KEY};
+use prescription::{PRESCRIPTION_KEY, RX_VERSION_KEY};
+use soroban_sdk::{contract, contractimpl, Address, Bytes, BytesN, Env, String, Vec};
 
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct VisualAcuity {
-    pub uncorrected: PhysicalMeasurement,
-    pub corrected: OptPhysicalMeasurement,
-}
+// `::fhir` is the fhir contract crate; plain `fhir` here would be this crate's
+// FHIR JSON export module.
+use ::fhir::types::{MedicationRequest, Observation};
 
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct IntraocularPressure {
-    pub left_eye: u32,
-    pub right_eye: u32,
-    pub method: String,
-    pub timestamp: u64,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SlitLampFindings {
-    pub cornea: String,
-    pub anterior_chamber: String,
-    pub iris: String,
-    pub lens: String,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct VisualField {
-    pub left_eye_reliability: String,
-    pub right_eye_reliability: String,
-    pub left_eye_defects: String,
-    pub right_eye_defects: String,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum OptVisualField {
-    None,
-    Some(VisualField),
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RetinalImaging {
-    pub image_url: String,
-    pub image_hash: String,
-    pub findings: String,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum OptRetinalImaging {
-    None,
-    Some(RetinalImaging),
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct FundusPhotography {
-    pub image_url: String,
-    pub image_hash: String,
-    pub cup_to_disc_ratio_left: String,
-    pub cup_to_disc_ratio_right: String,
-    pub macula_status: String,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum OptFundusPhotography {
-    None,
-    Some(FundusPhotography),
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct EyeExamination {
-    pub record_id: u64,
-    pub visual_acuity: VisualAcuity,
-    pub iop: IntraocularPressure,
-    pub slit_lamp: SlitLampFindings,
-    pub visual_field: OptVisualField,
-    pub retina_imaging: OptRetinalImaging,
-    pub fundus_photo: OptFundusPhotography,
-    pub clinical_notes: String,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum LensType {
-    Glasses,
-    ContactLens,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PrescriptionData {
-    pub sphere: String,
-    pub cylinder: String,
-    pub axis: String,
-    pub add: String,
-    pub pd: String,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ContactLensData {
-    pub base_curve: String,
-    pub diameter: String,
-    pub brand: String,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum OptionalContactLensData {
-    None,
-    Some(ContactLensData),
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Prescription {
-    pub id: u64,
-    pub patient: Address,
-    pub provider: Address,
-    pub lens_type: LensType,
-    pub left_eye: PrescriptionData,
-    pub right_eye: PrescriptionData,
-    pub contact_data: OptionalContactLensData,
-    pub issued_at: u64,
-    pub expires_at: u64,
-    pub verified: bool,
-    pub metadata_hash: String,
-}
-
+/// Soroban contract that stores eye examinations and prescriptions.
 #[contract]
 pub struct ClinicalRecordsContract;
 
 #[contractimpl]
 impl ClinicalRecordsContract {
-    pub fn initialize(env: Env, admin: Address, vision_records: Address) -> Result<(), ContractError> {
-        if env.storage().instance().has(&INITIALIZED) {
-            return Err(ContractError::AlreadyInitialized);
-        }
-        admin.require_auth();
-        env.storage().instance().set(&ADMIN, &admin);
-        env.storage().instance().set(&VISION_RECORDS, &vision_records);
-        env.storage().instance().set(&INITIALIZED, &true);
-        Ok(())
+    /// Initializes the contract once.
+    ///
+    /// Stores `admin`, the `vision_records` contract address, and an optional
+    /// `access_control` contract address. Requires authorization from `admin`.
+    ///
+    /// # Errors
+    /// Returns `AlreadyInitialized` if the contract has already been initialized.
+    pub fn initialize(
+        env: Env,
+        admin: Address,
+        vision_records: Address,
+        access_control: Option<Address>,
+    ) -> Result<(), ContractError> {
+        admin::initialize(&env, admin, vision_records, access_control)
     }
 
+    /// Returns the admin address set during initialization.
+    ///
+    /// # Errors
+    /// Returns `NotInitialized` if the contract has not been initialized.
     pub fn get_admin(env: Env) -> Result<Address, ContractError> {
-        env.storage()
-            .instance()
-            .get(&ADMIN)
-            .ok_or(ContractError::NotInitialized)
+        admin::get_admin(&env)
     }
 
+    /// Replaces the `vision_records` contract address.
+    ///
+    /// Requires authorization from `admin`, which must match the stored admin.
+    ///
+    /// # Errors
+    /// Returns `Unauthorized` if `admin` is not the stored admin.
     pub fn set_vision_records_contract(
         env: Env,
         admin: Address,
         vision_records: Address,
     ) -> Result<(), ContractError> {
-        admin.require_auth();
-        let stored_admin = Self::get_admin(env.clone())?;
-        if admin != stored_admin {
-            return Err(ContractError::Unauthorized);
-        }
-        env.storage().instance().set(&VISION_RECORDS, &vision_records);
-        Ok(())
+        admin::set_vision_records_contract(&env, admin, vision_records)
     }
 
+    /// Returns the configured `vision_records` contract address, if one is set.
     pub fn get_vision_records_contract(env: Env) -> Option<Address> {
-        env.storage().instance().get(&VISION_RECORDS)
+        admin::get_vision_records_contract(&env)
     }
 
-    fn require_authorized_vision_records(env: &Env, caller: &Address) -> Result<(), ContractError> {
-        let allowed = env
-            .storage()
-            .instance()
-            .get(&VISION_RECORDS)
-            .ok_or(ContractError::NotInitialized)?;
-        if *caller == allowed {
-            Ok(())
-        } else {
-            Err(ContractError::Unauthorized)
-        }
-    }
-
-    fn validate_string(value: &String, min_len: u32, max_len: u32) -> Result<(), ContractError> {
-        let len = value.len();
-        if len < min_len || len > max_len {
-            return Err(ContractError::InvalidInput);
-        }
-        Ok(())
-    }
-
-    fn validate_physical_measurement(value: &PhysicalMeasurement) -> Result<(), ContractError> {
-        Self::validate_string(&value.left_eye, 1, 64)?;
-        Self::validate_string(&value.right_eye, 1, 64)?;
-        Ok(())
-    }
-
-    fn validate_visual_acuity(value: &VisualAcuity) -> Result<(), ContractError> {
-        Self::validate_physical_measurement(&value.uncorrected)?;
-        if let OptPhysicalMeasurement::Some(corrected) = &value.corrected {
-            Self::validate_physical_measurement(corrected)?;
-        }
-        Ok(())
-    }
-
-    fn validate_iop(value: &IntraocularPressure) -> Result<(), ContractError> {
-        Self::validate_string(&value.method, 1, 64)?;
-        Ok(())
-    }
-
-    fn validate_slit_lamp(value: &SlitLampFindings) -> Result<(), ContractError> {
-        Self::validate_string(&value.cornea, 1, 256)?;
-        Self::validate_string(&value.anterior_chamber, 1, 256)?;
-        Self::validate_string(&value.iris, 1, 256)?;
-        Self::validate_string(&value.lens, 1, 256)?;
-        Ok(())
-    }
-
-    fn validate_visual_field(value: &OptVisualField) -> Result<(), ContractError> {
-        if let OptVisualField::Some(field) = value {
-            Self::validate_string(&field.left_eye_reliability, 0, 128)?;
-            Self::validate_string(&field.right_eye_reliability, 0, 128)?;
-            Self::validate_string(&field.left_eye_defects, 0, 256)?;
-            Self::validate_string(&field.right_eye_defects, 0, 256)?;
-        }
-        Ok(())
-    }
-
-    fn validate_retinal_imaging(value: &OptRetinalImaging) -> Result<(), ContractError> {
-        if let OptRetinalImaging::Some(image) = value {
-            Self::validate_string(&image.image_url, 1, 256)?;
-            Self::validate_string(&image.image_hash, 1, 128)?;
-            Self::validate_string(&image.findings, 0, 512)?;
-        }
-        Ok(())
-    }
-
-    fn validate_fundus_photo(value: &OptFundusPhotography) -> Result<(), ContractError> {
-        if let OptFundusPhotography::Some(photo) = value {
-            Self::validate_string(&photo.image_url, 1, 256)?;
-            Self::validate_string(&photo.image_hash, 1, 128)?;
-            Self::validate_string(&photo.cup_to_disc_ratio_left, 1, 64)?;
-            Self::validate_string(&photo.cup_to_disc_ratio_right, 1, 64)?;
-            Self::validate_string(&photo.macula_status, 0, 256)?;
-        }
-        Ok(())
-    }
-
-    fn validate_examination_strings(
-        visual_acuity: &VisualAcuity,
-        iop: &IntraocularPressure,
-        slit_lamp: &SlitLampFindings,
-        visual_field: &OptVisualField,
-        retina_imaging: &OptRetinalImaging,
-        fundus_photo: &OptFundusPhotography,
-        clinical_notes: &String,
+    /// Sets the `access_control` contract used for permission checks.
+    ///
+    /// Requires authorization from `admin`, which must match the stored admin.
+    ///
+    /// # Errors
+    /// Returns `Unauthorized` if `admin` is not the stored admin.
+    pub fn set_access_control_contract(
+        env: Env,
+        admin: Address,
+        access_control: Address,
     ) -> Result<(), ContractError> {
-        Self::validate_visual_acuity(visual_acuity)?;
-        Self::validate_iop(iop)?;
-        Self::validate_slit_lamp(slit_lamp)?;
-        Self::validate_visual_field(visual_field)?;
-        Self::validate_retinal_imaging(retina_imaging)?;
-        Self::validate_fundus_photo(fundus_photo)?;
-        Self::validate_string(clinical_notes, 0, 2048)?;
-        Ok(())
+        admin::set_access_control_contract(&env, admin, access_control)
     }
 
-    fn validate_prescription_data(value: &PrescriptionData) -> Result<(), ContractError> {
-        Self::validate_string(&value.sphere, 1, 64)?;
-        Self::validate_string(&value.cylinder, 1, 64)?;
-        Self::validate_string(&value.axis, 1, 32)?;
-        Self::validate_string(&value.add, 1, 32)?;
-        Self::validate_string(&value.pd, 1, 32)?;
-        Ok(())
+    /// Returns the configured `access_control` contract address, if one is set.
+    pub fn get_access_control_contract(env: Env) -> Option<Address> {
+        admin::get_access_control_contract(&env)
     }
 
+    /// Replaces the contract Wasm with an already-uploaded build (admin only).
+    ///
+    /// # Errors
+    /// Returns `Unauthorized` if `admin` is not the stored admin.
+    pub fn upgrade(
+        env: Env,
+        admin: Address,
+        new_wasm_hash: BytesN<32>,
+    ) -> Result<(), ContractError> {
+        migration::upgrade(&env, admin, new_wasm_hash)
+    }
+
+    /// Returns the current contract schema version.
+    pub fn get_schema_version(env: Env) -> u32 {
+        migration::get_schema_version(&env)
+    }
+
+    /// Advances the contract schema version (admin only).
+    ///
+    /// # Errors
+    /// Returns `Unauthorized`, `AlreadyMigrated`, or `InvalidVersion`.
+    pub fn migrate(env: Env, admin: Address, target_version: u32) -> Result<(), ContractError> {
+        migration::migrate(&env, admin, target_version)
+    }
+
+    /// Returns the schema version stored for one examination record.
+    pub fn get_examination_version(
+        env: Env,
+        caller: Address,
+        record_id: u64,
+    ) -> Result<u32, ContractError> {
+        migration::get_record_version(
+            &env,
+            &caller,
+            &(EXAM_KEY, record_id),
+            &(EXAM_VERSION_KEY, record_id),
+        )
+    }
+
+    /// Explicitly migrates one examination record to `target_version`.
+    pub fn migrate_examination(
+        env: Env,
+        caller: Address,
+        record_id: u64,
+        target_version: u32,
+    ) -> Result<u32, ContractError> {
+        migration::migrate_record(
+            &env,
+            &caller,
+            &(EXAM_KEY, record_id),
+            &(EXAM_VERSION_KEY, record_id),
+            target_version,
+        )
+    }
+
+    /// Returns the schema version stored for one prescription record.
+    pub fn get_prescription_version(
+        env: Env,
+        caller: Address,
+        rx_id: u64,
+    ) -> Result<u32, ContractError> {
+        migration::get_record_version(
+            &env,
+            &caller,
+            &(PRESCRIPTION_KEY, rx_id),
+            &(RX_VERSION_KEY, rx_id),
+        )
+    }
+
+    /// Explicitly migrates one prescription record to `target_version`.
+    pub fn migrate_prescription(
+        env: Env,
+        caller: Address,
+        rx_id: u64,
+        target_version: u32,
+    ) -> Result<u32, ContractError> {
+        migration::migrate_record(
+            &env,
+            &caller,
+            &(PRESCRIPTION_KEY, rx_id),
+            &(RX_VERSION_KEY, rx_id),
+            target_version,
+        )
+    }
+
+    /// Opens, or refreshes, a session that lets `session_key` call this contract for `principal`.
+    ///
+    /// Requires authorization from `principal`. While the session lasts, `session_key` passes
+    /// its own address as `caller`, signs the call, and is authorized with `principal`'s
+    /// permissions. Examination reads need Level 1, examination writes Level 2, and every
+    /// prescription operation Level 3. The session expires `ttl_seconds` after this call, up to
+    /// `MAX_SESSION_TTL_SECS` (24 hours). Emits a session-started event.
+    ///
+    /// # Errors
+    /// Returns `InvalidInput` if `session_key` equals `principal` or `ttl_seconds` is out of
+    /// range, `Unauthorized` if `session_key` is in use by another principal's unexpired
+    /// session, or `NotInitialized` if the contract is not set up.
+    pub fn start_session(
+        env: Env,
+        principal: Address,
+        session_key: Address,
+        max_level: AuthLevel,
+        ttl_seconds: u64,
+    ) -> Result<ClinicalSession, ContractError> {
+        session::start_session(&env, principal, session_key, max_level, ttl_seconds)
+    }
+
+    /// Ends `session_key`'s session before it expires.
+    ///
+    /// Requires authorization from `principal`, the address that opened the session. Emits a
+    /// session-revoked event.
+    ///
+    /// # Errors
+    /// Returns `RecordNotFound` if `session_key` has no session, or `Unauthorized` if it belongs
+    /// to a different principal.
+    pub fn revoke_session(
+        env: Env,
+        principal: Address,
+        session_key: Address,
+    ) -> Result<(), ContractError> {
+        session::revoke_session(&env, principal, session_key)
+    }
+
+    /// Returns `session_key`'s session, including an expired one, or `None` if it has none.
+    pub fn get_session(env: Env, session_key: Address) -> Option<ClinicalSession> {
+        session::get_session(&env, &session_key)
+    }
+
+    /// Stores a full eye examination under `record_id`.
+    ///
+    /// When `access_control` is configured, `caller` needs the `WriteRecord`
+    /// permission. Otherwise `caller` must be the `vision_records` contract.
+    /// Free-text fields are length-checked, for example `clinical_notes` is limited
+    /// to 2048 bytes. Emits an examination-added event on success.
+    ///
+    /// # Errors
+    /// Returns `Unauthorized` if the caller lacks write access, `InvalidInput` if a
+    /// field fails validation, or `NotInitialized` if the contract is not set up.
     pub fn add_eye_examination(
         env: Env,
         caller: Address,
@@ -331,18 +256,9 @@ impl ClinicalRecordsContract {
         fundus_photo: OptFundusPhotography,
         clinical_notes: String,
     ) -> Result<(), ContractError> {
-        Self::require_authorized_vision_records(&env, &caller)?;
-        Self::validate_examination_strings(
-            &visual_acuity,
-            &iop,
-            &slit_lamp,
-            &visual_field,
-            &retina_imaging,
-            &fundus_photo,
-            &clinical_notes,
-        )?;
-
-        let exam = EyeExamination {
+        examination::add_eye_examination(
+            &env,
+            caller,
             record_id,
             visual_acuity,
             iop,
@@ -351,24 +267,115 @@ impl ClinicalRecordsContract {
             retina_imaging,
             fundus_photo,
             clinical_notes,
-        };
-
-        env.storage().persistent().set(&(EXAM_KEY, record_id), &exam);
-        Ok(())
+        )
     }
 
+    /// Checks the clinical terminology of an examination and returns the warnings.
+    ///
+    /// This is a read-only check. It never stores anything and never rejects a
+    /// value: it reports intraocular pressure readings outside the normal range,
+    /// visual acuity values that are not written as a fraction, and slit lamp
+    /// findings that do not use the accepted terminology.
+    ///
+    /// The same warnings are published as an `EXAM_WARN` event when an
+    /// examination with warnings is stored.
+    pub fn validate_examination_terminology(
+        env: Env,
+        visual_acuity: VisualAcuity,
+        iop: IntraocularPressure,
+        slit_lamp: SlitLampFindings,
+    ) -> Vec<ClinicalWarning> {
+        terminology::collect_terminology_warnings(&env, &visual_acuity, &iop, &slit_lamp)
+    }
+
+    /// Links an examination record to the patient who owns it.
+    ///
+    /// The linked patient can read the examination through `get_eye_examination`.
+    /// Uses the same write authorization as `add_eye_examination`.
+    ///
+    /// # Errors
+    /// Returns `Unauthorized` if the caller lacks write access.
+    pub fn set_examination_patient(
+        env: Env,
+        caller: Address,
+        record_id: u64,
+        patient: Address,
+    ) -> Result<(), ContractError> {
+        examination::set_examination_patient(&env, caller, record_id, patient)
+    }
+
+    /// Returns the eye examination stored under `record_id`.
+    ///
+    /// When `access_control` is configured, `caller` must hold `ReadAnyRecord` or be
+    /// the patient linked to the record. Otherwise `caller` must be the
+    /// `vision_records` contract.
+    ///
+    /// # Errors
+    /// Returns `Unauthorized` if the caller is not allowed to read the record, or
+    /// `RecordNotFound` if no examination exists under `record_id`.
     pub fn get_eye_examination(
         env: Env,
         caller: Address,
         record_id: u64,
     ) -> Result<EyeExamination, ContractError> {
-        Self::require_authorized_vision_records(&env, &caller)?;
-        env.storage()
-            .persistent()
-            .get(&(EXAM_KEY, record_id))
-            .ok_or(ContractError::RecordNotFound)
+        examination::get_eye_examination(&env, caller, record_id)
     }
 
+    /// Map a stored [`EyeExamination`] to a list of FHIR R4 [`Observation`]
+    /// resources (visual acuity, IOP, eye-exam narrative).
+    ///
+    /// Each observation carries a canonical LOINC system URI, `status`,
+    /// `subject`, and `effective[x]` so it passes
+    /// [`FhirContract::validate_eye_exam_observation`].
+    ///
+    /// # Errors
+    /// * `Unauthorized`  – caller is not the configured vision-records contract.
+    /// * `RecordNotFound`– no examination exists for `record_id`.
+    pub fn get_eye_examination_fhir(
+        env: Env,
+        caller: Address,
+        record_id: u64,
+        subject_id: String,
+    ) -> Result<Vec<Observation>, ContractError> {
+        let exam = examination::get_eye_examination(&env, caller, record_id)?;
+        Ok(examination::eye_examination_to_fhir(
+            &env, &exam, subject_id,
+        ))
+    }
+
+    /// Map a stored [`Prescription`] to a FHIR R4 [`MedicationRequest`].
+    ///
+    /// `medication[x]` uses SNOMED CT Eye glasses (`50121007`) or Contact
+    /// lenses (`57368009`) coded per `lens_type`; per-eye lens parameters
+    /// (sphere / cylinder / axis / addition / PD) are carried in
+    /// `dosage_text` with the LOINC EYE.GLASSES prescription codes. The
+    /// result always satisfies the fhir contract's
+    /// `validate_medication_request` rules.
+    ///
+    /// # Errors
+    /// * `Unauthorized`  – caller is not the configured vision-records
+    ///   contract.
+    /// * `RecordNotFound`– no prescription exists for `id`.
+    pub fn get_prescription_fhir(
+        env: Env,
+        caller: Address,
+        id: u64,
+        subject_id: String,
+    ) -> Result<MedicationRequest, ContractError> {
+        let rx = prescription::get_prescription(&env, caller, id)?;
+        Ok(prescription::prescription_to_fhir(&env, &rx, subject_id))
+    }
+
+    /// First step of the two-phase prescription flow. Stores the prescription as pending.
+    ///
+    /// Assigns the next prescription id, keeps the pending data in temporary storage,
+    /// and emits a prepared event. Call `commit_add_prescription` with the returned id
+    /// to make it permanent, or `rollback_add_prescription` to discard it. Temporary
+    /// entries expire, so the commit must happen before they do.
+    ///
+    /// # Errors
+    /// Returns `Unauthorized` if the caller lacks write access, or `InvalidInput` if
+    /// the prescription values fail validation.
     pub fn prepare_add_prescription(
         env: Env,
         caller: Address,
@@ -376,72 +383,139 @@ impl ClinicalRecordsContract {
         provider: Address,
         prescription_data: PrescriptionData,
     ) -> Result<u64, ContractError> {
-        Self::require_authorized_vision_records(&env, &caller)?;
-        Self::validate_prescription_data(&prescription_data)?;
-        let next_id = env
-            .storage()
-            .instance()
-            .get(&RX_COUNTER)
-            .unwrap_or(0u64)
-            .saturating_add(1u64);
-        env.storage().instance().set(&RX_COUNTER, &next_id);
-        let prep_key = (symbol_short!("P_ADD_RX"), next_id);
-        let prep = (patient, provider, prescription_data, env.ledger().timestamp());
-        env.storage().temporary().set(&prep_key, &prep);
-        Ok(next_id)
+        prescription::prepare_add_prescription(&env, caller, patient, provider, prescription_data)
     }
 
+    /// Second step of the two-phase prescription flow. Makes a pending prescription permanent.
+    ///
+    /// The committed prescription is a glasses prescription, starts unverified, and
+    /// expires one year (31,536,000 seconds) after the prepare step.
+    ///
+    /// # Errors
+    /// Returns `InvalidPhase` if no pending prescription exists for `rx_id`, or
+    /// `Unauthorized` if the caller lacks write access.
     pub fn commit_add_prescription(
         env: Env,
         caller: Address,
         rx_id: u64,
     ) -> Result<(), ContractError> {
-        Self::require_authorized_vision_records(&env, &caller)?;
-        let prep_key = (symbol_short!("P_ADD_RX"), rx_id);
-        let prepared: (Address, Address, PrescriptionData, u64) = env
-            .storage()
-            .temporary()
-            .get(&prep_key)
-            .ok_or(ContractError::InvalidPhase)?;
-
-        let prescription = Prescription {
-            id: rx_id,
-            patient: prepared.0,
-            provider: prepared.1,
-            lens_type: LensType::Glasses,
-            left_eye: prepared.2.clone(),
-            right_eye: prepared.2,
-            contact_data: OptionalContactLensData::None,
-            issued_at: prepared.3,
-            expires_at: prepared.3.saturating_add(31_536_000),
-            verified: false,
-            metadata_hash: String::from_str(&env, ""),
-        };
-
-        env.storage().persistent().set(&(PRESCRIPTION_KEY, rx_id), &prescription);
-        env.storage().temporary().remove(&prep_key);
-        Ok(())
+        prescription::commit_add_prescription(&env, caller, rx_id)
     }
 
+    /// Discards a pending prescription that was prepared but not committed.
+    ///
+    /// Emits a rolled-back event. The id is not reused.
+    ///
+    /// # Errors
+    /// Returns `Unauthorized` if the caller lacks write access.
     pub fn rollback_add_prescription(
         env: Env,
         caller: Address,
         rx_id: u64,
     ) -> Result<(), ContractError> {
-        Self::require_authorized_vision_records(&env, &caller)?;
-        env.storage().temporary().remove(&(symbol_short!("P_ADD_RX"), rx_id));
-        Ok(())
+        prescription::rollback_add_prescription(&env, caller, rx_id)
     }
 
+    /// Batch form of `prepare_add_prescription` for the several prescriptions one examination
+    /// often produces. Returns the new ids in input order.
+    ///
+    /// Authorization is checked once for the whole batch. The batch is atomic: if any entry is
+    /// invalid, nothing is prepared and no id is consumed. At most `MAX_PRESCRIPTION_BATCH` (10)
+    /// entries are accepted.
+    ///
+    /// # Errors
+    /// Returns `Unauthorized` if the caller lacks write access, or `InvalidInput` if the batch is
+    /// empty, too large, or contains invalid prescription values.
+    pub fn prepare_add_prescriptions(
+        env: Env,
+        caller: Address,
+        prescriptions: Vec<BatchPrescriptionInput>,
+    ) -> Result<Vec<u64>, ContractError> {
+        prescription::prepare_add_prescriptions(&env, caller, prescriptions)
+    }
+
+    /// Batch form of `commit_add_prescription`. Atomic: either every id is committed or none is.
+    ///
+    /// # Errors
+    /// Returns `Unauthorized` if the caller lacks write access, `InvalidInput` if the batch is
+    /// empty or too large, or `InvalidPhase` if any id is not pending (including a repeated id).
+    pub fn commit_add_prescriptions(
+        env: Env,
+        caller: Address,
+        rx_ids: Vec<u64>,
+    ) -> Result<(), ContractError> {
+        prescription::commit_add_prescriptions(&env, caller, rx_ids)
+    }
+
+    /// Batch form of `rollback_add_prescription`. Atomic: either every id is discarded or none
+    /// is. Every id must still be pending.
+    ///
+    /// # Errors
+    /// Returns `Unauthorized` if the caller lacks write access, `InvalidInput` if the batch is
+    /// empty or too large, or `InvalidPhase` if any id is not pending (including a repeated id).
+    pub fn rollback_add_prescriptions(
+        env: Env,
+        caller: Address,
+        rx_ids: Vec<u64>,
+    ) -> Result<(), ContractError> {
+        prescription::rollback_add_prescriptions(&env, caller, rx_ids)
+    }
+
+    /// Returns how many prescription ids have been issued by `prepare_add_prescription`.
+    ///
+    /// This counts prepared prescriptions, including ones later rolled back, not only
+    /// committed ones.
     pub fn get_prescription_count(env: Env) -> u64 {
-        env.storage().instance().get(&RX_COUNTER).unwrap_or(0)
+        prescription::get_prescription_count(&env)
     }
 
-    pub fn get_prescription(env: Env, caller: Address, id: u64) -> Result<Prescription, ContractError> {
-        Self::require_authorized_vision_records(&env, &caller)?;
-        env.storage()
-            .persistent()
-            .get(&(PRESCRIPTION_KEY, id))
-            .ok_or(ContractError::RecordNotFound)
+    /// Returns the committed prescription with the given `id`.
+    ///
+    /// When `access_control` is configured, `caller` must hold `ReadAnyRecord` or be
+    /// the patient on the prescription. Otherwise `caller` must be the
+    /// `vision_records` contract.
+    ///
+    /// # Errors
+    /// Returns `Unauthorized` if the caller is not allowed to read it, or
+    /// `RecordNotFound` if no committed prescription has that id.
+    pub fn get_prescription(
+        env: Env,
+        caller: Address,
+        id: u64,
+    ) -> Result<Prescription, ContractError> {
+        prescription::get_prescription(&env, caller, id)
+    }
+
+    /// Exports the eye examination stored under `record_id` as a FHIR R4 `Observation`, encoded
+    /// as UTF-8 JSON.
+    ///
+    /// Uses the same read access rules as `get_eye_examination`. The linked patient, if any,
+    /// becomes the `subject`.
+    ///
+    /// # Errors
+    /// Returns `Unauthorized`, `RecordNotFound`, or `InvalidInput` if stored data cannot be
+    /// represented in FHIR (text that is not UTF-8, or a timestamp past the year 9999).
+    pub fn export_eye_examination_fhir(
+        env: Env,
+        caller: Address,
+        record_id: u64,
+    ) -> Result<Bytes, ContractError> {
+        fhir::export_eye_examination(&env, caller, record_id)
+    }
+
+    /// Exports the committed prescription `id` as a FHIR R4 `MedicationRequest`, encoded as
+    /// UTF-8 JSON.
+    ///
+    /// Uses the same read access rules as `get_prescription`.
+    ///
+    /// # Errors
+    /// Returns `Unauthorized`, `RecordNotFound`, or `InvalidInput` if stored data cannot be
+    /// represented in FHIR.
+    pub fn export_prescription_fhir(
+        env: Env,
+        caller: Address,
+        id: u64,
+    ) -> Result<Bytes, ContractError> {
+        fhir::export_prescription(&env, caller, id)
     }
 }

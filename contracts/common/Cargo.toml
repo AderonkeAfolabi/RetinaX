@@ -16,6 +16,26 @@ default = []
 std = []
 testutils = ["soroban-sdk/testutils"]
 
+# Optional feature gates — contracts that don't need these modules can omit them
+# to reduce compile time and WASM size.
+#
+# Usage in a contract's Cargo.toml:
+#   common = { path = "../common", features = ["migration"] }
+#
+# migration     — versioned storage migration framework (pulls in extra storage logic)
+# provenance    — lineage DAG + provenance graph traversal helpers
+# risk          — risk engine and progressive authentication
+# policy        — policy DSL and policy engine
+# state-machine — generic lifecycle state machine with audit log
+migration     = []
+provenance    = []
+risk          = []
+policy        = []
+state-machine = []
+
+# "full" re-enables everything — equivalent to the previous default behaviour.
+full = ["migration", "provenance", "risk", "policy", "state-machine"]
+
 [dependencies]
 soroban-sdk = { workspace = true }
 

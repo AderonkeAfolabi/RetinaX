@@ -1,0 +1,33 @@
+# Local PostgreSQL for development. Not for production: the password is fixed and public.
+services:
+  offchain-server:
+    build: .
+    environment:
+      DATABASE_URL: postgres://retinax:retinax@postgres:5432/retinax
+      API_TOKEN: ${API_TOKEN:-0123456789abcdef0123456789abcdef}
+      BIND_ADDR: 0.0.0.0:8080
+      ZK_VERIFIER_CONTRACT: ${ZK_VERIFIER_CONTRACT:-}
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: retinax
+      POSTGRES_PASSWORD: retinax
+      POSTGRES_DB: retinax
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - retinax-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U retinax"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  retinax-pg:

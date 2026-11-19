@@ -53,6 +53,12 @@ pub enum RecoveryError {
     CooldownNotExpired = 14,
     /// Identity owner account has been deactivated (e.g. following ownership recovery).
     OwnerDeactivated = 15,
+    /// A DID identifier or document value is invalid.
+    InvalidInput = 16,
+    /// A DID or DID document already exists.
+    AlreadyExists = 17,
+    /// The requested DID document was not found.
+    RecordNotFound = 18,
 }
 
 // ── Types ────────────────────────────────────────────────────────────────────

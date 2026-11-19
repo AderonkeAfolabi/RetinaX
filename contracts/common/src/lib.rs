@@ -35,32 +35,51 @@ pub(crate) fn soroban_str_to_std(s: &soroban_sdk::String) -> alloc::string::Stri
 #[allow(clippy::enum_variant_names)]
 pub mod admin_tiers;
 pub mod concurrency;
+#[cfg(feature = "policy")]
 pub mod conflict_resolver;
 #[cfg(feature = "std")]
 pub mod consent;
 pub mod keys;
 /// On-chain DAG provenance data model and storage primitives.
+/// Feature-gated: only compiled when the `provenance` feature is enabled.
+#[cfg(feature = "provenance")]
 pub mod lineage;
 pub mod meta_tx;
 pub mod metering;
+/// Contract upgrade migration framework with data versioning and rollback.
+/// Feature-gated: only compiled when the `migration` feature is enabled.
+#[cfg(feature = "migration")]
 pub mod migration;
 pub mod multisig;
 pub mod multisig_test;
 pub mod nonce;
 pub mod pausable;
+/// Policy DSL and policy engine.
+/// Feature-gated: only compiled when the `policy` feature is enabled.
+#[cfg(feature = "policy")]
 pub mod policy_dsl;
 pub mod progressive_auth;
 /// Higher-level provenance traversal, access checks, and export helpers.
+/// Feature-gated: only compiled when the `provenance` feature is enabled.
+#[cfg(feature = "provenance")]
 pub mod provenance_graph;
 pub mod rate_limit;
 pub mod reentrancy_guard;
+/// Risk scoring engine and risk-aware access control.
+/// Feature-gated: only compiled when the `risk` feature is enabled.
+#[cfg(feature = "risk")]
 pub mod risk_engine;
 pub mod session;
 /// Generic lifecycle state machine with guarded transitions and hash-chained audit log.
+/// Feature-gated: only compiled when the `state-machine` feature is enabled.
+#[cfg(feature = "state-machine")]
 pub mod state_machine;
 pub mod transaction;
 pub mod vault_types;
 pub mod vector_clock;
+/// Lazy-migration storage layer (depends on `migration`).
+/// Feature-gated: only compiled when the `migration` feature is enabled.
+#[cfg(feature = "migration")]
 pub mod versioned_storage;
 pub mod whitelist;
 
@@ -77,23 +96,29 @@ pub use concurrency::{
 pub use consent::*;
 pub use credential_types::*;
 pub use keys::*;
+#[cfg(feature = "provenance")]
 pub use lineage::{
     LineageEdge, LineageNode, LineageSummary, RelationshipKind, TraversalNode, TraversalResult,
     VerificationResult,
 };
 pub use meta_tx::*;
 pub use metering::*;
+#[cfg(feature = "migration")]
 pub use migration::*;
 pub use multisig::*;
 pub use nonce::*;
+#[cfg(feature = "provenance")]
 pub use provenance_graph::*;
 pub use rate_limit::*;
 pub use reentrancy_guard::*;
+#[cfg(feature = "risk")]
 pub use risk_engine::*;
 pub use session::*;
+#[cfg(feature = "state-machine")]
 pub use state_machine::*;
 pub use vault_types::*;
 pub use vector_clock::*;
+#[cfg(feature = "migration")]
 pub use versioned_storage::*;
 pub use whitelist::*;
 
