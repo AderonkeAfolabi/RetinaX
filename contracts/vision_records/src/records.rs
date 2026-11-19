@@ -156,6 +156,39 @@ impl VisionRecordsContract {
 
     /// Add multiple vision records in a single transaction.
     /// Validates provider permission once, then creates all records atomically.
+    ///
+    /// # Gas optimization notes (#329)
+    ///
+    /// Compared with N individual `add_record` calls, this function reduces
+    /// per-item gas overhead by:
+    ///
+    /// - **Single auth check** — `provider.require_auth()` and permission
+    ///   lookups run once instead of once per record.
+    /// - **Single whitelist lookup** — `check_whitelist_access` is called once
+    ///   for the whole batch.
+    /// - **Single encryption-key fetch** — the master key bytes and current
+    ///   key version are loaded from storage once and reused across all items.
+    /// - **Deferred counter commit** — the `REC_CTR` instance-storage write
+    ///   happens once after the loop, not on every iteration.
+    /// - **Single batch event** — one `publish_batch_records_added` event is
+    ///   emitted instead of N individual record-added events.
+    ///
+    /// # Recommended batch size limits
+    ///
+    /// Soroban measures resource consumption (CPU instructions, memory, and
+    /// ledger I/O) per transaction. Based on current resource limits:
+    ///
+    /// | Batch size | Expected behaviour                                        |
+    /// |------------|-----------------------------------------------------------|
+    /// | 1          | Equivalent to a single `add_record` call; always safe.    |
+    /// | 10         | Well within limits; recommended for routine imports.      |
+    /// | 50         | Approaches ledger I/O limits; acceptable for bulk loads.  |
+    /// | 100        | May exceed instruction / I/O budgets — test on testnet    |
+    /// |            | before deploying with batches this large.                 |
+    ///
+    /// **Maximum recommended batch size: 50** for general use. For
+    /// performance-sensitive paths, benchmark on testnet with sizes 1, 10,
+    /// 50, and 100 and pick the largest that consistently stays under limits.
     #[allow(clippy::arithmetic_side_effects)]
     pub fn add_records(
         env: Env,

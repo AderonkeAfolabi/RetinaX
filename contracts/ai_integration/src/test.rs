@@ -161,3 +161,340 @@ fn test_register_provider_requires_admin() {
 
     assert!(result.is_err());
 }
+
+// ── #330: Provider scoring and verification tests ────────────────────────────
+
+#[test]
+fn test_provider_registration_requires_admin() {
+    let (env, client, _admin, operator) = setup();
+    let non_admin = Address::generate(&env);
+
+    let result = client.try_register_provider(
+        &non_admin,
+        &10,
+        &operator,
+        &String::from_str(&env, "Rogue Provider"),
+        &String::from_str(&env, "model-x"),
+        &String::from_str(&env, "sha256:rogue"),
+    );
+
+    assert!(result.is_err(), "non-admin must not register a provider");
+}
+
+#[test]
+fn test_provider_duplicate_registration_rejected() {
+    let (env, client, admin, operator) = setup();
+
+    client.register_provider(
+        &admin,
+        &1,
+        &operator,
+        &String::from_str(&env, "Provider A"),
+        &String::from_str(&env, "retina-v1"),
+        &String::from_str(&env, "sha256:a"),
+    );
+
+    let result = client.try_register_provider(
+        &admin,
+        &1,
+        &operator,
+        &String::from_str(&env, "Provider A Duplicate"),
+        &String::from_str(&env, "retina-v1"),
+        &String::from_str(&env, "sha256:a-dup"),
+    );
+
+    assert!(result.is_err(), "duplicate provider_id must be rejected");
+}
+
+#[test]
+fn test_provider_zero_id_rejected() {
+    let (env, client, admin, operator) = setup();
+
+    let result = client.try_register_provider(
+        &admin,
+        &0,
+        &operator,
+        &String::from_str(&env, "Bad Provider"),
+        &String::from_str(&env, "model"),
+        &String::from_str(&env, "sha256:bad"),
+    );
+
+    assert!(result.is_err(), "provider_id 0 must be rejected as invalid");
+}
+
+#[test]
+fn test_inactive_provider_cannot_store_result() {
+    let (env, client, admin, operator) = setup();
+    let requester = Address::generate(&env);
+    let patient = Address::generate(&env);
+
+    client.register_provider(
+        &admin,
+        &5,
+        &operator,
+        &String::from_str(&env, "Provider E"),
+        &String::from_str(&env, "model-e"),
+        &String::from_str(&env, "sha256:e"),
+    );
+
+    // Pause the provider
+    client.set_provider_status(&admin, &5, &ProviderStatus::Paused);
+
+    // Submit a request while provider was still active (before pause)
+    // — we simulate by re-activating, submitting, then pausing again
+    client.set_provider_status(&admin, &5, &ProviderStatus::Active);
+    let request_id = client.submit_analysis_request(
+        &requester,
+        &5,
+        &patient,
+        &1,
+        &String::from_str(&env, "sha256:img"),
+        &String::from_str(&env, "task"),
+    );
+    client.set_provider_status(&admin, &5, &ProviderStatus::Paused);
+
+    // Storing result with paused provider must fail
+    let result = client.try_store_analysis_result(
+        &operator,
+        &request_id,
+        &String::from_str(&env, "sha256:out"),
+        &8_000,
+        &1_000,
+    );
+
+    assert!(result.is_err(), "paused provider must not store a result");
+}
+
+#[test]
+fn test_wrong_operator_cannot_store_result() {
+    let (env, client, admin, operator) = setup();
+    let requester = Address::generate(&env);
+    let patient = Address::generate(&env);
+    let impostor = Address::generate(&env);
+
+    client.register_provider(
+        &admin,
+        &6,
+        &operator,
+        &String::from_str(&env, "Provider F"),
+        &String::from_str(&env, "model-f"),
+        &String::from_str(&env, "sha256:f"),
+    );
+
+    let request_id = client.submit_analysis_request(
+        &requester,
+        &6,
+        &patient,
+        &2,
+        &String::from_str(&env, "sha256:img2"),
+        &String::from_str(&env, "task2"),
+    );
+
+    // Impostor (not the registered operator) tries to store result
+    let result = client.try_store_analysis_result(
+        &impostor,
+        &request_id,
+        &String::from_str(&env, "sha256:out2"),
+        &7_500,
+        &500,
+    );
+
+    assert!(result.is_err(), "non-operator must not store a result");
+}
+
+#[test]
+fn test_provider_score_calculation_via_confidence() {
+    // The contract stores confidence_bps on the result. This test verifies
+    // that high-confidence results are marked Completed and low-flagged ones
+    // are marked Flagged, confirming the scoring threshold logic.
+    let (env, client, admin, operator) = setup();
+    let requester = Address::generate(&env);
+    let patient = Address::generate(&env);
+
+    client.register_provider(
+        &admin,
+        &20,
+        &operator,
+        &String::from_str(&env, "Scorer"),
+        &String::from_str(&env, "score-v1"),
+        &String::from_str(&env, "sha256:scorer"),
+    );
+
+    // High confidence, low anomaly → Completed
+    let r1 = client.submit_analysis_request(
+        &requester,
+        &20,
+        &patient,
+        &10,
+        &String::from_str(&env, "sha256:hi-conf"),
+        &String::from_str(&env, "screening"),
+    );
+    let status1 = client.store_analysis_result(
+        &operator,
+        &r1,
+        &String::from_str(&env, "sha256:res-hi"),
+        &9_500, // confidence 95 %
+        &2_000, // anomaly 20 % — below 70 % threshold
+    );
+    assert_eq!(status1, RequestStatus::Completed);
+
+    let result1 = client.get_analysis_result(&r1);
+    assert_eq!(result1.confidence_bps, 9_500);
+    assert_eq!(result1.anomaly_score_bps, 2_000);
+    assert_eq!(result1.verification_state, VerificationState::Unverified);
+
+    // Low confidence, high anomaly → Flagged
+    let r2 = client.submit_analysis_request(
+        &requester,
+        &20,
+        &patient,
+        &11,
+        &String::from_str(&env, "sha256:lo-conf"),
+        &String::from_str(&env, "macula"),
+    );
+    let status2 = client.store_analysis_result(
+        &operator,
+        &r2,
+        &String::from_str(&env, "sha256:res-lo"),
+        &4_000, // confidence 40 %
+        &8_500, // anomaly 85 % — above 70 % threshold
+    );
+    assert_eq!(status2, RequestStatus::Flagged);
+
+    let flagged = client.get_flagged_requests();
+    assert!(flagged.contains(&r2), "high-anomaly request must appear in flagged list");
+}
+
+#[test]
+fn test_anomaly_threshold_boundary() {
+    // Verifies exact boundary: anomaly == threshold → Flagged;
+    // anomaly == threshold - 1 → Completed.
+    let (env, client, admin, operator) = setup();
+    let requester = Address::generate(&env);
+    let patient = Address::generate(&env);
+
+    // Default threshold is 7_000 bps (70 %) set in setup()
+    client.register_provider(
+        &admin,
+        &30,
+        &operator,
+        &String::from_str(&env, "Boundary Tester"),
+        &String::from_str(&env, "bnd-v1"),
+        &String::from_str(&env, "sha256:bnd"),
+    );
+
+    // Exactly at threshold → Flagged
+    let r_at = client.submit_analysis_request(
+        &requester, &30, &patient, &20,
+        &String::from_str(&env, "sha256:at"),
+        &String::from_str(&env, "task"),
+    );
+    let status_at = client.store_analysis_result(
+        &operator, &r_at,
+        &String::from_str(&env, "sha256:out-at"),
+        &5_000, &7_000, // anomaly == threshold
+    );
+    assert_eq!(status_at, RequestStatus::Flagged);
+
+    // One below threshold → Completed
+    let r_below = client.submit_analysis_request(
+        &requester, &30, &patient, &21,
+        &String::from_str(&env, "sha256:below"),
+        &String::from_str(&env, "task"),
+    );
+    let status_below = client.store_analysis_result(
+        &operator, &r_below,
+        &String::from_str(&env, "sha256:out-below"),
+        &5_000, &6_999, // one below threshold
+    );
+    assert_eq!(status_below, RequestStatus::Completed);
+}
+
+#[test]
+fn test_verified_result_cannot_be_overwritten() {
+    // Once a result is stored, calling store_analysis_result again on the
+    // same request_id must return ResultAlreadyExists.
+    let (env, client, admin, operator) = setup();
+    let requester = Address::generate(&env);
+    let patient = Address::generate(&env);
+
+    client.register_provider(
+        &admin,
+        &40,
+        &operator,
+        &String::from_str(&env, "Idempotent"),
+        &String::from_str(&env, "idem-v1"),
+        &String::from_str(&env, "sha256:idem"),
+    );
+
+    let r = client.submit_analysis_request(
+        &requester, &40, &patient, &30,
+        &String::from_str(&env, "sha256:once"),
+        &String::from_str(&env, "task"),
+    );
+    client.store_analysis_result(
+        &operator, &r,
+        &String::from_str(&env, "sha256:first"),
+        &8_000, &1_000,
+    );
+
+    // Second attempt must fail
+    let result = client.try_store_analysis_result(
+        &operator, &r,
+        &String::from_str(&env, "sha256:second"),
+        &8_000, &1_000,
+    );
+    assert!(result.is_err(), "duplicate result store must be rejected");
+}
+
+#[test]
+fn test_non_admin_cannot_verify_result() {
+    let (env, client, admin, operator) = setup();
+    let requester = Address::generate(&env);
+    let patient = Address::generate(&env);
+    let non_admin = Address::generate(&env);
+
+    client.register_provider(
+        &admin,
+        &50,
+        &operator,
+        &String::from_str(&env, "AuthChecker"),
+        &String::from_str(&env, "auth-v1"),
+        &String::from_str(&env, "sha256:auth"),
+    );
+
+    let r = client.submit_analysis_request(
+        &requester, &50, &patient, &40,
+        &String::from_str(&env, "sha256:img-auth"),
+        &String::from_str(&env, "task"),
+    );
+    client.store_analysis_result(
+        &operator, &r,
+        &String::from_str(&env, "sha256:out-auth"),
+        &8_000, &1_000,
+    );
+
+    let result = client.try_verify_analysis_result(
+        &non_admin, &r, &true,
+        &String::from_str(&env, "sha256:qa-nonauth"),
+    );
+    assert!(result.is_err(), "non-admin must not verify a result");
+}
+
+#[test]
+fn test_set_anomaly_threshold_requires_admin() {
+    let (env, client, _admin, _operator) = setup();
+    let non_admin = Address::generate(&env);
+
+    let result = client.try_set_anomaly_threshold(&non_admin, &5_000);
+    assert!(result.is_err(), "non-admin must not change anomaly threshold");
+}
+
+#[test]
+fn test_anomaly_threshold_above_max_bps_rejected() {
+    let (env, client, admin, _operator) = setup();
+
+    // 10_001 exceeds MAX_BPS (10_000)
+    let result = client.try_set_anomaly_threshold(&admin, &10_001);
+    assert!(result.is_err(), "threshold above MAX_BPS must be rejected");
+}
