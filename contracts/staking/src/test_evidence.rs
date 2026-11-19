@@ -5,9 +5,7 @@ use soroban_sdk::{
     Address, BytesN, Env,
 };
 
-use crate::{
-    ContractError, EvidenceStatus, StakingContract, StakingContractClient,
-};
+use crate::{ContractError, EvidenceStatus, StakingContract, StakingContractClient};
 
 fn setup() -> (Env, StakingContractClient<'static>, Address, Address) {
     let env = Env::default();
