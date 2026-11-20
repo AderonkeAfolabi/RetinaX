@@ -108,7 +108,7 @@ fn setup(option_count: u32) -> (Env, Address, ZkVotingClient<'static>) {
 #[test]
 fn test_nullifier_contains_no_wallet_address() {
     let (env, _, client) = setup(3);
-    let voter = Address::generate(&env);
+    let _voter = Address::generate(&env);
     let n = nullifier(&env, 0xAB);
 
     assert!(!client.is_nullifier_used(&n));
