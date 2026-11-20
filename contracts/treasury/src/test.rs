@@ -5,7 +5,7 @@ use soroban_sdk::{
     contract, contractimpl,
     testutils::{Address as _, Events, Ledger as _},
     token::{Client as TokenClient, StellarAssetClient},
-    vec, Address, Env, String, Symbol, Vec,
+    vec, Address, Env, IntoVal, String, Symbol, Vec,
 };
 
 use crate::{ProposalStatus, TreasuryConfig, TreasuryContract, TreasuryContractClient};
@@ -28,7 +28,7 @@ impl MockDexRouter {
         let asset_in = path.get(0).unwrap();
         let asset_out = path.get(path.len() - 1).unwrap();
 
-        let _token_in = TokenClient::new(&env, &asset_in);
+        let token_in = TokenClient::new(&env, &asset_in);
         let token_out = TokenClient::new(&env, &asset_out);
 
         // Router theoretically pulls amount_in from `from` here via allowance.
