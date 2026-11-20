@@ -16,9 +16,9 @@ use compliance::{
     breach_detector::{AccessEvent, BreachDetector},
     gdpr::{self, ErasureManager},
     hipaa,
-    rules_engine::{ComplianceRule, Jurisdiction, OperationContext, RulesEngine, Severity},
+    rules_engine::{Jurisdiction, OperationContext, RulesEngine},
 };
-use soroban_sdk::{contract, contractimpl, Env, String as SorobanString, Vec as SorobanVec};
+use soroban_sdk::{contract, contractimpl, Env, String as SorobanString};
 use std::{collections::HashMap, string::String, vec::Vec};
 
 // ---------------------------------------------------------------------------
@@ -41,7 +41,7 @@ impl MockDataRegistry {
 
     /// Simulates data transfer across jurisdictions
     pub fn transfer_data(
-        env: Env,
+        _env: Env,
         _from_region: SorobanString,
         _to_region: SorobanString,
         _data_hash: SorobanString,
