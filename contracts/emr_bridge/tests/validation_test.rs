@@ -34,9 +34,9 @@ fn test_create_field_mapping_empty_strings() {
         &admin,
         &provider_id,
         &String::from_str(&env, "Test Prov"),
-        &EmrSystem::Fhir,
+        &EmrSystem::EpicFhir,
         &String::from_str(&env, "http://zero"),
-        &DataFormat::Json,
+        &DataFormat::FhirR4,
     );
 
     let empty_str = String::from_str(&env, "");
@@ -84,9 +84,9 @@ fn test_verify_sync_empty_discrepancies() {
         &admin,
         &provider_id,
         &String::from_str(&env, "Prov"),
-        &EmrSystem::Fhir,
+        &EmrSystem::EpicFhir,
         &String::from_str(&env, "http://test"),
-        &DataFormat::Json,
+        &DataFormat::FhirR4,
     );
     client.activate_provider(&admin, &provider_id);
 
@@ -97,7 +97,7 @@ fn test_verify_sync_empty_discrepancies() {
         &provider_id,
         &String::from_str(&env, "pat_1"),
         &emr_bridge::types::ExchangeDirection::Export,
-        &DataFormat::Json,
+        &DataFormat::FhirR4,
         &String::from_str(&env, "Observation"),
         &String::from_str(&env, "hash_1"),
     );
