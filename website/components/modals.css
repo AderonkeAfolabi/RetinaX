@@ -261,3 +261,18 @@ modal-dialog {
   justify-content: flex-end;
   gap: 12px;
 }
+
+/* ==========================================================================
+   Accessible Keyboard Navigation & Focus Trap Outlines
+   ========================================================================== */
+.modal-close-btn:focus-visible,
+.modal-dialog-close-btn:focus-visible {
+  outline: 2px solid var(--clinical-teal, #0d9488);
+  outline-offset: 2px;
+}
+
+.modal-base:focus-visible,
+.modal-dialog-card:focus-visible {
+  outline: 2px solid var(--clinical-teal, #0d9488);
+  outline-offset: 2px;
+}
