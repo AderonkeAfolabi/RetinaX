@@ -13,6 +13,22 @@ The Compliance contract is structured as a collection of sub-modules that work t
 - **baa** — Business Associate Agreement tracking
 - **retention** — Data retention policy enforcement
 
+## Architecture at a Glance
+
+```mermaid
+flowchart TD
+    Admin[Admin] -->|role and permission setup| Access[access_control]
+    Patient[Patient] -->|consent grant or revocation| Consent[consent requirements]
+    Caller[Contract caller] --> Decision{Compliance check}
+    Access --> Decision
+    Consent --> Decision
+    BAA[baa] --> Decision
+    Retention[retention] --> Decision
+    Decision -->|allowed| Operation[Medical record operation]
+    Decision -->|denied| Reject[Return compliance error]
+    Decision -->|recorded| Audit[audit trail]
+```
+
 ---
 
 ## Roles & Permissions
@@ -370,7 +386,7 @@ pub struct AuditEntry {
 
 ## Related Documentation
 
-- [RBAC Design](../docs/governance.md#rbac)
-- [Audit Logging](../docs/audit-logging.md)
-- [Data Retention](../docs/data-portability.md#retention)
-- [Security Audit Checklist](../docs/security-audit-checklist.md)
+- [RBAC Design](../governance.md#rbac)
+- [Audit Logging](../audit-logging.md)
+- [Data Retention](../data-portability.md#retention)
+- [Security Audit Checklist](../security-audit-checklist.md)

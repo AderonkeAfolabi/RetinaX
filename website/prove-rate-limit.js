@@ -29,7 +29,8 @@
   }
 
   function allow() {
-    const key = document.querySelector('[data-wallet-address]')?.dataset.walletAddress || 'anonymous';
+    const key =
+      document.querySelector('[data-wallet-address]')?.dataset.walletAddress || 'anonymous';
     return allowByKey(key);
   }
 
