@@ -2,6 +2,18 @@
    RetinaX — Clinical Interactive JS & GSAP + AOS Mega Animations
    ========================================================================== */
 
+window.RETINAX_CONTRACTS = Object.assign({
+  audit: '',
+  identity: '',
+  key_manager: '',
+  vision_records: ''
+}, window.RETINAX_CONTRACTS || {});
+
+window.RETINAX_DEPLOYMENTS = Object.assign({
+  testnet: { rpcUrl: 'https://soroban-testnet.stellar.org', contracts: { access_control: '' } },
+  mainnet: { rpcUrl: '', contracts: { access_control: '' } }
+}, window.RETINAX_DEPLOYMENTS || {});
+
 if (typeof document !== 'undefined') {
   document.addEventListener('DOMContentLoaded', () => {
     initPageTransitions();
@@ -2246,6 +2258,8 @@ function initWallet() {
   const button = document.getElementById('btn-connect-wallet');
   const dialog = document.getElementById('connect-wallet-dialog');
   const freighterOption = document.getElementById('wallet-option-freighter');
+  const albedoOption = document.getElementById('wallet-option-albedo');
+  const xbullOption = document.getElementById('wallet-option-xbull');
   const installPrompt = document.getElementById('wallet-install-prompt');
   const status = document.getElementById('wallet-status');
   const networkSelect = document.getElementById('wallet-network-select');
@@ -2253,6 +2267,13 @@ function initWallet() {
   const networkPillLabel = document.getElementById('network-pill-label');
   let wasConnected = false;
   let hadMismatch = false;
+
+  if (albedoOption) {
+    albedoOption.addEventListener('click', () => window.alert('Simulated: Connecting Albedo...'));
+  }
+  if (xbullOption) {
+    xbullOption.addEventListener('click', () => window.alert('Simulated: Connecting xBull...'));
+  }
 
   function setStatus(message) {
     if (!status) return;

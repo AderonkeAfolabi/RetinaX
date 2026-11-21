@@ -638,13 +638,13 @@ get_role(user: G...)</pre>
       <a href="https://freighter.app/" target="_blank" rel="noopener noreferrer" data-i18n="wallet.install">Install Freighter</a>
     </p>
     <p class="modal-footer-text" id="wallet-status" role="status" aria-live="polite" hidden></p>
-    <div class="wallet-option" onclick="alert('Simulated: Connecting Albedo...')">
+    <div class="wallet-option" id="wallet-option-albedo">
       <div class="wallet-info">
         <div class="wallet-icon">A</div>
         <span class="wallet-name" data-i18n="wallet.albedo">Albedo</span>
       </div>
     </div>
-    <div class="wallet-option" onclick="alert('Simulated: Connecting xBull...')">
+    <div class="wallet-option" id="wallet-option-xbull">
       <div class="wallet-info">
         <div class="wallet-icon">x</div>
         <span class="wallet-name" data-i18n="wallet.xbull">xBull Wallet</span>
@@ -672,22 +672,6 @@ get_role(user: G...)</pre>
   <!-- utils.js exposes window.RetinaXUtils for date formatting (used by RepoAvatar + app.js) -->
   <script src="utils.js"></script>
 
-  <!-- Deployment configuration: set each deployed contract ID here or before this page loads. -->
-  <script>
-    window.RETINAX_CONTRACTS = Object.assign({
-      audit: '',
-      identity: '',
-      key_manager: '',
-      vision_records: ''
-    }, window.RETINAX_CONTRACTS || {});
-    // Per-network settings for wallet-signed Soroban calls, since contract IDs differ per network.
-    // An empty rpcUrl falls back to the Soroban RPC URL configured in Freighter.
-    window.RETINAX_DEPLOYMENTS = Object.assign({
-      testnet: { rpcUrl: 'https://soroban-testnet.stellar.org', contracts: { access_control: '' } },
-      mainnet: { rpcUrl: '', contracts: { access_control: '' } }
-    }, window.RETINAX_DEPLOYMENTS || {});
-  </script>
-
   <!-- Freighter wallet API (window.freighterApi) and Stellar SDK (window.StellarSdk) -->
   <script src="https://cdn.jsdelivr.net/npm/@stellar/freighter-api@6.0.1/build/index.min.js" integrity="sha384-PBwq0JVfqy16Z6jvKJPx93jpStXbwF2oWvsRTODkvE/3hOX5zmLvAuMiKgAaxe2b" crossorigin="anonymous" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/@stellar/stellar-sdk@17.2.1/dist/stellar-sdk.min.js" integrity="sha384-z72iOjWW+lhGmZrU900uVQX76pdHCbGOL7YyFgTd/mzXLbHQtQuUrxGOfETZJM/D" crossorigin="anonymous" defer></script>
@@ -711,37 +695,5 @@ get_role(user: G...)</pre>
   <script src="components/error-feedback.js"></script>
 
   <script src="app.js"></script>
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const nav = document.querySelector('.nav-menu');
-      const toggle = document.querySelector('.nav-toggle');
-      const links = document.querySelectorAll('.nav-link');
-
-      if (!nav || !toggle) return;
-
-      const closeMenu = () => {
-        nav.classList.remove('is-open');
-        toggle.setAttribute('aria-expanded', 'false');
-        toggle.setAttribute('aria-label', 'Open navigation menu');
-      };
-
-      toggle.addEventListener('click', () => {
-        const isOpen = nav.classList.toggle('is-open');
-        toggle.setAttribute('aria-expanded', String(isOpen));
-        toggle.setAttribute('aria-label', isOpen ? 'Close navigation menu' : 'Open navigation menu');
-      });
-
-      links.forEach((link) => {
-        link.addEventListener('click', closeMenu);
-      });
-
-      document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && nav.classList.contains('is-open')) {
-          closeMenu();
-          toggle.focus();
-        }
-      });
-    });
-  </script>
 </body>
 </html>
