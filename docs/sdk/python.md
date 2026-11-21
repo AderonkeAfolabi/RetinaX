@@ -406,5 +406,5 @@ if __name__ == '__main__':
 ## References
 
 - [Stellar Python SDK](https://stellar-sdk.readthedocs.io/)
-- [Example Python Code](../../../example/python/)
-- [Contract API Documentation](../../api/)
+- [Example Python Code](../../example/python/)
+- [Contract API Documentation](../api.md)

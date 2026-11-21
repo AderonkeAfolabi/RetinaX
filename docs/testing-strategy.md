@@ -450,7 +450,7 @@ RUSTFLAGS="-Z sanitizer=undefined" cargo fuzz run vision_records
 ### Pipeline Stages
 
 ```yaml
-# .github/workflows/ci.yml
+# .github/workflows/cargo-test.yml
 name: CI Pipeline
 
 on: [push, pull_request]

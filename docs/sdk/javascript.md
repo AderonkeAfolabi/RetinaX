@@ -810,3 +810,5 @@ try {
 - `permissions` is an array: `["read"]`, `["read", "write"]`, etc.
 - After `revokeConsent` the provider's access is removed in the next ledger.
   Existing in-flight transactions signed before revocation may still settle.
+- [Example JavaScript Code](../../example/js/)
+- [Contract API Documentation](../api.md)

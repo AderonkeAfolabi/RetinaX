@@ -15,6 +15,8 @@ Located in: `contracts/clinical_records/src/`
 | `EXAM` | `symbol_short!("EXAM")` | Eye examination records | `examination.rs` |
 | `RX` | `symbol_short!("RX")` | Prescription key | `prescription.rs` |
 | `RX_CTR` | `symbol_short!("RX_CTR")` | Prescription counter | `prescription.rs` |
+| `SESS_GRT` | `symbol_short!("SESS_GRT")` | Session key → principal grant | `session.rs` |
+| `SESS` | `symbol_short!("SESS")` | Session level and expiry | `common/src/session.rs` |
 
 ### Access Control Contract
 Located in: `contracts/access_control/src/permissions.rs`
@@ -102,7 +104,7 @@ This script scans all contracts for `symbol_short!()` declarations and reports a
 
 The storage key check is integrated into CI pipeline to automatically detect collisions on every PR.
 
-See: `.github/workflows/ci.yml`
+See: `.github/workflows/storage-keys-check.yml`
 
 ---
 

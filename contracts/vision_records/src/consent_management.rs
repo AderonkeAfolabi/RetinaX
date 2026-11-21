@@ -53,6 +53,19 @@ pub fn get_consent(env: &Env, patient: &Address, grantee: &Address) -> Option<Co
     env.storage().persistent().get::<_, ConsentGrant>(&key)
 }
 
+/// Removes an expired or revoked consent grant for one patient/grantee pair.
+/// Returns true when an expired/revoked record was removed.
+pub fn purge_expired_consent(env: &Env, patient: &Address, grantee: &Address) -> bool {
+    let key = consent_key(patient, grantee);
+    if let Some(consent) = env.storage().persistent().get::<_, ConsentGrant>(&key) {
+        if consent.revoked || consent.expires_at <= env.ledger().timestamp() {
+            env.storage().persistent().remove(&key);
+            return true;
+        }
+    }
+    false
+}
+
 /// Grant consent for a grantee to access patient records
 pub fn grant_consent(
     env: &Env,
@@ -61,10 +74,7 @@ pub fn grant_consent(
     consent_type: ConsentType,
     duration_seconds: u64,
 ) -> Result<(), ContractError> {
-    circuit_breaker::require_not_paused(
-        env,
-        &PauseScope::Function(symbol_short!("GNT_CNS")),
-    )?;
+    circuit_breaker::require_not_paused(env, &PauseScope::Function(symbol_short!("GNT_CNS")))?;
     patient.require_auth();
     validation::validate_duration(duration_seconds)?;
 
@@ -83,7 +93,15 @@ pub fn grant_consent(
     let key = consent_key(patient, grantee);
     env.storage().persistent().set(&key, &consent);
 
-    events::publish_consent_granted(env, patient.clone(), grantee.clone(), consent_type, now, expires_at, duration_seconds);
+    events::publish_consent_granted(
+        env,
+        patient.clone(),
+        grantee.clone(),
+        consent_type,
+        now,
+        expires_at,
+        duration_seconds,
+    );
 
     Ok(())
 }
@@ -94,10 +112,7 @@ pub fn revoke_consent(
     patient: &Address,
     grantee: &Address,
 ) -> Result<(), ContractError> {
-    circuit_breaker::require_not_paused(
-        env,
-        &PauseScope::Function(symbol_short!("RVK_CNS")),
-    )?;
+    circuit_breaker::require_not_paused(env, &PauseScope::Function(symbol_short!("RVK_CNS")))?;
     patient.require_auth();
 
     let key = consent_key(patient, grantee);
@@ -106,7 +121,12 @@ pub fn revoke_consent(
         env.storage().persistent().set(&key, &consent);
     }
 
-    events::publish_consent_revoked(env, patient.clone(), grantee.clone(), env.ledger().timestamp());
+    events::publish_consent_revoked(
+        env,
+        patient.clone(),
+        grantee.clone(),
+        env.ledger().timestamp(),
+    );
 
     Ok(())
 }

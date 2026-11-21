@@ -19,5 +19,5 @@ This platform implements decentralized governance using:
 
 ## Smart Contracts
 
-- `PlatformGovernor.sol` — governance logic
-- `PlatformTimelock.sol` — timelock execution
+- `contracts/governor` — governance logic (proposals, voting, queueing)
+- `contracts/timelock` — timelock execution delay

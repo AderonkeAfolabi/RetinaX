@@ -141,3 +141,30 @@ fn test_multi_hop() {
     let channel_id = client.open_multi_hop(&patient, &provider, &intermediary, &1000);
     assert_eq!(channel_id, 1);
 }
+
+#[test]
+fn test_fraudulent_dispute_penalty_and_valid_evidence() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let admin = Address::generate(&env);
+    let vision_records = env.register(MockVisionRecords, ());
+    let patient = Address::generate(&env);
+    let provider = Address::generate(&env);
+
+    let contract_id = env.register(StateChannelContract, ());
+    let client = StateChannelContractClient::new(&env, &contract_id);
+    client.initialize(&admin, &vision_records);
+
+    let channel_id = client.open_channel(&patient, &provider, &1000);
+    client.unilateral_close(&channel_id, &patient);
+    let sig = BytesN::from_array(&env, &[0u8; 64]);
+
+    assert_eq!(
+        client.try_submit_fraud_proof(&channel_id, &0, &100, &sig),
+        Err(Ok(common::CommonError::InvalidNonce))
+    );
+    client.submit_fraud_proof(&channel_id, &1, &600, &sig);
+    env.ledger().set_timestamp(env.ledger().timestamp() + 86401);
+    client.settle(&channel_id);
+}

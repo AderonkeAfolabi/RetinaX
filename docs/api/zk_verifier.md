@@ -13,6 +13,23 @@ ZK Verifier is a privacy-first authentication system where:
 - Access decisions happen on-chain based solely on proof verification results
 - Audit trail records verification events without revealing proof content
 
+## Architecture at a Glance
+
+```mermaid
+flowchart TD
+    Caller[Caller] --> Request[Verification request]
+    Request --> API{Verification API}
+    API -->|access level| Access[verify_access]
+    API -->|auth level| Auth[verify_auth_level_access]
+    API -->|PLONK| Plonk[verify_access_plonk]
+    Access --> Validate[Validate proof system and verifier key]
+    Auth --> Validate
+    Plonk --> Validate
+    Validate --> Verify[Verify proof]
+    Verify --> Record[Rate-limit check and audit record]
+    Record --> Decision[Allow or deny access]
+```
+
 ---
 
 ## Initialization
@@ -400,6 +417,6 @@ ZK Verifier is called by:
 
 ## Related Documentation
 
-- [ZK Integration Guide](../docs/zk-integration-guide.md)
-- [Post-Quantum ZK Research](../docs/post-quantum-zk-research.md)
+- [ZK Integration Guide](../zk-integration-guide.md)
+- [Post-Quantum ZK Research](../post-quantum-zk-research.md)
 - [Identity Contract](./identity.md#zk-credential-verification)

@@ -1,6 +1,6 @@
 # Glossary
 
-This glossary covers project, domain, and blockchain terminology.
+This glossary covers project, domain, blockchain, and tooling terminology.
 
 ## Soroban and Rust
 
@@ -64,3 +64,15 @@ This glossary covers project, domain, and blockchain terminology.
 - Testnet - Public testing network.
 - Mainnet - Production Stellar network.
 - Futurenet - Staging network for upcoming features.
+
+## Tooling and Website
+
+- node:test - Node.js built-in test runner used by website and documentation tests.
+- npm ci - Clean install of the locked website dependencies.
+- ESLint - JavaScript linter used by the website package.
+- Prettier - JavaScript formatter used by the website package.
+- UMD - Universal Module Definition pattern used by shared website scripts.
+- Mermaid - Markdown diagram syntax rendered by GitHub for architecture visuals.
+- Lychee - Link checker used by the Markdown link CI workflow.
+- Indexer node - Off-chain service that reads contract events for querying.
+- Prover node - Off-chain service that generates zero-knowledge proofs.

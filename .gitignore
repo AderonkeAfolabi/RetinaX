@@ -1,6 +1,7 @@
 # Build artifacts
 target/
 *.wasm
+!contracts/clinical_records/tests/fixtures/*.wasm
 
 # IDE
 .idea/
@@ -40,6 +41,11 @@ coverage/
 # Node (if using scripts)
 node_modules/
 package-lock.json
+!website/package-lock.json
 
 # Soroban
 .soroban/
+
+# Local tooling
+.claude/
+.freebuff/

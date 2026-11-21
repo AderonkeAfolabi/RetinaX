@@ -1,13 +1,30 @@
 use soroban_sdk::contracterror;
 
+/// Errors returned by the clinical records contract.
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum ContractError {
+    /// `initialize` was called more than once.
     AlreadyInitialized = 1,
+    /// The contract has not been initialized yet.
     NotInitialized = 2,
+    /// The caller is not allowed to perform this action.
     Unauthorized = 3,
+    /// An input failed validation, for example a field was too long or empty.
     InvalidInput = 4,
+    /// Reserved for unsupported record types. No function currently returns it.
     InvalidRecordType = 5,
+    /// No record exists for the given id.
     RecordNotFound = 6,
+    /// The operation was called out of order, for example committing a prescription that was
+    /// never prepared.
     InvalidPhase = 7,
+    /// The caller is a session key whose session has expired or been revoked.
+    SessionExpired = 8,
+    /// The caller is a session key whose auth level is too low for this operation.
+    InsufficientAuthLevel = 9,
+    /// A migration target version is lower than the current version.
+    InvalidVersion = 10,
+    /// The record or contract is already at the requested schema version.
+    AlreadyMigrated = 11,
 }

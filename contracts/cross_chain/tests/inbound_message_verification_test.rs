@@ -13,7 +13,7 @@
 //!    by tracking processed message IDs.
 
 use cross_chain::{
-    bridge::{self, anchor_root, import_record, ExportPackage},
+    bridge::{self, import_record},
     CrossChainContract, CrossChainContractClient, CrossChainError, CrossChainMessage,
 };
 use soroban_sdk::{
