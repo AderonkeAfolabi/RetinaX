@@ -756,5 +756,59 @@ describe('Patient Management Integration', () => {
 
 - [Stellar SDK Documentation](https://stellar.github.io/js-stellar-sdk/)
 - [Soroban Documentation](https://soroban.stellar.org/docs/)
+- [Example JavaScript Code](../../../example/js/)
+- [Contract API Documentation](../../api/)
+
+## Record-Sharing Consent (Issue #488)
+
+The `grantConsent` and `revokeConsent` helpers in
+[`example/js/invoke.js`](../../../example/js/invoke.js) extend the basic
+invocation example with a full consent lifecycle.
+
+### Grant consent
+
+```javascript
+import { grantConsent } from "./example/js/invoke.js";
+
+// Grant read + write access to a provider for 30 days
+await grantConsent(
+  process.env.PATIENT_SECRET_KEY,
+  "GPROVIDER_PUBLIC_KEY_HERE",
+  ["read", "write"],
+  30 * 24 * 60 * 60 * 1000, // 30 days in ms; pass null for indefinite
+);
+```
+
+### Revoke consent
+
+```javascript
+import { revokeConsent } from "./example/js/invoke.js";
+
+await revokeConsent(
+  process.env.PATIENT_SECRET_KEY,
+  "GPROVIDER_PUBLIC_KEY_HERE",
+);
+```
+
+### Error handling
+
+Both functions throw descriptive errors on simulation failure, network
+rejection, or polling timeout — the same pattern as `invokeTeyeContract`.
+Wrap calls in `try/catch` and surface the message to the user:
+
+```javascript
+try {
+  await grantConsent(secret, provider, ["read"]);
+} catch (err) {
+  console.error("Consent grant failed:", err.message);
+}
+```
+
+### Notes
+
+- Never commit `PATIENT_SECRET_KEY` to version control; use a `.env` file.
+- `permissions` is an array: `["read"]`, `["read", "write"]`, etc.
+- After `revokeConsent` the provider's access is removed in the next ledger.
+  Existing in-flight transactions signed before revocation may still settle.
 - [Example JavaScript Code](../../example/js/)
 - [Contract API Documentation](../api.md)
