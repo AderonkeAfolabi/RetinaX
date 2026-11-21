@@ -10,11 +10,17 @@ This reference documents every Makefile target and usage examples.
   - Example: `make build`
 - `make build-release` - Build optimized WASM artifacts.
   - Example: `make build-release`
+- `make wasm-sizes` - Report WASM artifact sizes.
+  - Example: `make wasm-sizes`
+- `make wasm-opt-all` - Run `wasm-opt -Oz` on all WASM artifacts.
+  - Example: `make wasm-opt-all`
 
 ## Test Targets
 
-- `make test` - Run all tests.
+- `make test` - Run `cargo test --all` and the website `node --test` suite.
   - Example: `make test`
+- `make test-js` - Run only the website `node --test` suite.
+  - Example: `make test-js`
 - `make test-unit` - Run unit tests only.
   - Example: `make test-unit`
 - `make test-integration` - Run integration tests only.
@@ -35,24 +41,36 @@ This reference documents every Makefile target and usage examples.
 
 - `make clean` - Remove build artifacts.
   - Example: `make clean`
-- `make fmt` - Format code.
+- `make fmt` - Format Rust code.
   - Example: `make fmt`
-- `make fmt-check` - Verify formatting.
+- `make fmt-check` - Verify Rust formatting.
   - Example: `make fmt-check`
 - `make lint` - Run Clippy.
   - Example: `make lint`
 - `make lint-fix` - Run Clippy with fixes.
   - Example: `make lint-fix`
-- `make setup` - Setup dev environment.
+- `make setup` - Set up the Rust toolchain and Soroban CLI.
   - Example: `make setup`
 - `make docs` - Build Rust docs.
   - Example: `make docs`
-- `make check` - Run fmt-check, lint, and tests.
+- `make check` - Run `fmt-check`, `lint`, and `test`.
   - Example: `make check`
 - `make watch` - Watch and re-run tests on changes.
   - Example: `make watch`
 - `make help` - Print target list.
   - Example: `make help`
+
+## Website Commands
+
+The website package has its own npm scripts. Run them from `website/`:
+
+```bash
+npm ci
+npm test
+npm run lint
+npm run format:check
+npm run format
+```
 
 ## Network Targets
 

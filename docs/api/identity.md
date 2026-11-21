@@ -4,6 +4,24 @@
 
 Manages user identity recovery and social recovery mechanisms through guardian-based multi-signature approval. Enables secure identity ownership transfer and ZK credential verification without exposing sensitive credentials on-chain.
 
+## Architecture at a Glance
+
+```mermaid
+sequenceDiagram
+    participant Owner
+    participant Identity as Identity Contract
+    participant Guardians
+    participant Verifier as ZK Verifier
+
+    Owner->>Identity: add_guardian
+    Owner->>Identity: initiate_recovery
+    Guardians->>Identity: approve_recovery
+    Identity->>Identity: execute_recovery after threshold and cooldown
+    Owner->>Identity: verify_zk_credential
+    Identity->>Verifier: verify_access
+    Verifier-->>Identity: proof result
+```
+
 ## Initialization
 
 ### `initialize(env: Env, owner: Address) -> Result<(), RecoveryError>`

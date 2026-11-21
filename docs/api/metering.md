@@ -4,6 +4,21 @@
 
 Tracks per-tenant resource consumption and enforces quotas across a hierarchy of organizations, clinics, providers, and patients. Enables fair cost allocation and prevents resource abuse in multi-tenant healthcare systems.
 
+## Architecture at a Glance
+
+```mermaid
+flowchart TD
+    Admin[Admin] -->|register_tenant| Hierarchy[Tenant hierarchy]
+    Hierarchy --> Org[Organization]
+    Org --> Clinic[Clinic]
+    Clinic --> Provider[Provider]
+    Provider --> Patient[Patient]
+    Contract[Contract call] -->|record_gas| Meter[Metering ledger]
+    Meter --> Quota{Quota available?}
+    Quota -- Yes --> Allow[Allow operation]
+    Quota -- No --> Deny[Rate-limit error]
+```
+
 ## Initialization
 
 ### `initialize(env: Env, admin: Address) -> Result<(), MeteringError>`
@@ -458,6 +473,6 @@ All ancestors' usage counters are incremented, enabling top-down quota enforceme
 
 ## Related Documentation
 
-- [Rate Limiting](../docs/rate-limiting.md)
-- [Cost Allocation](../docs/operations.md#cost-allocation)
-- [Governance](../docs/governance.md)
+- [Rate Limiting](../rate-limiting.md)
+- [Cost Allocation](../operations.md#cost-allocation)
+- [Governance](../governance.md)

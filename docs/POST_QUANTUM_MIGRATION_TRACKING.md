@@ -3,7 +3,7 @@
 - **Status**: In Progress / Phase 1 Complete
 - **Assigned Domain**: Security & Zero-Knowledge Cryptography (`contracts/zk_verifier`, `sdk/zk_prover`)
 - **Related Issue**: #266
-- **Architecture Reference**: [`docs/post-quantum-zk-research.md`](file:///c:/Users/PAB-NETWORK/Downloads/RetinaX-2/docs/post-quantum-zk-research.md)
+- **Architecture Reference**: [`docs/post-quantum-zk-research.md`](post-quantum-zk-research.md)
 
 ---
 
@@ -19,7 +19,7 @@ $$\mathcal{O}((\log N)^3)$$
 When a cryptanalytically relevant quantum computer (CRQC) becomes viable, an attacker can:
 - Recover toxic waste parameters $(\alpha, \beta, \gamma, \delta)$ from trusted setups.
 - Solve discrete logs to forge proofs of arbitrary false statements.
-- Bypass access control in [`contracts/zk_verifier/src/lib.rs`](file:///c:/Users/PAB-NETWORK/Downloads/RetinaX-2/contracts/zk_verifier/src/lib.rs) and falsify optometry data in [`contracts/vision_records`](file:///c:/Users/PAB-NETWORK/Downloads/RetinaX-2/contracts/vision_records).
+- Bypass access control in [`contracts/zk_verifier/src/lib.rs`](../contracts/zk_verifier/src/lib.rs) and falsify optometry data in [`contracts/vision_records`](../contracts/vision_records).
 
 ---
 
@@ -38,19 +38,19 @@ When a cryptanalytically relevant quantum computer (CRQC) becomes viable, an att
 ## 3. Migration Roadmap & Milestones
 
 ### Phase 1: Architectural Abstraction & Extensibility (Complete in #266)
-- [x] Defined [`ProofSystemId`](file:///c:/Users/PAB-NETWORK/Downloads/RetinaX-2/contracts/zk_verifier/src/verifier.rs) enum supporting:
+- [x] Defined [`ProofSystemId`](../contracts/zk_verifier/src/verifier.rs) enum supporting:
   - `Groth16Bn254` (ID 1)
   - `PlonkBn254` (ID 2)
   - `StarkFri` (ID 3)
   - `LatticeZk` (ID 4)
-- [x] Introduced [`ExtensibleProof`](file:///c:/Users/PAB-NETWORK/Downloads/RetinaX-2/contracts/zk_verifier/src/verifier.rs) envelope.
+- [x] Introduced [`ExtensibleProof`](../contracts/zk_verifier/src/verifier.rs) envelope.
 - [x] Implemented strict validation and rejection of invalid proof system identifiers (`ProofValidationError::InvalidProofSystemId` -> `ContractError::InvalidProofSystem`).
-- [x] Added unit and integration test suite in [`contracts/zk_verifier/tests/test_post_quantum_readiness.rs`](file:///c:/Users/PAB-NETWORK/Downloads/RetinaX-2/contracts/zk_verifier/tests/test_post_quantum_readiness.rs).
+- [x] Added unit and integration test suite in [`contracts/zk_verifier/tests/test_post_quantum_readiness.rs`](../contracts/zk_verifier/tests/test_post_quantum_readiness.rs).
 
 ### Phase 2: Soroban Host Hash Precompiles & SDK Updates
 - [ ] Implement prototype STARK FRI verifier in `contracts/zk_verifier/src/stark.rs`.
 - [ ] Propose Stellar Core host functions for high-speed Blake3/Poseidon hash execution to satisfy CPU instruction limits for 40KB+ Merkle auth paths.
-- [ ] Extend [`sdk/zk_prover`](file:///c:/Users/PAB-NETWORK/Downloads/RetinaX-2/sdk/zk_prover) to generate STARK execution traces for identity and consent circuits.
+- [ ] Extend [`sdk/zk_prover`](../sdk/zk_prover) to generate STARK execution traces for identity and consent circuits.
 
 ### Phase 3: Dual-Verification & Deprecation Period
 - [ ] Deploy contract upgrade introducing parallel verification paths:
