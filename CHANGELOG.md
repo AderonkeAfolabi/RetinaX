@@ -1,3 +1,12 @@
+## [Unreleased]
+
+### Features
+
+* **sdk/zk_prover:** add `wasm32-unknown-unknown` WASM build target and browser JS usage guide ([#471](https://github.com/RetinaX-Org/RetinaX/issues/471))
+* **offchain-server:** add cursor pagination and Stellar Ed25519 signature header authentication for `/api/audit-logs` ([#472](https://github.com/RetinaX-Org/RetinaX/issues/472))
+* **offchain-server:** add OpenAPI 3.0 specification, Swagger UI documentation at `/docs`, and database migration tooling ([#473](https://github.com/RetinaX-Org/RetinaX/issues/473))
+* **website:** audit and enforce WCAG 2.1 AA compliant color contrast tokens for light and dark themes ([#474](https://github.com/RetinaX-Org/RetinaX/issues/474))
+
 ## 1.0.0 (2026-02-21)
 
 ### Features
@@ -48,6 +57,15 @@
 ### Features
 
 * implement record versioning and history tracking ([5b6a6ea](https://github.com/RetinaX-Org/RetinaX/commit/5b6a6ea5d2089510641b23e9b9ec8fa1347f0175))
+
+## [Unreleased]
+
+### Features
+
+* **sdk/zk_prover:** add `wasm32-unknown-unknown` WASM build target and browser JS usage guide ([#471](https://github.com/RetinaX-Org/RetinaX/issues/471))
+* **offchain-server:** add cursor pagination and Stellar Ed25519 signature header authentication for `/api/audit-logs` ([#472](https://github.com/RetinaX-Org/RetinaX/issues/472))
+* **offchain-server:** add OpenAPI 3.0 specification, Swagger UI documentation at `/docs`, and database migration tooling ([#473](https://github.com/RetinaX-Org/RetinaX/issues/473))
+* **website:** audit and enforce WCAG 2.1 AA compliant color contrast tokens for light and dark themes ([#474](https://github.com/RetinaX-Org/RetinaX/issues/474))
 
 ## 1.0.0 (2026-02-21)
 
