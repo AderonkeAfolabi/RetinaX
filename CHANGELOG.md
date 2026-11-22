@@ -1,3 +1,9 @@
+## [Unreleased]
+
+### Features
+
+* **staking:** delegated staking with provider registration, commission on delegator rewards, and pro rata slashing propagation to delegators
+
 ## 1.0.0 (2026-02-21)
 
 ### Features
