@@ -17,6 +17,9 @@ const PROPOSAL: Symbol = symbol_short!("PROPOSAL");
 const ALLOCATION: Symbol = symbol_short!("ALLOC");
 const GOVERNOR: Symbol = symbol_short!("GOVERNOR");
 const ASSET_LIMIT: Symbol = symbol_short!("LIMIT");
+const CATEGORY_LIMIT: Symbol = symbol_short!("CAT_LIM");
+const CATEGORY_SPENT: Symbol = symbol_short!("CAT_SPT");
+const PERIOD_DURATION: Symbol = symbol_short!("PERIOD");
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -149,6 +152,37 @@ fn get_asset_limit(env: &Env, asset: &Address) -> i128 {
         .unwrap_or(i128::MAX)
 }
 
+fn category_limit_key(category: &Symbol) -> (Symbol, Symbol) {
+    (CATEGORY_LIMIT, category.clone())
+}
+
+fn get_category_limit(env: &Env, category: &Symbol) -> i128 {
+    env.storage()
+        .instance()
+        .get(&category_limit_key(category))
+        .unwrap_or(i128::MAX)
+}
+
+fn category_spent_key(category: &Symbol, period_start: u64) -> (Symbol, Symbol, u64) {
+    (CATEGORY_SPENT, category.clone(), period_start)
+}
+
+fn get_period_start(env: &Env, now: u64) -> u64 {
+    let period: u64 = env
+        .storage()
+        .instance()
+        .get(&PERIOD_DURATION)
+        .unwrap_or(86400);
+    (now / period) * period
+}
+
+fn get_category_spent(env: &Env, category: &Symbol, period_start: u64) -> i128 {
+    env.storage()
+        .instance()
+        .get(&category_spent_key(category, period_start))
+        .unwrap_or(0)
+}
+
 fn has_approval(_env: &Env, proposal: &Proposal, signer: &Address) -> bool {
     proposal.approvals.iter().any(|s| s == *signer)
 }
@@ -229,6 +263,55 @@ impl TreasuryContract {
         get_asset_limit(&env, &asset)
     }
 
+    pub fn set_category_limit(
+        env: Env,
+        admin: Address,
+        category: Symbol,
+        limit: i128,
+    ) -> Result<(), ContractError> {
+        admin.require_auth();
+        let cfg = load_config(&env)?;
+        if cfg.admin != admin {
+            return Err(ContractError::UnauthorisedAdmin);
+        }
+        env.storage()
+            .instance()
+            .set(&category_limit_key(&category), &limit);
+
+        env.events().publish((symbol_short!("cat_lim"), category), limit);
+        Ok(())
+    }
+
+    pub fn get_category_limit(env: Env, category: Symbol) -> i128 {
+        get_category_limit(&env, &category)
+    }
+
+    pub fn set_period_duration(
+        env: Env,
+        admin: Address,
+        duration: u64,
+    ) -> Result<(), ContractError> {
+        admin.require_auth();
+        let cfg = load_config(&env)?;
+        if cfg.admin != admin {
+            return Err(ContractError::UnauthorisedAdmin);
+        }
+        if duration == 0 {
+            return Err(ContractError::FutureExpiryRequired);
+        }
+        env.storage().instance().set(&PERIOD_DURATION, &duration);
+        env.events()
+            .publish((symbol_short!("period"),), duration);
+        Ok(())
+    }
+
+    pub fn get_period_duration(env: Env) -> u64 {
+        env.storage()
+            .instance()
+            .get(&PERIOD_DURATION)
+            .unwrap_or(86400)
+    }
+
     pub fn set_governor(env: Env, caller: Address, governor: Address) -> Result<(), ContractError> {
         caller.require_auth();
         let cfg = load_config(&env)?;
@@ -249,6 +332,7 @@ impl TreasuryContract {
         asset: Address,
         to: Address,
         amount: i128,
+        category: Symbol,
     ) -> Result<(), ContractError> {
         caller.require_auth();
 
@@ -270,12 +354,25 @@ impl TreasuryContract {
             return Err(ContractError::LimitExceeded);
         }
 
+        let category_limit = get_category_limit(&env, &category);
+        let now = env.ledger().timestamp();
+        let period_start = get_period_start(&env, now);
+        let spent = get_category_spent(&env, &category, period_start);
+        if spent.saturating_add(amount) > category_limit {
+            return Err(ContractError::LimitExceeded);
+        }
+
         token::Client::new(&env, &asset).transfer(&env.current_contract_address(), &to, &amount);
 
-        let key = allocation_key(&asset, &symbol_short!("GOVERN"));
-        let mut spent: i128 = env.storage().instance().get(&key).unwrap_or(0);
-        spent = spent.saturating_add(amount);
-        env.storage().instance().set(&key, &spent);
+        let key = allocation_key(&asset, &category);
+        let mut total_spent: i128 = env.storage().instance().get(&key).unwrap_or(0);
+        total_spent = total_spent.saturating_add(amount);
+        env.storage().instance().set(&key, &total_spent);
+
+        let spent_key = category_spent_key(&category, period_start);
+        let mut period_spent: i128 = env.storage().instance().get(&spent_key).unwrap_or(0);
+        period_spent = period_spent.saturating_add(amount);
+        env.storage().instance().set(&spent_key, &period_spent);
 
         env.events()
             .publish((symbol_short!("gov_spend"), asset.clone()), (to, amount));
@@ -497,13 +594,25 @@ impl TreasuryContract {
                     return Err(ContractError::LimitExceeded);
                 }
 
+                let category_limit = get_category_limit(&env, &proposal.category);
+                let period_start = get_period_start(&env, now);
+                let spent = get_category_spent(&env, &proposal.category, period_start);
+                if spent.saturating_add(t.amount) > category_limit {
+                    return Err(ContractError::LimitExceeded);
+                }
+
                 let token_client = token::Client::new(&env, &t.asset);
                 token_client.transfer(&env.current_contract_address(), &t.to, &t.amount);
 
                 let key = allocation_key(&t.asset, &proposal.category);
-                let mut spent: i128 = env.storage().instance().get(&key).unwrap_or(0);
-                spent = spent.saturating_add(t.amount);
-                env.storage().instance().set(&key, &spent);
+                let mut total_spent: i128 = env.storage().instance().get(&key).unwrap_or(0);
+                total_spent = total_spent.saturating_add(t.amount);
+                env.storage().instance().set(&key, &total_spent);
+
+                let spent_key = category_spent_key(&proposal.category, period_start);
+                let mut period_spent: i128 = env.storage().instance().get(&spent_key).unwrap_or(0);
+                period_spent = period_spent.saturating_add(t.amount);
+                env.storage().instance().set(&spent_key, &period_spent);
 
                 env.events().publish(
                     (
@@ -518,6 +627,13 @@ impl TreasuryContract {
                 let asset_in = s.path.get(0).unwrap();
                 let limit = get_asset_limit(&env, &asset_in);
                 if s.amount_in > limit {
+                    return Err(ContractError::LimitExceeded);
+                }
+
+                let category_limit = get_category_limit(&env, &proposal.category);
+                let period_start = get_period_start(&env, now);
+                let spent = get_category_spent(&env, &proposal.category, period_start);
+                if spent.saturating_add(s.amount_in) > category_limit {
                     return Err(ContractError::LimitExceeded);
                 }
 
@@ -549,6 +665,17 @@ impl TreasuryContract {
                 }
 
                 let asset_out = s.path.get(s.path.len() - 1).unwrap();
+
+                let key = allocation_key(&asset_in, &proposal.category);
+                let mut total_spent: i128 = env.storage().instance().get(&key).unwrap_or(0);
+                total_spent = total_spent.saturating_add(s.amount_in);
+                env.storage().instance().set(&key, &total_spent);
+
+                let spent_key = category_spent_key(&proposal.category, period_start);
+                let mut period_spent: i128 = env.storage().instance().get(&spent_key).unwrap_or(0);
+                period_spent = period_spent.saturating_add(s.amount_in);
+                env.storage().instance().set(&spent_key, &period_spent);
+
                 env.events().publish(
                     (
                         symbol_short!("executed"),
@@ -577,5 +704,14 @@ impl TreasuryContract {
             category,
             total_spent: spent,
         }
+    }
+
+    pub fn get_category_spent_in_period(
+        env: Env,
+        category: Symbol,
+    ) -> i128 {
+        let now = env.ledger().timestamp();
+        let period_start = get_period_start(&env, now);
+        get_category_spent(&env, &category, period_start)
     }
 }
