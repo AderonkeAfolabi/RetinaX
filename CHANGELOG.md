@@ -69,6 +69,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+* **treasury:** recurring grants and streaming payments with configurable rate, cliff, cancellation, and claim with underflow protection (#458).
+* **governor:** emergency veto guardian role allowing guardian to cancel malicious queued proposals during the timelock window (#457).
+* **governor:** proposal categories with configurable distinct quorum and pass threshold parameters per category (#456).
+* **events:** bounded dead-letter queue (DLQ) with configurable capacity, FIFO capacity eviction, and retry mechanism (#455).
 * **docs:** ADR-0013 — research spike on Ethereum header/receipt verification on Soroban (light client vs optimistic vs ZK) (#469)
 * **ai_integration:** model version pinning per request. Providers record `model_version`, `submit_pinned_analysis_request` refuses a version other than the one pinned, and results carry the version they were made against (#465).
 * **vision_records:** cursor-based bulk patient export through `export_patient_data_page`. Records, prescriptions and grants are paged together, so long lists no longer fail the export (#446).
