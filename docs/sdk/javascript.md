@@ -756,13 +756,13 @@ describe('Patient Management Integration', () => {
 
 - [Stellar SDK Documentation](https://stellar.github.io/js-stellar-sdk/)
 - [Soroban Documentation](https://soroban.stellar.org/docs/)
-- [Example JavaScript Code](../../../example/js/)
-- [Contract API Documentation](../../api/)
+- [Example JavaScript Code](../../example/js/)
+- [Contract API Documentation](../api.md)
 
 ## Record-Sharing Consent (Issue #488)
 
 The `grantConsent` and `revokeConsent` helpers in
-[`example/js/invoke.js`](../../../example/js/invoke.js) extend the basic
+[`example/js/invoke.js`](../../example/js/invoke.js) extend the basic
 invocation example with a full consent lifecycle.
 
 ### Grant consent
