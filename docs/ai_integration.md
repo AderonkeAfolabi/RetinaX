@@ -74,3 +74,18 @@ Tests live in:
 
 - `contracts/ai_integration/src/test.rs`
 - `contracts/ai_integration/tests/core.rs`
+
+## Model Version Pinning (#465)
+
+Each provider records the model version it runs. It starts at `1`, and the admin changes it with
+`set_model_version(caller, provider_id, model_version)`. A version of `0` is refused.
+
+- `submit_analysis_request(...)` records the provider's current `model_version` on the request.
+- `submit_pinned_analysis_request(..., pinned_model_version)` submits only if the provider runs exactly
+  `pinned_model_version`. Otherwise it fails with `ModelVersionMismatch` (error code 12), and no request is stored.
+- Every result carries the `model_version` of the request it answers, so the output can be attributed for audit.
+- A version change does not alter requests or results that were already made. They keep the version they were made
+  against.
+
+Requests and results store the new `model_version` fields. Contracts deployed before this change have to be
+redeployed, because their stored structs do not include them.
