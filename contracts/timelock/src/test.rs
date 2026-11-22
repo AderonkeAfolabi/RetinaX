@@ -177,3 +177,37 @@ fn test_unauthorized_caller() {
     let res = client.try_execute_tx(&attacker, &tx_id);
     assert_eq!(res, Err(Ok(TimelockError::Unauthorized)));
 }
+
+#[test]
+fn test_guardian_veto_tx() {
+    let env = Env::default();
+    let contract_id = env.register(TimelockContract, ());
+    let client = TimelockContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let guardian = Address::generate(&env);
+    let attacker = Address::generate(&env);
+    let min_delay = 100u64;
+
+    env.mock_all_auths();
+    client.initialize(&admin, &min_delay);
+
+    client.set_guardian(&admin, &guardian);
+    assert_eq!(client.get_guardian(), guardian);
+
+    let tx_id = create_tx_id(&env, 42);
+    client.queue_tx(&admin, &tx_id, &200);
+    assert_eq!(client.get_queue().len(), 1);
+
+    // Attacker cannot veto
+    let res = client.try_veto_tx(&attacker, &tx_id);
+    assert_eq!(res, Err(Ok(TimelockError::Unauthorized)));
+
+    // Guardian vetoes malicious tx
+    client.veto_tx(&guardian, &tx_id);
+    assert_eq!(client.get_queue().len(), 0);
+
+    // Transaction is no longer in queue
+    let res = client.try_get_tx(&tx_id);
+    assert_eq!(res, Err(Ok(TimelockError::TxNotFound)));
+}
