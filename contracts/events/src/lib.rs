@@ -405,6 +405,20 @@ impl EventStreamContract {
         replay::retry_dead_letter(&env, dead_letter_index)
     }
 
+    /// Set maximum capacity for the dead letter queue.
+    pub fn set_dlq_capacity(env: Env, caller: Address, capacity: u32) -> Result<(), EventError> {
+        caller.require_auth();
+        Self::require_initialized(&env)?;
+        Self::require_admin(&env, &caller)?;
+        replay::set_dlq_capacity(&env, capacity)
+    }
+
+    /// Return current dead letter queue maximum capacity.
+    pub fn get_dlq_capacity(env: Env) -> Result<u32, EventError> {
+        Self::require_initialized(&env)?;
+        Ok(replay::get_dlq_capacity(&env))
+    }
+
     // ── Source contract registration ─────────────────────────────────────────
 
     /// Register an address as an authorized event publisher.
