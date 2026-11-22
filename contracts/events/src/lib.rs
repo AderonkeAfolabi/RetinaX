@@ -55,6 +55,7 @@ pub struct EventEnvelope {
     pub payload_hash: String,
     pub lamport_ts: u64,
     pub ledger_ts: u64,
+    pub patient: Option<Address>,
 }
 
 /// Severity levels for events, allowing consumers to filter by importance.
@@ -128,6 +129,7 @@ impl EventStreamContract {
         topic: String,
         schema_version: u32,
         payload_hash: String,
+        patient: Option<Address>,
     ) -> Result<u64, EventError> {
         caller.require_auth();
         Self::require_initialized(&env)?;
@@ -150,6 +152,7 @@ impl EventStreamContract {
             payload_hash,
             lamport_ts,
             ledger_ts: env.ledger().timestamp(),
+            patient,
         };
 
         // Persist the event in the sequential log
