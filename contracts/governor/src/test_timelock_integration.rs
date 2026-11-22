@@ -308,3 +308,83 @@ fn test_cancelling_one_pending_tx_leaves_others_queued() {
     assert_eq!(f.tl.get_queue().len(), 1);
     assert_eq!(f.tl.get_tx(&tx_id(&f, b)).id, tx_id(&f, b));
 }
+
+// ── Negative paths (issue #427) ───────────────────────────────────────────────
+
+#[test]
+fn test_replayed_queue_for_the_same_proposal_is_rejected() {
+    let f = fixture();
+    let id = f.passed(ProposalType::ParameterChange, 1);
+    f.queue(id);
+
+    let p = f.gov.client.get_proposal(&id).unwrap();
+    let delay = p.timelock_ends - f.gov.now();
+    assert_eq!(
+        f.tl.try_queue_tx(&f.gov.id, &tx_id(&f, id), &delay),
+        Err(Ok(TimelockError::TxAlreadyQueued))
+    );
+    assert_eq!(f.tl.get_queue().len(), 1);
+}
+
+#[test]
+fn test_replayed_execution_is_rejected_after_the_first_execute() {
+    let f = fixture();
+    let id = f.passed(ProposalType::ParameterChange, 1);
+    let execute_after = f.queue(id);
+
+    f.gov.advance_to(execute_after);
+    f.tl.execute_tx(&f.gov.id, &tx_id(&f, id));
+
+    assert_eq!(
+        f.tl.try_execute_tx(&f.gov.id, &tx_id(&f, id)),
+        Err(Ok(TimelockError::TxNotFound))
+    );
+}
+
+#[test]
+fn test_zero_delay_is_rejected_below_the_minimum() {
+    let f = fixture();
+    let id = f.passed(ProposalType::ParameterChange, 1);
+    assert_eq!(
+        f.tl.try_queue_tx(&f.gov.id, &tx_id(&f, id), &0),
+        Err(Ok(TimelockError::DelayTooShort))
+    );
+    assert_eq!(f.tl.get_queue().len(), 0);
+}
+
+#[test]
+fn test_delay_one_second_too_long_is_still_locked_when_governor_unlocks() {
+    let f = fixture();
+    let id = f.passed(ProposalType::ParameterChange, 1);
+    let p = f.gov.client.get_proposal(&id).unwrap();
+    let delay = p.timelock_ends - f.gov.now() + 1;
+    let execute_after = f.tl.queue_tx(&f.gov.id, &tx_id(&f, id), &delay);
+    assert_eq!(execute_after, p.timelock_ends + 1);
+
+    // The governor's timelock has ended, but the mis-sized transaction has not.
+    f.gov.advance_to(p.timelock_ends);
+    assert_eq!(
+        f.tl.try_execute_tx(&f.gov.id, &tx_id(&f, id)),
+        Err(Ok(TimelockError::TooEarly))
+    );
+    assert_eq!(f.tl.get_queue().len(), 1);
+}
+
+#[test]
+fn test_stranger_cannot_execute_or_cancel_a_matured_transaction() {
+    let f = fixture();
+    let id = f.passed(ProposalType::ParameterChange, 1);
+    let execute_after = f.queue(id);
+    f.gov.advance_to(execute_after);
+    let stranger = Address::generate(&f.gov.env);
+
+    assert_eq!(
+        f.tl.try_execute_tx(&stranger, &tx_id(&f, id)),
+        Err(Ok(TimelockError::Unauthorized))
+    );
+    assert_eq!(
+        f.tl.try_cancel_tx(&stranger, &tx_id(&f, id)),
+        Err(Ok(TimelockError::Unauthorized))
+    );
+    assert_eq!(f.tl.get_queue().len(), 1);
+}
