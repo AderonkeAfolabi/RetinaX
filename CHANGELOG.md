@@ -70,6 +70,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 * **docs:** ADR-0013 — research spike on Ethereum header/receipt verification on Soroban (light client vs optimistic vs ZK) (#469)
+* **ai_integration:** model version pinning per request. Providers record `model_version`, `submit_pinned_analysis_request` refuses a version other than the one pinned, and results carry the version they were made against (#465).
+* **vision_records:** cursor-based bulk patient export through `export_patient_data_page`. Records, prescriptions and grants are paged together, so long lists no longer fail the export (#446).
+* **analytics:** admin-configurable differential-privacy parameters through `set_dp_params` and `get_dp_params`, bounded to epsilon 1 to 10 and sensitivity 1 to 1,000,000 (#463).
+* **metering:** tiered pricing plans with per-plan quotas and base prices, managed with `set_plan` and `assign_plan`. Postpaid invoices include the plan base price (#462).
 - Initial project scaffolding
 - Vision records smart contract with basic functionality
 - User registration and management
