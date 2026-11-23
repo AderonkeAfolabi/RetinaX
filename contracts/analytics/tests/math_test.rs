@@ -69,8 +69,8 @@ fn test_differential_privacy_stays_within_i128_bounds() {
         let high = DifferentialPrivacy::add_laplace_noise(&env, i128::MAX, 1, 1);
         let low = DifferentialPrivacy::add_laplace_noise(&env, i128::MIN, 1, 1);
 
-        assert!(high <= i128::MAX);
-        assert!(low >= i128::MIN);
+        assert!(high.abs_diff(i128::MAX) <= 1);
+        assert!(low.abs_diff(i128::MIN) <= 1);
     });
 }
 
