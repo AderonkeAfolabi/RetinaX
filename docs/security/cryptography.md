@@ -346,10 +346,10 @@ pub fn encrypt_data(
 ### Standards and Specifications
 - [NIST Cryptographic Standards](https://csrc.nist.gov/)
 - [FIPS 140-2](https://csrc.nist.gov/pubs/fips/140-2/upd2/final)
-- [HIPAA Security Rule](https://www.hhs.gov/hipaa/for-professionals/security/)
+- [HIPAA Security Rule](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C)
 
 ### Research Papers
-- [Groth16 zk-SNARKs](https://eprint.iacr.org/2016/260)
+- Jens Groth, *On the Size of Pairing-Based Non-interactive Arguments*, IACR ePrint 2016/260
 - [Differential Privacy](https://www.cis.upenn.edu/~aaroth/Papers/privacybook.pdf)
 - [Homomorphic Encryption](https://homomorphicencryption.org/)
 

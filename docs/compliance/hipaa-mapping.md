@@ -383,9 +383,9 @@ pub struct ComplianceThresholds {
 ## 📚 References
 
 ### Regulatory Documents
-- [HIPAA Privacy Rule](https://www.hhs.gov/hipaa/for-professionals/privacy/)
-- [HIPAA Security Rule](https://www.hhs.gov/hipaa/for-professionals/security/)
-- [Breach Notification Rule](https://www.hhs.gov/hipaa/for-professionals/breach-notification/)
+- [HIPAA Privacy Rule](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E)
+- [HIPAA Security Rule](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C)
+- [Breach Notification Rule](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-D)
 
 ### Implementation Guides
 - [HIPAA Compliance Guide](../compliance/architecture.md)
@@ -395,8 +395,8 @@ pub struct ComplianceThresholds {
 
 ### Technical References
 - [NIST Security Standards](https://csrc.nist.gov/)
-- [HHS Technical Guidance](https://www.hhs.gov/hipaa/for-professionals/security/guidance/)
-- [OCR Enforcement Rules](https://www.hhs.gov/hipaa/for-professionals/privacy/hipaa-enforcement/)
+- [NIST SP 800-66 Rev. 2 HIPAA Security Rule implementation guide](https://csrc.nist.gov/pubs/sp/800/66/r2/final)
+- [OCR Enforcement Rules](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-160)
 
 ---
 
