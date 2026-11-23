@@ -9,6 +9,8 @@ const i18n = require('./i18n/loader.js');
 const root = __dirname;
 const en = JSON.parse(fs.readFileSync(path.join(root, 'i18n', 'en.json'), 'utf8'));
 const es = JSON.parse(fs.readFileSync(path.join(root, 'i18n', 'es.json'), 'utf8'));
+const fr = JSON.parse(fs.readFileSync(path.join(root, 'i18n', 'fr.json'), 'utf8'));
+const pt = JSON.parse(fs.readFileSync(path.join(root, 'i18n', 'pt.json'), 'utf8'));
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 
 function getNested(catalog, key) {
@@ -31,7 +33,7 @@ function flatten(catalog, prefix) {
   return keys;
 }
 
-test('every data-i18n key used by the page exists in English and Spanish', () => {
+test('every data-i18n key used by the page exists in all supported languages', () => {
   const keys = new Set();
   const pattern = /data-i18n(?:-[a-z-]+)?="([^"]+)"/g;
   let match;
@@ -41,25 +43,40 @@ test('every data-i18n key used by the page exists in English and Spanish', () =>
   for (const key of keys) {
     assert.notEqual(getNested(en, key), undefined, `missing English key: ${key}`);
     assert.notEqual(getNested(es, key), undefined, `missing Spanish key: ${key}`);
+    assert.notEqual(getNested(fr, key), undefined, `missing French key: ${key}`);
+    assert.notEqual(getNested(pt, key), undefined, `missing Portuguese key: ${key}`);
   }
 });
 
-test('English and Spanish catalogs expose matching top-level metadata', () => {
+test('English, Spanish, French, and Portuguese catalogs expose matching top-level metadata', () => {
   assert.equal(en._meta.fallback, 'en');
   assert.equal(es._meta.fallback, 'en');
+  assert.equal(fr._meta.fallback, 'en');
+  assert.equal(pt._meta.fallback, 'en');
+
   assert.equal(en._meta.direction, 'ltr');
   assert.equal(es._meta.direction, 'ltr');
+  assert.equal(fr._meta.direction, 'ltr');
+  assert.equal(pt._meta.direction, 'ltr');
+
   assert.equal(en.contracts.items.vision_records.name, 'Vision Records');
   assert.equal(es.contracts.items.vision_records.name, 'Registros de Visión');
+  assert.equal(fr.contracts.items.vision_records.name, 'Dossiers de vision');
+  assert.equal(pt.contracts.items.vision_records.name, 'Prontuários de Visão');
 });
 
-test('Spanish catalog covers every English key', () => {
-  assert.deepEqual(Object.keys(flatten(es, '')).sort(), Object.keys(flatten(en, '')).sort());
+test('Spanish, French, and Portuguese catalogs cover every English key', () => {
+  const enKeys = Object.keys(flatten(en, '')).sort();
+  assert.deepEqual(Object.keys(flatten(es, '')).sort(), enKeys);
+  assert.deepEqual(Object.keys(flatten(fr, '')).sort(), enKeys);
+  assert.deepEqual(Object.keys(flatten(pt, '')).sort(), enKeys);
 });
 
-test('catalog lookup supports nested keys', () => {
+test('catalog lookup supports nested keys in all locales', () => {
   assert.equal(i18n.lookup(en, 'nav.contracts'), 'Contracts');
   assert.equal(i18n.lookup(es, 'nav.contracts'), 'Contratos');
+  assert.equal(i18n.lookup(fr, 'nav.contracts'), 'Contrats');
+  assert.equal(i18n.lookup(pt, 'nav.contracts'), 'Contratos');
   assert.equal(i18n.lookup(en, 'does.not.exist'), undefined);
 });
 
@@ -77,7 +94,9 @@ test('missing translations fall back to English', () => {
 
 test('language normalization and RTL direction are supported', () => {
   assert.equal(i18n.normalizeLanguage('es-MX'), 'es');
-  assert.equal(i18n.normalizeLanguage('fr-FR'), 'en');
+  assert.equal(i18n.normalizeLanguage('fr-FR'), 'fr');
+  assert.equal(i18n.normalizeLanguage('pt-BR'), 'pt');
+  assert.equal(i18n.normalizeLanguage('de-DE'), 'en');
   assert.equal(i18n.isRtlLanguage('ar-SA'), true);
   assert.equal(i18n.isRtlLanguage('he'), true);
   assert.equal(i18n.isRtlLanguage('es'), false);

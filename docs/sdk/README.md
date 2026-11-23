@@ -221,6 +221,6 @@ cargo test --test integration
 
 - [Stellar SDK Documentation](https://stellar.github.io/js-stellar-sdk/)
 - [Soroban Documentation](https://soroban.stellar.org/docs/)
-- [Example Code](../../../example/)
-- [Contract API Reference](../../api/)
+- [Example Code](../../example/)
+- [Contract API Reference](../api.md)
 - [Security Guidelines](../security/)

@@ -31,6 +31,7 @@
 pub mod billing;
 pub mod events;
 pub mod gas_token;
+pub mod plans;
 pub mod quota;
 
 use billing::{BillingError, BillingModel, BillingReport, Invoice, TenantUsageRecord};
@@ -142,6 +143,7 @@ pub enum MeteringError {
     GasTokenAccountFrozen = 14,
     GasTokenInsufficientBalance = 15,
     ZeroMintAmount = 16,
+    PlanNotFound = 17,
 }
 
 fn map_quota_error(_e: QuotaError) -> MeteringError {
@@ -382,6 +384,51 @@ impl MeteringContract {
         Ok(())
     }
 
+    /// Admin: creates or replaces a pricing plan (#462). `plan_id` must be non-zero.
+    pub fn set_plan(
+        env: Env,
+        caller: Address,
+        plan_id: u32,
+        plan: plans::Plan,
+    ) -> Result<(), MeteringError> {
+        caller.require_auth();
+        Self::require_admin(&env, &caller)?;
+        if plan_id == 0 {
+            return Err(MeteringError::InvalidInput);
+        }
+        plans::set_plan(&env, plan_id, &plan);
+        Ok(())
+    }
+
+    /// Return a pricing plan, if one is registered under `plan_id`.
+    pub fn get_plan(env: Env, plan_id: u32) -> Option<plans::Plan> {
+        plans::get_plan(&env, plan_id)
+    }
+
+    /// Admin: puts a registered tenant on a plan (#462). The tenant's quota becomes the plan's quota at once. Assigning
+    /// a different plan is an upgrade or a downgrade, and usage already recorded in the cycle is kept.
+    pub fn assign_plan(
+        env: Env,
+        caller: Address,
+        tenant: Address,
+        plan_id: u32,
+    ) -> Result<(), MeteringError> {
+        caller.require_auth();
+        Self::require_admin(&env, &caller)?;
+        if !env.storage().persistent().has(&tenant_key(&tenant)) {
+            return Err(MeteringError::TenantNotFound);
+        }
+        let plan = plans::get_plan(&env, plan_id).ok_or(MeteringError::PlanNotFound)?;
+        plans::assign(&env, &tenant, plan_id);
+        quota::set_quota(&env, &tenant, plan.quota);
+        Ok(())
+    }
+
+    /// The plan a tenant is on, if any.
+    pub fn get_tenant_plan(env: Env, tenant: Address) -> Option<u32> {
+        plans::tenant_plan(&env, &tenant)
+    }
+
     /// Return the quota for a tenant.
     pub fn get_quota(env: Env, tenant: Address) -> Option<TenantQuota> {
         quota::get_quota(&env, &tenant)
@@ -580,11 +627,13 @@ impl MeteringContract {
                     total_cost,
                 };
 
-                // Issue invoice for postpaid tenants with non-zero cost.
+                // Issue invoice for postpaid tenants with a non-zero charge. The charge is the gas used plus the
+                // base price of the tenant's plan (#462), so a plan is billed even in a cycle with no usage.
                 let model = billing::get_billing_model(&env, &addr);
-                if model == BillingModel::Postpaid && total_cost > 0 {
-                    billing::create_invoice(&env, &addr, cycle_id, total_cost);
-                    events::publish_invoice_issued(&env, addr.clone(), cycle_id, total_cost);
+                let charge = total_cost.saturating_add(plans::tenant_plan_price(&env, &addr));
+                if model == BillingModel::Postpaid && charge > 0 {
+                    billing::create_invoice(&env, &addr, cycle_id, charge);
+                    events::publish_invoice_issued(&env, addr.clone(), cycle_id, charge);
                 }
 
                 records.push_back(record);

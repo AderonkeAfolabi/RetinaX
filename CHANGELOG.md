@@ -1,3 +1,12 @@
+## [Unreleased]
+
+### Features
+
+* **sdk/zk_prover:** add `wasm32-unknown-unknown` WASM build target and browser JS usage guide ([#471](https://github.com/RetinaX-Org/RetinaX/issues/471))
+* **offchain-server:** add cursor pagination and Stellar Ed25519 signature header authentication for `/api/audit-logs` ([#472](https://github.com/RetinaX-Org/RetinaX/issues/472))
+* **offchain-server:** add OpenAPI 3.0 specification, Swagger UI documentation at `/docs`, and database migration tooling ([#473](https://github.com/RetinaX-Org/RetinaX/issues/473))
+* **website:** audit and enforce WCAG 2.1 AA compliant color contrast tokens for light and dark themes ([#474](https://github.com/RetinaX-Org/RetinaX/issues/474))
+
 ## 1.0.0 (2026-02-21)
 
 ### Features
@@ -49,6 +58,15 @@
 
 * implement record versioning and history tracking ([5b6a6ea](https://github.com/RetinaX-Org/RetinaX/commit/5b6a6ea5d2089510641b23e9b9ec8fa1347f0175))
 
+## [Unreleased]
+
+### Features
+
+* **sdk/zk_prover:** add `wasm32-unknown-unknown` WASM build target and browser JS usage guide ([#471](https://github.com/RetinaX-Org/RetinaX/issues/471))
+* **offchain-server:** add cursor pagination and Stellar Ed25519 signature header authentication for `/api/audit-logs` ([#472](https://github.com/RetinaX-Org/RetinaX/issues/472))
+* **offchain-server:** add OpenAPI 3.0 specification, Swagger UI documentation at `/docs`, and database migration tooling ([#473](https://github.com/RetinaX-Org/RetinaX/issues/473))
+* **website:** audit and enforce WCAG 2.1 AA compliant color contrast tokens for light and dark themes ([#474](https://github.com/RetinaX-Org/RetinaX/issues/474))
+
 ## 1.0.0 (2026-02-21)
 
 ### Features
@@ -69,7 +87,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+* **treasury:** recurring grants and streaming payments with configurable rate, cliff, cancellation, and claim with underflow protection (#458).
+* **governor:** emergency veto guardian role allowing guardian to cancel malicious queued proposals during the timelock window (#457).
+* **governor:** proposal categories with configurable distinct quorum and pass threshold parameters per category (#456).
+* **events:** bounded dead-letter queue (DLQ) with configurable capacity, FIFO capacity eviction, and retry mechanism (#455).
 * **docs:** ADR-0013 — research spike on Ethereum header/receipt verification on Soroban (light client vs optimistic vs ZK) (#469)
+* **ai_integration:** model version pinning per request. Providers record `model_version`, `submit_pinned_analysis_request` refuses a version other than the one pinned, and results carry the version they were made against (#465).
+* **vision_records:** cursor-based bulk patient export through `export_patient_data_page`. Records, prescriptions and grants are paged together, so long lists no longer fail the export (#446).
+* **analytics:** admin-configurable differential-privacy parameters through `set_dp_params` and `get_dp_params`, bounded to epsilon 1 to 10 and sensitivity 1 to 1,000,000 (#463).
+* **metering:** tiered pricing plans with per-plan quotas and base prices, managed with `set_plan` and `assign_plan`. Postpaid invoices include the plan base price (#462).
 - Initial project scaffolding
 - Vision records smart contract with basic functionality
 - User registration and management

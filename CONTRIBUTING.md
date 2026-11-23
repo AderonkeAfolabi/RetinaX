@@ -84,7 +84,7 @@ Include:
 
 ## 🔒 Branch Protection on `main`
 
-Nobody pushes to `main` directly, maintainers included. Every change lands through a pull request that meets these rules:
+Nobody pushes to `main` directly, maintainers included. All contributions must be submitted from a feature branch as a pull request; direct commits and pushes to `main` are not accepted.
 
 | Rule | What it means for you |
 |------|-----------------------|

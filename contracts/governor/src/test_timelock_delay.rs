@@ -6,7 +6,7 @@ mod tests {
         timelock_duration, TIMELOCK_EMERGENCY, TIMELOCK_STANDARD, TIMELOCK_UPGRADE,
     };
     use crate::proposal::{
-        load, next_id, store, Proposal, ProposalAction, ProposalPhase, ProposalType,
+        load, next_id, store, Proposal, ProposalAction, ProposalCategory, ProposalPhase, ProposalType,
     };
     use soroban_sdk::{
         symbol_short, testutils::Address as _, testutils::Ledger as _, Address, BytesN, Env,
@@ -19,9 +19,11 @@ mod tests {
 
     fn make_proposal(env: &Env, proposal_type: ProposalType, timelock_ends: u64) -> Proposal {
         let now = env.ledger().timestamp();
+        let category = ProposalCategory::from_proposal_type(&proposal_type);
         Proposal {
             id: 1,
             proposal_type,
+            category,
             phase: ProposalPhase::Timelock,
             proposer: Address::generate(env),
             title: String::from_str(env, "Test proposal"),

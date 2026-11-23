@@ -1,88 +1,96 @@
-# Error Codes
+# Contract Error Code Reference
 
-Standardised error codes used across all RetinaX contracts.
-Every contract re-exports `CommonError` from the `common` crate as `ContractError` so that error codes are identical everywhere.
+This document is the canonical reference for Soroban `#[contracterror]` enums in RetinaX.
+For handling and recovery behavior, see [Error Handling and Recovery](error-handling.md). For example negative-test scenarios, see [Error Handling and Negative Test Scenarios](error_scenarios.md).
 
-## Code Ranges
+## Shared `CommonError`
 
-| Range   | Category                       | Description                                   |
-|---------|--------------------------------|-----------------------------------------------|
-| 1 – 9   | Lifecycle / Initialisation     | Contract setup and one-time operations         |
-| 10 – 19 | Authentication & Authorisation | Caller identity and permission checks          |
-| 20 – 29 | Resource Not Found             | Requested entity does not exist in storage     |
-| 30 – 39 | Validation / Input             | Invalid parameters or malformed data           |
-| 40 – 49 | Contract State                 | Runtime state constraints (paused, locked, …)  |
-| 100+    | Contract-Specific              | Reserved for individual contract extensions    |
+All contracts that use `common::CommonError` share these codes:
 
-## Common Errors
+| Code | Variant |
+|---:|---|
+| 1 | `NotInitialized` |
+| 2 | `AlreadyInitialized` |
+| 10 | `AccessDenied` |
+| 20 | `UserNotFound` |
+| 21 | `RecordNotFound` |
+| 30 | `InvalidInput` |
+| 31 | `InvalidNonce` |
+| 32 | `NonceOverflow` |
+| 40 | `Paused` |
+| 50 | `InvalidChannelState` |
+| 51 | `InvalidSignature` |
+| 52 | `InvalidTransition` |
+| 53 | `ChallengePeriodActive` |
+| 54 | `AlreadySettled` |
 
-| Code | Variant              | When it is returned                                                                                   |
-|------|----------------------|-------------------------------------------------------------------------------------------------------|
-| 1    | `NotInitialized`     | A function that requires prior initialisation is called before `initialize()`.                        |
-| 2    | `AlreadyInitialized` | `initialize()` is called more than once on the same contract instance.                                |
-| 10   | `AccessDenied`       | The caller lacks the required role or permission (e.g. not admin, not record owner, expired grant).   |
-| 20   | `UserNotFound`       | The requested user address does not exist in contract storage.                                        |
-| 21   | `RecordNotFound`     | The requested record ID does not exist in contract storage.                                           |
-| 30   | `InvalidInput`       | One or more parameters are invalid (empty list, zero duration, malformed hash, etc.).                 |
-| 40   | `Paused`             | The contract is temporarily paused and cannot process the request.                                    |
+## Contract-Specific Error Enums
 
-## Migration Notes
+Contract-specific codes belong to their executing contract and should be matched using that contract's exported error type.
 
-### `Unauthorized` → `AccessDenied` (code 10)
+### Access Control
 
-Previous versions of `vision_records` defined two overlapping error variants:
-- `Unauthorized` (code 3) — caller is not allowed
-- `AccessDenied` (code 7) — caller is not allowed
+| Code | Variant |
+|---:|---|
+| 1 | `Unauthorized` |
+| 2 | `InvalidInput` |
+| 3 | `NotFound` |
+| 4 | `DelegationExpired` |
+| 5 | `Paused` |
+| 6 | `AlreadyExists` |
+| 7 | `AlreadyInitialized` |
+| 8 | `DelegationDepthExceeded` |
 
-These have been consolidated into a single `AccessDenied` (code **10**).
-Any off-chain code that matched on error code `3` or `7` should now match on `10`.
+### Clinical Records
 
-## Extending Errors
+| Code | Variant |
+|---:|---|
+| 1 | `AlreadyInitialized` |
+| 2 | `NotInitialized` |
+| 3 | `Unauthorized` |
+| 4 | `InvalidInput` |
+| 5 | `InvalidRecordType` |
+| 6 | `RecordNotFound` |
+| 7 | `InvalidPhase` |
+| 8 | `SessionExpired` |
+| 9 | `InsufficientAuthLevel` |
 
-Contracts that need domain-specific error codes define them in their own `#[contracterror]` enum. In Soroban, contract error codes are scoped to the executing contract; contracts may use dedicated domain error types or reserve error code offsets starting at **100+** when sharing namespace boundaries with `CommonError`.
+### Vision Records
 
-```rust
-#[contracterror]
-#[derive(Clone, Debug, Eq, PartialEq, Copy)]
-#[repr(u32)]
-pub enum VisionError {
-    /// The emergency access window has expired.
-    EmergencyExpired = 100,
-    /// Maximum record limit per patient exceeded.
-    RecordLimitExceeded = 101,
-}
+| Code | Variant |
+|---:|---|
+| 1 | `NotInitialized` |
+| 2 | `AlreadyInitialized` |
+| 3 | `Unauthorized` |
+| 4 | `UserNotFound` |
+| 5 | `RecordNotFound` |
+| 6 | `InvalidInput` |
+| 7 | `AccessDenied` |
+| 8 | `Paused` |
+| 9 | `ProviderNotFound` |
+| 10 | `ProviderAlreadyRegistered` |
+| 11 | `InvalidVerificationStatus` |
+| 12 | `InvalidAddress` |
+| 13 | `InvalidTimestamp` |
+| 14 | `StorageError` |
+| 15 | `RateLimitExceeded` |
+| 16 | `ExpiredAccess` |
+| 17 | `InvalidRole` |
+| 18 | `InvalidPermission` |
+| 19 | `DelegationExpired` |
+| 20 | `InvalidDataHash` |
+| 21 | `DuplicateRecord` |
+| 22 | `InvalidRecordType` |
+| 23 | `ContractPaused` |
+| 24 | `InsufficientPermissions` |
+| 25 | `TransientFailure` |
+
+### Other Contract Errors
+
+Other contract crates define their own `#[contracterror]` enums, including `audit`, `key_manager`, `staking`, `treasury`, `governor`, `timelock`, `identity`, `zk_verifier`, `zk_voting`, `ai_integration`, `fhir`, `cross_chain`, `analytics`, `emr_bridge`, `vault`, `metering`, `orchestrator`, `events`, `delegation`, and `compliance`. Source enum declarations are the authoritative inventory while this reference is expanded; locate declarations with:
+
+```bash
+rg '#\[.*contracterror\]' contracts
 ```
 
-## Contract-Specific Error References
-
-### Access Control (`AccessControlError`)
-
-The `access_control` contract defines domain-specific error codes for fine-grained role-based (RBAC) and attribute-based access control (ABAC).
-
-| Code | Variant                   | When it is returned                                                                                    |
-|------|---------------------------|--------------------------------------------------------------------------------------------------------|
-| 1    | `Unauthorized`            | Caller lacks administrative privileges or the required permissions to perform the operation.           |
-| 2    | `InvalidInput`            | Provided string parameter or identifier is empty or exceeds length limits (`MAX_STRING_LEN`).           |
-| 3    | `NotFound`                | The specified role assignment, delegation, user credential, policy, or entity was not found in storage.|
-| 4    | `DelegationExpired`       | Requested delegation or scoped permission grant has reached its expiration timestamp or is invalid.     |
-| 5    | `Paused`                  | The access control micro-contract is temporarily paused by the emergency admin.                        |
-| 6    | `AlreadyExists`           | The target user already belongs to the group, holds the credential, or the entity already exists.      |
-| 7    | `AlreadyInitialized`      | `initialize()` is invoked on an access control contract instance that has already been initialized.     |
-| 8    | `DelegationDepthExceeded` | The delegation chain depth exceeds the configured maximum allowed limit (`MAX_DEL_DEPTH`).            |
-
-### Clinical Records (`ContractError`)
-
-The `clinical_records` contract defines error codes for managing eye examination and ophthalmic prescription lifecycles.
-
-| Code | Variant              | When it is returned                                                                                    |
-|------|----------------------|--------------------------------------------------------------------------------------------------------|
-| 1    | `AlreadyInitialized` | `initialize()` was called more than once on the clinical records contract instance.                    |
-| 2    | `NotInitialized`     | A function requiring prior configuration was invoked before `initialize()` completed.                 |
-| 3    | `Unauthorized`       | The caller is not authorized (e.g. not admin, not assigned practitioner, or not patient record owner). |
-| 4    | `InvalidInput`       | An input failed validation (e.g. empty string, string exceeding character bounds, or malformed data).  |
-| 5    | `InvalidRecordType`  | Reserved for unsupported clinical record types.                                                        |
-| 6    | `RecordNotFound`     | No examination or prescription record exists for the given record ID.                                  |
-| 7    | `InvalidPhase`       | The prescription lifecycle operation was called out of order (e.g. committing an un-prepared record).  |
-| 8    | `SessionExpired`     | The caller is a session key whose session has expired.                                                 |
-| 9    | `InsufficientAuthLevel` | The caller is a session key whose auth level is too low (prescriptions need Level 3).               |
-
+When a contract adds or changes an enum, update this reference in the same pull request.

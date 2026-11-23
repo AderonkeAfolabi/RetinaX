@@ -3020,6 +3020,7 @@ dependencies = [
 name = "zk_voting"
 version = "1.2.2"
 dependencies = [
+ "proptest",
  "soroban-sdk",
  "zk_verifier",
 ]
