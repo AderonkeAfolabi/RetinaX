@@ -71,7 +71,7 @@ fn test_cross_contract_subscription_notification_flow() {
     // Verify events were emitted
     let all_events = env.events().all();
     assert!(
-        all_events.events().len() > 0,
+        !all_events.events().is_empty(),
         "Events should be emitted for cross-contract flow"
     );
 }
@@ -114,7 +114,7 @@ fn test_subscription_notification_flow_end_to_end() {
 
     let all_events = env.events().all();
     assert!(
-        all_events.events().len() > 0,
+        !all_events.events().is_empty(),
         "Subscription/notification flow should emit events"
     );
 }
@@ -150,7 +150,7 @@ fn test_dead_letter_queue_end_to_end() {
     // push_dead_letter must emit a DLQ_PUSH event.
     let ev = env.events().all();
     assert!(
-        ev.events().len() > 0,
+        !ev.events().is_empty(),
         "push_dead_letter must emit a DLQ_PUSH event"
     );
 
@@ -166,7 +166,7 @@ fn test_dead_letter_queue_end_to_end() {
     // retry_dead_letter must emit a DLQ_RTY event
     let ev = env.events().all();
     assert!(
-        ev.events().len() > 0,
+        !ev.events().is_empty(),
         "retry_dead_letter must emit a DLQ_RTY event"
     );
 
@@ -261,7 +261,7 @@ fn test_cross_contract_event_emission_with_registered_source() {
 
     let all_events = env.events().all();
     assert!(
-        all_events.events().len() > 0,
+        !all_events.events().is_empty(),
         "Cross-contract event emission should work"
     );
 }
@@ -327,7 +327,7 @@ fn test_cross_contract_consumer_group_distribution() {
 
     let all_events = env.events().all();
     assert!(
-        all_events.events().len() > 0,
+        !all_events.events().is_empty(),
         "Consumer group distribution should emit events"
     );
 }

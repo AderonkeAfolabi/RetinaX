@@ -633,7 +633,9 @@ fn test_emergency_veto_guardian() {
 
     let admin = Address::generate(&env);
     // Replace admin with test admin
-    env.storage().instance().set(&crate::ADMIN, &admin);
+    env.as_contract(&contract_id, || {
+        env.storage().instance().set(&crate::ADMIN, &admin)
+    });
 
     let guardian = Address::generate(&env);
     let attacker = Address::generate(&env);
@@ -695,7 +697,9 @@ fn test_proposal_category_config() {
     default_init(&env, &client);
 
     let admin = Address::generate(&env);
-    env.storage().instance().set(&crate::ADMIN, &admin);
+    env.as_contract(&contract_id, || {
+        env.storage().instance().set(&crate::ADMIN, &admin)
+    });
 
     // Configure ContractUpgrade category with 35% quorum and 66% threshold
     client.set_category_config(

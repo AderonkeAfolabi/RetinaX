@@ -11,11 +11,11 @@ use soroban_sdk::{
     contract, contractimpl, symbol_short,
     testutils::{Address as _, Ledger as _},
     token::{Client as TokenClient, StellarAssetClient},
-    Address, Env, String, Symbol, Vec,
+    Address, Env, String, Vec,
 };
 use treasury::{
-    AllocationSummary, ContractError, Proposal, ProposalKind, ProposalStatus, SwapProposal,
-    TransferProposal, TreasuryConfig, TreasuryContract, TreasuryContractClient,
+    AllocationSummary, ContractError, Proposal, ProposalStatus, TreasuryConfig, TreasuryContract,
+    TreasuryContractClient,
 };
 
 #[contract]

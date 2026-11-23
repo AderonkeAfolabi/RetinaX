@@ -132,7 +132,7 @@ fn test_is_initialized_after_initialize() {
 /// After initialize(), get_admin() must return the exact address passed in.
 #[test]
 fn test_admin_set_correctly_on_initialize() {
-    let (env, client, admin) = setup();
+    let (_env, client, admin) = setup();
     let stored_admin = client.get_admin();
     assert_eq!(
         stored_admin, admin,
