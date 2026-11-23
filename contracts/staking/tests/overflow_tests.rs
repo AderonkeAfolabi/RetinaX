@@ -85,7 +85,7 @@ mod overflow_boundary_tests {
     #[test]
     fn test_multiplier_chain_overflow() {
         // Test chained multiplier calculations that could overflow
-        let base = 1_000_000u64;
+        let base = u64::MAX / 1_000_000;
         let mult1 = 1000u64;
         let mult2 = 1000u64;
         let mult3 = 1000u64;
