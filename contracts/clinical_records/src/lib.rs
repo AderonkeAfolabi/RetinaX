@@ -519,3 +519,10 @@ impl ClinicalRecordsContract {
         fhir::export_prescription(&env, caller, id)
     }
 }
+
+/// Convert a contract string without relying on the host-only Display implementation.
+pub(crate) fn contract_text(value: &soroban_sdk::String) -> alloc::string::String {
+    let mut bytes = alloc::vec![0; value.len() as usize];
+    value.copy_into_slice(&mut bytes);
+    alloc::string::String::from_utf8_lossy(&bytes).into_owned()
+}

@@ -333,9 +333,9 @@ pub fn eye_examination_to_fhir(
             env,
             &alloc::format!(
                 "L:{} R:{} ({})",
-                exam.iop.left_eye,
-                exam.iop.right_eye,
-                exam.iop.method
+                crate::contract_text(&exam.iop.left_eye),
+                crate::contract_text(&exam.iop.right_eye),
+                crate::contract_text(&exam.iop.method)
             ),
         ),
     );
