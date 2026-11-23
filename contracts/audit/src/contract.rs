@@ -1,8 +1,9 @@
+#![allow(deprecated)]
 #![allow(clippy::too_many_arguments)]
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, symbol_short, Address, Env, Error,
-    IntoVal, Symbol, Val, Vec,
+    contract, contracterror, contractimpl, contracttype, symbol_short, Address, Bytes, BytesN, Env,
+    Error, IntoVal, Symbol, Val, Vec,
 };
 
 /// Typed error enum for the AuditContract.
@@ -25,6 +26,10 @@ pub enum AuditContractError {
     VaultBalanceInsufficient = 5,
     /// Compliance check failed.
     ComplianceCheckFailed = 6,
+    /// No checkpoints exist for the segment.
+    NoCheckpoints = 7,
+    /// Entry not found at the requested sequence.
+    EntryNotFound = 8,
 }
 
 #[contract]
@@ -43,6 +48,15 @@ pub struct AuditLogEntry {
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CheckpointRecord {
+    pub sequence: u64,
+    pub timestamp: u64,
+    pub root: BytesN<32>,
+    pub entry_count: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SegmentInfo {
     pub entries: Vec<AuditLogEntry>,
     pub next_sequence: u64,
@@ -50,6 +64,9 @@ pub struct SegmentInfo {
 
 const ADMIN: Symbol = symbol_short!("ADMIN");
 const SEGMENTS: Symbol = symbol_short!("SEGMENTS");
+const CHECKPOINTS: Symbol = symbol_short!("CHK_HIST");
+const CHECKPOINT_LATEST: Symbol = symbol_short!("CHK_LAST");
+const CHECKPOINT_EVENT: Symbol = symbol_short!("CHECKPNT");
 
 #[contractimpl]
 impl AuditContract {
@@ -301,5 +318,225 @@ impl AuditContract {
         }
 
         Self::append_entry(env, segment_id, actor, action, target, result)
+    }
+
+    /// Hash an internal node: SHA256(0x01 || left || right)
+    fn hash_internal_node(env: &Env, left: &BytesN<32>, right: &BytesN<32>) -> BytesN<32> {
+        let mut payload = Bytes::new(env);
+        payload.push_back(0x01);
+        payload.append(&left.to_bytes());
+        payload.append(&right.to_bytes());
+        env.crypto().sha256(&payload).into()
+    }
+
+    /// Iterative bottom-up reduction to compute RFC 6962 Merkle root.
+    fn compute_merkle_root(env: &Env, mut level: Vec<BytesN<32>>) -> BytesN<32> {
+        if level.is_empty() {
+            return BytesN::from_array(env, &[0u8; 32]);
+        }
+        while level.len() > 1 {
+            let mut next = Vec::new(env);
+            let mut i = 0u32;
+            let len = level.len();
+            while i < len {
+                if i + 1 < len {
+                    let left = level.get(i).unwrap();
+                    let right = level.get(i + 1).unwrap();
+                    next.push_back(Self::hash_internal_node(env, &left, &right));
+                } else {
+                    next.push_back(level.get(i).unwrap());
+                }
+                i += 2;
+            }
+            level = next;
+        }
+        level.get(0).unwrap()
+    }
+
+    /// Compute RFC 6962 leaf hash for an audit log entry: SHA256(0x00 || fields).
+    pub fn compute_entry_leaf_hash(env: Env, entry: AuditLogEntry) -> BytesN<32> {
+        let mut payload = Bytes::new(&env);
+        payload.push_back(0x00);
+        for b in entry.sequence.to_be_bytes() {
+            payload.push_back(b);
+        }
+        for b in entry.timestamp.to_be_bytes() {
+            payload.push_back(b);
+        }
+        for b in entry.action.to_val().get_payload().to_be_bytes() {
+            payload.push_back(b);
+        }
+        for b in entry.target.to_val().get_payload().to_be_bytes() {
+            payload.push_back(b);
+        }
+        for b in entry.result.to_val().get_payload().to_be_bytes() {
+            payload.push_back(b);
+        }
+        env.crypto().sha256(&payload).into()
+    }
+
+    /// Periodically anchor the log Merkle root to allow cheap verification.
+    ///
+    /// Computes Merkle root over all segment entries and records a CheckpointRecord.
+    pub fn checkpoint(env: Env, segment_id: Symbol) -> Result<BytesN<32>, Error> {
+        let segment_info: SegmentInfo = env
+            .storage()
+            .persistent()
+            .get(&(SEGMENTS, segment_id.clone()))
+            .ok_or(Error::from_contract_error(
+                AuditContractError::SegmentNotFound as u32,
+            ))?;
+
+        let mut leaves: Vec<BytesN<32>> = Vec::new(&env);
+        for entry in segment_info.entries.iter() {
+            leaves.push_back(Self::compute_entry_leaf_hash(env.clone(), entry));
+        }
+
+        let root = Self::compute_merkle_root(&env, leaves);
+        let count = segment_info.entries.len() as u64;
+        let record = CheckpointRecord {
+            sequence: count,
+            timestamp: env.ledger().timestamp(),
+            root: root.clone(),
+            entry_count: count,
+        };
+
+        let mut history: Vec<CheckpointRecord> = env
+            .storage()
+            .persistent()
+            .get(&(CHECKPOINTS, segment_id.clone()))
+            .unwrap_or_else(|| Vec::new(&env));
+        history.push_back(record.clone());
+
+        env.storage()
+            .persistent()
+            .set(&(CHECKPOINTS, segment_id.clone()), &history);
+        env.storage()
+            .persistent()
+            .set(&(CHECKPOINT_LATEST, segment_id.clone()), &record);
+
+        env.events().publish(
+            (CHECKPOINT_EVENT, segment_id),
+            (record.sequence, record.root.clone()),
+        );
+
+        Ok(root)
+    }
+
+    /// Retrieve the most recent checkpoint for a given segment.
+    pub fn get_latest_checkpoint(env: Env, segment_id: Symbol) -> Result<CheckpointRecord, Error> {
+        env.storage()
+            .persistent()
+            .get(&(CHECKPOINT_LATEST, segment_id))
+            .ok_or(Error::from_contract_error(
+                AuditContractError::NoCheckpoints as u32,
+            ))
+    }
+
+    /// Retrieve all checkpoints for a given segment.
+    pub fn get_checkpoints(env: Env, segment_id: Symbol) -> Result<Vec<CheckpointRecord>, Error> {
+        let history: Vec<CheckpointRecord> = env
+            .storage()
+            .persistent()
+            .get(&(CHECKPOINTS, segment_id))
+            .unwrap_or_else(|| Vec::new(&env));
+        Ok(history)
+    }
+
+    /// Generate Merkle inclusion proof siblings for a given entry sequence.
+    pub fn get_inclusion_proof(
+        env: Env,
+        segment_id: Symbol,
+        sequence: u64,
+    ) -> Result<Vec<BytesN<32>>, Error> {
+        let segment_info: SegmentInfo = env
+            .storage()
+            .persistent()
+            .get(&(SEGMENTS, segment_id))
+            .ok_or(Error::from_contract_error(
+                AuditContractError::SegmentNotFound as u32,
+            ))?;
+
+        if sequence == 0 || sequence > segment_info.entries.len() as u64 {
+            return Err(Error::from_contract_error(
+                AuditContractError::EntryNotFound as u32,
+            ));
+        }
+
+        let mut target_idx = (sequence - 1) as u32;
+        let mut level: Vec<BytesN<32>> = Vec::new(&env);
+        for entry in segment_info.entries.iter() {
+            level.push_back(Self::compute_entry_leaf_hash(env.clone(), entry));
+        }
+
+        let mut siblings: Vec<BytesN<32>> = Vec::new(&env);
+        while level.len() > 1 {
+            let len = level.len();
+            if target_idx % 2 == 1 {
+                siblings.push_back(level.get(target_idx - 1).unwrap());
+            } else if target_idx < len - 1 {
+                siblings.push_back(level.get(target_idx + 1).unwrap());
+            }
+
+            let mut next = Vec::new(&env);
+            let mut i = 0u32;
+            while i < len {
+                if i + 1 < len {
+                    let left = level.get(i).unwrap();
+                    let right = level.get(i + 1).unwrap();
+                    next.push_back(Self::hash_internal_node(&env, &left, &right));
+                } else {
+                    next.push_back(level.get(i).unwrap());
+                }
+                i += 2;
+            }
+            level = next;
+            target_idx /= 2;
+        }
+
+        Ok(siblings)
+    }
+
+    /// Verify an inclusion proof against an anchored root.
+    ///
+    /// Complexity: O(log n).
+    pub fn verify_inclusion(
+        env: Env,
+        leaf_hash: BytesN<32>,
+        leaf_index: u64,
+        tree_size: u64,
+        siblings: Vec<BytesN<32>>,
+        root: BytesN<32>,
+    ) -> bool {
+        let mut computed = leaf_hash;
+        let mut index = leaf_index;
+        let mut size = tree_size;
+        let mut sib_idx = 0u32;
+
+        while size > 1 {
+            if index % 2 == 1 {
+                if sib_idx >= siblings.len() {
+                    return false;
+                }
+                let sibling = siblings.get(sib_idx).unwrap();
+                sib_idx += 1;
+                computed = Self::hash_internal_node(&env, &sibling, &computed);
+            } else if index < size - 1 {
+                if sib_idx >= siblings.len() {
+                    return false;
+                }
+                let sibling = siblings.get(sib_idx).unwrap();
+                sib_idx += 1;
+                computed = Self::hash_internal_node(&env, &computed, &sibling);
+            }
+            index /= 2;
+            size = size.saturating_add(1) / 2;
+        }
+
+        if sib_idx != siblings.len() {
+            return false;
+        }
+
+        computed == root
     }
 }

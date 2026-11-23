@@ -506,6 +506,7 @@ pub struct AuditEntry {
 | `REC_NEW` | Recovery initiated |
 | `REC_APP` | Recovery approved by guardian |
 | `REC_EXE` | Recovery executed |
+| `REC_CAN` | Recovery cancelled by owner or admin |
 
 ### Integrity Verification
 
@@ -593,6 +594,11 @@ The Key Manager implements social recovery where a key owner designates M guardi
 - Replaces key with new version
 - Removes recovery request
 - Returns new version number
+
+**Step 4: Cancellation and Querying**
+
+- `cancel_recovery`: Key owner or admin can abort a pending recovery before execution, removing the request and logging `REC_CAN`.
+- `get_recovery_request`: Public query to inspect active recovery details, proposed key, and guardian approvals.
 
 ### Security Properties
 
