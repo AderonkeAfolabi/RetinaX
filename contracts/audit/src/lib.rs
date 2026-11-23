@@ -58,6 +58,10 @@
 
 extern crate alloc;
 
+// The WASM library target still needs the SDK allocator and panic handler.
+#[cfg(all(target_family = "wasm", feature = "library"))]
+extern crate soroban_sdk as _;
+
 pub mod consistency;
 #[cfg(not(all(target_family = "wasm", feature = "library")))]
 pub mod contract;
