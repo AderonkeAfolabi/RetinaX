@@ -11,7 +11,7 @@ Integrating ZK proofs involves two main parts:
 ## Off-chain Integration
 
 ### 1. Circuit Design
-RetinaX uses Groth16 proofs. You should design your circuits using [Circom](https://docs.circom.io/getting-started/installation/). Ensure your circuit returns public signals that match the `public_inputs` expected by your on-chain logic.
+RetinaX uses Groth16 proofs. You should design your circuits using [Circom](https://github.com/iden3/circom). Ensure your circuit returns public signals that match the `public_inputs` expected by your on-chain logic.
 
 ### 2. Generating the Proof
 Use `snarkjs` or a similar tool to generate the proof and `public_signals`.
