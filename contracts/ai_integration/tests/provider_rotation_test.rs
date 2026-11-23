@@ -17,7 +17,7 @@ use ai_integration::{
 };
 use soroban_sdk::{
     symbol_short,
-    testutils::{Address as _, Events as _, Ledger},
+    testutils::{Address as _, Events as _},
     vec,
     xdr::{ContractEventBody, ScVal},
     Address, Env, String, Symbol, TryFromVal, Vec,
@@ -39,7 +39,7 @@ fn s(env: &Env, value: &str) -> String {
     String::from_str(env, value)
 }
 
-fn setup_with_providers(env: &Env) -> (AiIntegrationContractClient, Address, Vec<u32>) {
+fn setup_with_providers(env: &Env) -> (AiIntegrationContractClient<'_>, Address, Vec<u32>) {
     let admin = Address::generate(env);
     let contract_id = env.register(AiIntegrationContract, ());
     let client = AiIntegrationContractClient::new(env, &contract_id);

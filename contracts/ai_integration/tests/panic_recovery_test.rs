@@ -118,13 +118,6 @@ fn test_panic_recovery_request_submission_invalid_provider() {
         AiIntegrationError::ProviderNotFound
     );
 
-    // Verify request counter wasn't incremented
-    let request_counter_before = env
-        .storage()
-        .instance()
-        .get::<_, u64>(&soroban_sdk::symbol_short!("REQCTR"))
-        .unwrap_or(0);
-
     // Register a valid provider and submit request
     client.register_provider(
         &admin,
@@ -284,8 +277,8 @@ fn test_panic_recovery_concurrent_requests() {
     }
 
     // Verify all requests have unique IDs
-    for i in 0..5 {
-        assert_eq!(request_ids[i], (i + 1) as u64);
+    for (i, request_id) in request_ids.iter().enumerate() {
+        assert_eq!(*request_id, (i + 1) as u64);
     }
 
     // Store results for all requests
