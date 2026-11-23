@@ -15,7 +15,7 @@
 #![allow(unused_variables, unused_imports)]
 extern crate std;
 
-use soroban_sdk::{testutils::events::Event, testutils::Address as _, Address, Env};
+use soroban_sdk::{testutils::{Address as _, ContractEvents, Events}, vec, Address, Env, IntoVal, TryFromVal, Vec};
 
 use crate::{
     billing::{BillingModel, CycleStatus},
@@ -862,7 +862,7 @@ fn test_rounding_stays_in_base_units_without_fractional_drift() {
 // ── Event emission tests ──────────────────────────────────────────────────────
 
 /// Helper to collect all events emitted during a test.
-fn collect_events(env: &Env) -> soroban_sdk::testutils::events::ContractEvents {
+fn collect_events(env: &Env) -> ContractEvents {
     env.events().all()
 }
 
@@ -873,9 +873,9 @@ fn test_tenant_registered_event_emitted() {
     client.register_tenant(&admin, &org, &TenantLevel::Organization, &org);
 
     let events = collect_events(&env);
-    assert_eq!(events.len(), 1);
+    assert_eq!(events.events().len(), 1);
 
-    let expected_topics = vec![
+    let expected_topics = vec![&env,
         soroban_sdk::symbol_short!("METER").into_val(&env),
         soroban_sdk::Symbol::new(&env, "TenantReg").into_val(&env),
     ];
@@ -896,7 +896,7 @@ fn test_gas_recorded_event_emitted_for_direct_tenant() {
     client.record_gas(&admin, &org, &OperationType::Read);
 
     let events = collect_events(&env);
-    assert_eq!(events.len(), 1);
+    assert_eq!(events.events().len(), 1);
 }
 
 #[test]
@@ -909,7 +909,7 @@ fn test_gas_recorded_events_emitted_for_hierarchy_rollup() {
     client.record_gas(&admin, &provider, &OperationType::Write);
 
     let events = collect_events(&env);
-    assert_eq!(events.len(), 3); // provider, clinic, org
+    assert_eq!(events.events().len(), 3); // provider, clinic, org
 }
 
 #[test]
@@ -934,12 +934,12 @@ fn test_quota_alert_event_emitted_when_threshold_crossed() {
     }
 
     let events = collect_events(&env);
-    // 8 gas recorded events + 1 alert event
-    assert_eq!(events.len(), 9);
+    // The last invocation recorded gas and crossed the alert threshold.
+    assert_eq!(events.events().len(), 2);
 }
 
 #[test]
-fn test_quota_exceeded_event_emitted_when_quota_breached() {
+fn test_quota_breach_rolls_back_contract_events() {
     let (env, client, admin) = setup();
     let org = register_org(&client, &admin, &env);
     let quota = TenantQuota {
@@ -955,12 +955,10 @@ fn test_quota_exceeded_event_emitted_when_quota_breached() {
 
     // First read succeeds
     client.record_gas(&admin, &org, &OperationType::Read);
-    // Second read fails and emits event
-    let _ = client.try_record_gas(&admin, &org, &OperationType::Read);
-
-    let events = collect_events(&env);
-    // 1 gas recorded + 1 quota exceeded
-    assert_eq!(events.len(), 2);
+        // The failed invocation rolls back contract events.
+    let result = client.try_record_gas(&admin, &org, &OperationType::Read);
+    assert!(result.is_err());
+    assert!(collect_events(&env).events().is_empty());
 }
 
 #[test]
@@ -969,7 +967,7 @@ fn test_cycle_opened_event_emitted() {
     client.open_billing_cycle(&admin);
 
     let events = collect_events(&env);
-    assert_eq!(events.len(), 1);
+    assert_eq!(events.events().len(), 1);
 }
 
 #[test]
@@ -979,7 +977,7 @@ fn test_cycle_closed_event_emitted() {
     client.close_billing_cycle(&admin);
 
     let events = collect_events(&env);
-    assert_eq!(events.len(), 2); // opened and closed
+    assert_eq!(events.events().len(), 1);
 }
 
 #[test]
@@ -993,8 +991,7 @@ fn test_invoice_issued_event_emitted_for_postpaid_tenant() {
     client.close_billing_cycle(&admin);
 
     let events = collect_events(&env);
-    // cycle opened, gas recorded, invoice issued, cycle closed
-    assert_eq!(events.len(), 4);
+    assert_eq!(events.events().len(), 2);
 }
 
 #[test]
@@ -1009,8 +1006,7 @@ fn test_invoice_settled_event_emitted() {
     client.settle_invoice(&org, &1u64);
 
     let events = collect_events(&env);
-    // cycle opened, gas recorded, invoice issued, cycle closed, invoice settled
-    assert_eq!(events.len(), 5);
+    assert_eq!(events.events().len(), 1);
 }
 
 #[test]
@@ -1020,7 +1016,7 @@ fn test_gas_token_minted_event_emitted() {
     client.mint_gas_tokens(&admin, &org, &100u64);
 
     let events = collect_events(&env);
-    assert_eq!(events.len(), 1);
+    assert_eq!(events.events().len(), 1);
 }
 
 #[test]
@@ -1032,8 +1028,7 @@ fn test_gas_token_burned_event_emitted_for_prepaid_usage() {
     client.record_gas(&admin, &org, &OperationType::Write); // burns 5
 
     let events = collect_events(&env);
-    // mint + gas recorded + burn
-    assert_eq!(events.len(), 3);
+    assert_eq!(events.events().len(), 2);
 }
 
 #[test]
@@ -1043,8 +1038,7 @@ fn test_no_events_emitted_for_deactivate_tenant() {
     client.deactivate_tenant(&admin, &org);
 
     let events = collect_events(&env);
-    // Only the registration event
-    assert_eq!(events.len(), 1);
+    assert!(events.events().is_empty());
 }
 
 #[test]
@@ -1056,7 +1050,7 @@ fn test_events_include_correct_timestamps() {
     client.record_gas(&admin, &org, &OperationType::Read);
 
     let events = collect_events(&env);
-    assert_eq!(events.len(), 2);
+    assert_eq!(events.events().len(), 1);
 
     // Just check that events are emitted, timestamps are checked in the detailed test
     // In a real test, we could check each event's timestamp > initial_time
