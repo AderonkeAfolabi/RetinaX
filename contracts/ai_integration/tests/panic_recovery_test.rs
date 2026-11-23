@@ -19,7 +19,7 @@ fn setup() -> (Env, AiIntegrationContractClient<'static>, Address, Address) {
     let admin = Address::generate(&env);
     let operator = Address::generate(&env);
 
-    client.initialize(&admin, &7_000).unwrap();
+    client.initialize(&admin, &7_000);
 
     (env, client, admin, operator)
 }
@@ -57,7 +57,7 @@ fn test_panic_recovery_provider_registration_invalid_id() {
     );
 
     assert!(result.is_ok());
-    let provider = client.get_provider(&1).unwrap();
+    let provider = client.get_provider(&1);
     assert_eq!(provider.provider_id, 1);
     assert_eq!(provider.status, ProviderStatus::Active);
 }
@@ -126,27 +126,23 @@ fn test_panic_recovery_request_submission_invalid_provider() {
         .unwrap_or(0);
 
     // Register a valid provider and submit request
-    client
-        .register_provider(
-            &admin,
-            &1,
-            &Address::generate(&env),
-            &String::from_str(&env, "Provider A"),
-            &String::from_str(&env, "retina-v1"),
-            &String::from_str(&env, "sha256:endpoint"),
-        )
-        .unwrap();
+    client.register_provider(
+        &admin,
+        &1,
+        &Address::generate(&env),
+        &String::from_str(&env, "Provider A"),
+        &String::from_str(&env, "retina-v1"),
+        &String::from_str(&env, "sha256:endpoint"),
+    );
 
-    let request_id = client
-        .submit_analysis_request(
-            &requester,
-            &1,
-            &patient,
-            &9001,
-            &String::from_str(&env, "sha256:image-1"),
-            &String::from_str(&env, "retina_screening"),
-        )
-        .unwrap();
+    let request_id = client.submit_analysis_request(
+        &requester,
+        &1,
+        &patient,
+        &9001,
+        &String::from_str(&env, "sha256:image-1"),
+        &String::from_str(&env, "retina_screening"),
+    );
 
     assert_eq!(request_id, 1);
 }
@@ -158,38 +154,32 @@ fn test_panic_recovery_result_storage_invalid_state() {
     let requester = Address::generate(&env);
     let patient = Address::generate(&env);
 
-    client
-        .register_provider(
-            &admin,
-            &1,
-            &operator,
-            &String::from_str(&env, "Provider A"),
-            &String::from_str(&env, "retina-v1"),
-            &String::from_str(&env, "sha256:endpoint"),
-        )
-        .unwrap();
+    client.register_provider(
+        &admin,
+        &1,
+        &operator,
+        &String::from_str(&env, "Provider A"),
+        &String::from_str(&env, "retina-v1"),
+        &String::from_str(&env, "sha256:endpoint"),
+    );
 
-    let request_id = client
-        .submit_analysis_request(
-            &requester,
-            &1,
-            &patient,
-            &9001,
-            &String::from_str(&env, "sha256:image-1"),
-            &String::from_str(&env, "retina_screening"),
-        )
-        .unwrap();
+    let request_id = client.submit_analysis_request(
+        &requester,
+        &1,
+        &patient,
+        &9001,
+        &String::from_str(&env, "sha256:image-1"),
+        &String::from_str(&env, "retina_screening"),
+    );
 
     // Store result successfully
-    let status = client
-        .store_analysis_result(
-            &operator,
-            &request_id,
-            &String::from_str(&env, "sha256:result-1"),
-            &8_800,
-            &3_500,
-        )
-        .unwrap();
+    let status = client.store_analysis_result(
+        &operator,
+        &request_id,
+        &String::from_str(&env, "sha256:result-1"),
+        &8_800,
+        &3_500,
+    );
 
     assert_eq!(status, RequestStatus::Completed);
 
@@ -209,7 +199,7 @@ fn test_panic_recovery_result_storage_invalid_state() {
     );
 
     // Verify original result is intact
-    let stored_result = client.get_analysis_result(&request_id).unwrap();
+    let stored_result = client.get_analysis_result(&request_id);
     assert_eq!(
         stored_result.output_hash,
         String::from_str(&env, "sha256:result-1")
@@ -223,27 +213,23 @@ fn test_panic_recovery_verification_invalid_state() {
     let requester = Address::generate(&env);
     let patient = Address::generate(&env);
 
-    client
-        .register_provider(
-            &admin,
-            &1,
-            &operator,
-            &String::from_str(&env, "Provider A"),
-            &String::from_str(&env, "retina-v1"),
-            &String::from_str(&env, "sha256:endpoint"),
-        )
-        .unwrap();
+    client.register_provider(
+        &admin,
+        &1,
+        &operator,
+        &String::from_str(&env, "Provider A"),
+        &String::from_str(&env, "retina-v1"),
+        &String::from_str(&env, "sha256:endpoint"),
+    );
 
-    let request_id = client
-        .submit_analysis_request(
-            &requester,
-            &1,
-            &patient,
-            &9001,
-            &String::from_str(&env, "sha256:image-1"),
-            &String::from_str(&env, "retina_screening"),
-        )
-        .unwrap();
+    let request_id = client.submit_analysis_request(
+        &requester,
+        &1,
+        &patient,
+        &9001,
+        &String::from_str(&env, "sha256:image-1"),
+        &String::from_str(&env, "retina_screening"),
+    );
 
     // Try to verify result before storing it
     let result = client.try_verify_analysis_result(
@@ -260,7 +246,7 @@ fn test_panic_recovery_verification_invalid_state() {
     );
 
     // Verify request is still in Pending state
-    let request = client.get_analysis_request(&request_id).unwrap();
+    let request = client.get_analysis_request(&request_id);
     assert_eq!(request.status, RequestStatus::Pending);
 }
 
@@ -270,16 +256,14 @@ fn test_panic_recovery_verification_invalid_state() {
 fn test_panic_recovery_concurrent_requests() {
     let (env, client, admin, operator) = setup();
 
-    client
-        .register_provider(
-            &admin,
-            &1,
-            &operator,
-            &String::from_str(&env, "Provider A"),
-            &String::from_str(&env, "retina-v1"),
-            &String::from_str(&env, "sha256:endpoint"),
-        )
-        .unwrap();
+    client.register_provider(
+        &admin,
+        &1,
+        &operator,
+        &String::from_str(&env, "Provider A"),
+        &String::from_str(&env, "retina-v1"),
+        &String::from_str(&env, "sha256:endpoint"),
+    );
 
     // Submit multiple requests
     let mut request_ids = Vec::new();
@@ -287,16 +271,14 @@ fn test_panic_recovery_concurrent_requests() {
         let requester = Address::generate(&env);
         let patient = Address::generate(&env);
 
-        let request_id = client
-            .submit_analysis_request(
-                &requester,
-                &1,
-                &patient,
-                &(9000 + i as u64),
-                &String::from_str(&env, &format!("sha256:image-{}", i)),
-                &String::from_str(&env, "retina_screening"),
-            )
-            .unwrap();
+        let request_id = client.submit_analysis_request(
+            &requester,
+            &1,
+            &patient,
+            &(9000 + i as u64),
+            &String::from_str(&env, &format!("sha256:image-{}", i)),
+            &String::from_str(&env, "retina_screening"),
+        );
 
         request_ids.push(request_id);
     }
@@ -308,22 +290,20 @@ fn test_panic_recovery_concurrent_requests() {
 
     // Store results for all requests
     for (i, &request_id) in request_ids.iter().enumerate() {
-        let status = client
-            .store_analysis_result(
-                &operator,
-                &request_id,
-                &String::from_str(&env, &format!("sha256:result-{}", i)),
-                &8_800,
-                &3_500,
-            )
-            .unwrap();
+        let status = client.store_analysis_result(
+            &operator,
+            &request_id,
+            &String::from_str(&env, &format!("sha256:result-{}", i)),
+            &8_800,
+            &3_500,
+        );
 
         assert_eq!(status, RequestStatus::Completed);
     }
 
     // Verify all results are stored correctly
     for (i, &request_id) in request_ids.iter().enumerate() {
-        let result = client.get_analysis_result(&request_id).unwrap();
+        let result = client.get_analysis_result(&request_id);
         assert_eq!(
             result.output_hash,
             String::from_str(&env, &format!("sha256:result-{}", i))
@@ -339,32 +319,26 @@ fn test_panic_recovery_provider_status_change_during_processing() {
     let requester = Address::generate(&env);
     let patient = Address::generate(&env);
 
-    client
-        .register_provider(
-            &admin,
-            &1,
-            &operator,
-            &String::from_str(&env, "Provider A"),
-            &String::from_str(&env, "retina-v1"),
-            &String::from_str(&env, "sha256:endpoint"),
-        )
-        .unwrap();
+    client.register_provider(
+        &admin,
+        &1,
+        &operator,
+        &String::from_str(&env, "Provider A"),
+        &String::from_str(&env, "retina-v1"),
+        &String::from_str(&env, "sha256:endpoint"),
+    );
 
-    let request_id = client
-        .submit_analysis_request(
-            &requester,
-            &1,
-            &patient,
-            &9001,
-            &String::from_str(&env, "sha256:image-1"),
-            &String::from_str(&env, "retina_screening"),
-        )
-        .unwrap();
+    let request_id = client.submit_analysis_request(
+        &requester,
+        &1,
+        &patient,
+        &9001,
+        &String::from_str(&env, "sha256:image-1"),
+        &String::from_str(&env, "retina_screening"),
+    );
 
     // Pause the provider
-    client
-        .set_provider_status(&admin, &1, &ProviderStatus::Paused)
-        .unwrap();
+    client.set_provider_status(&admin, &1, &ProviderStatus::Paused);
 
     // Try to store result with paused provider
     let result = client.try_store_analysis_result(
@@ -382,23 +356,19 @@ fn test_panic_recovery_provider_status_change_during_processing() {
     );
 
     // Verify request is still in Pending state
-    let request = client.get_analysis_request(&request_id).unwrap();
+    let request = client.get_analysis_request(&request_id);
     assert_eq!(request.status, RequestStatus::Pending);
 
     // Reactivate provider and retry
-    client
-        .set_provider_status(&admin, &1, &ProviderStatus::Active)
-        .unwrap();
+    client.set_provider_status(&admin, &1, &ProviderStatus::Active);
 
-    let status = client
-        .store_analysis_result(
-            &operator,
-            &request_id,
-            &String::from_str(&env, "sha256:result-1"),
-            &8_800,
-            &3_500,
-        )
-        .unwrap();
+    let status = client.store_analysis_result(
+        &operator,
+        &request_id,
+        &String::from_str(&env, "sha256:result-1"),
+        &8_800,
+        &3_500,
+    );
 
     assert_eq!(status, RequestStatus::Completed);
 }
@@ -411,40 +381,34 @@ fn test_panic_recovery_anomaly_threshold_boundaries() {
     let patient = Address::generate(&env);
 
     // Set threshold to maximum
-    client.set_anomaly_threshold(&admin, &10_000).unwrap();
+    client.set_anomaly_threshold(&admin, &10_000);
 
-    client
-        .register_provider(
-            &admin,
-            &1,
-            &operator,
-            &String::from_str(&env, "Provider A"),
-            &String::from_str(&env, "retina-v1"),
-            &String::from_str(&env, "sha256:endpoint"),
-        )
-        .unwrap();
+    client.register_provider(
+        &admin,
+        &1,
+        &operator,
+        &String::from_str(&env, "Provider A"),
+        &String::from_str(&env, "retina-v1"),
+        &String::from_str(&env, "sha256:endpoint"),
+    );
 
-    let request_id = client
-        .submit_analysis_request(
-            &requester,
-            &1,
-            &patient,
-            &9001,
-            &String::from_str(&env, "sha256:image-1"),
-            &String::from_str(&env, "retina_screening"),
-        )
-        .unwrap();
+    let request_id = client.submit_analysis_request(
+        &requester,
+        &1,
+        &patient,
+        &9001,
+        &String::from_str(&env, "sha256:image-1"),
+        &String::from_str(&env, "retina_screening"),
+    );
 
     // Store result with max anomaly score - should not be flagged
-    let status = client
-        .store_analysis_result(
-            &operator,
-            &request_id,
-            &String::from_str(&env, "sha256:result-1"),
-            &10_000,
-            &10_000,
-        )
-        .unwrap();
+    let status = client.store_analysis_result(
+        &operator,
+        &request_id,
+        &String::from_str(&env, "sha256:result-1"),
+        &10_000,
+        &10_000,
+    );
 
     assert_eq!(status, RequestStatus::Completed);
 
@@ -457,7 +421,7 @@ fn test_panic_recovery_anomaly_threshold_boundaries() {
     );
 
     // Verify threshold is still at max
-    let threshold = client.get_anomaly_threshold().unwrap();
+    let threshold = client.get_anomaly_threshold();
     assert_eq!(threshold, 10_000);
 }
 
@@ -466,16 +430,14 @@ fn test_panic_recovery_anomaly_threshold_boundaries() {
 fn test_panic_recovery_request_counter_saturation() {
     let (env, client, admin, operator) = setup();
 
-    client
-        .register_provider(
-            &admin,
-            &1,
-            &operator,
-            &String::from_str(&env, "Provider A"),
-            &String::from_str(&env, "retina-v1"),
-            &String::from_str(&env, "sha256:endpoint"),
-        )
-        .unwrap();
+    client.register_provider(
+        &admin,
+        &1,
+        &operator,
+        &String::from_str(&env, "Provider A"),
+        &String::from_str(&env, "retina-v1"),
+        &String::from_str(&env, "sha256:endpoint"),
+    );
 
     // Manually set request counter to near u64::MAX
     let counter_key = soroban_sdk::symbol_short!("REQCTR");
@@ -485,30 +447,26 @@ fn test_panic_recovery_request_counter_saturation() {
     let patient = Address::generate(&env);
 
     // Submit request - should use saturating_add
-    let request_id_1 = client
-        .submit_analysis_request(
-            &requester,
-            &1,
-            &patient,
-            &9001,
-            &String::from_str(&env, "sha256:image-1"),
-            &String::from_str(&env, "retina_screening"),
-        )
-        .unwrap();
+    let request_id_1 = client.submit_analysis_request(
+        &requester,
+        &1,
+        &patient,
+        &9001,
+        &String::from_str(&env, "sha256:image-1"),
+        &String::from_str(&env, "retina_screening"),
+    );
 
     assert_eq!(request_id_1, u64::MAX);
 
     // Submit another request - should saturate at u64::MAX
-    let request_id_2 = client
-        .submit_analysis_request(
-            &requester,
-            &1,
-            &patient,
-            &9002,
-            &String::from_str(&env, "sha256:image-2"),
-            &String::from_str(&env, "retina_screening"),
-        )
-        .unwrap();
+    let request_id_2 = client.submit_analysis_request(
+        &requester,
+        &1,
+        &patient,
+        &9002,
+        &String::from_str(&env, "sha256:image-2"),
+        &String::from_str(&env, "retina_screening"),
+    );
 
     assert_eq!(request_id_2, u64::MAX);
 }
@@ -520,53 +478,45 @@ fn test_panic_recovery_verification_rejection_state() {
     let requester = Address::generate(&env);
     let patient = Address::generate(&env);
 
-    client
-        .register_provider(
-            &admin,
-            &1,
-            &operator,
-            &String::from_str(&env, "Provider A"),
-            &String::from_str(&env, "retina-v1"),
-            &String::from_str(&env, "sha256:endpoint"),
-        )
-        .unwrap();
+    client.register_provider(
+        &admin,
+        &1,
+        &operator,
+        &String::from_str(&env, "Provider A"),
+        &String::from_str(&env, "retina-v1"),
+        &String::from_str(&env, "sha256:endpoint"),
+    );
 
-    let request_id = client
-        .submit_analysis_request(
-            &requester,
-            &1,
-            &patient,
-            &9001,
-            &String::from_str(&env, "sha256:image-1"),
-            &String::from_str(&env, "retina_screening"),
-        )
-        .unwrap();
+    let request_id = client.submit_analysis_request(
+        &requester,
+        &1,
+        &patient,
+        &9001,
+        &String::from_str(&env, "sha256:image-1"),
+        &String::from_str(&env, "retina_screening"),
+    );
 
-    client
-        .store_analysis_result(
-            &operator,
-            &request_id,
-            &String::from_str(&env, "sha256:result-1"),
-            &8_800,
-            &3_500,
-        )
-        .unwrap();
+    client.store_analysis_result(
+        &operator,
+        &request_id,
+        &String::from_str(&env, "sha256:result-1"),
+        &8_800,
+        &3_500,
+    );
 
     // Reject the result
-    client
-        .verify_analysis_result(
-            &admin,
-            &request_id,
-            &false,
-            &String::from_str(&env, "sha256:qa-reject"),
-        )
-        .unwrap();
+    client.verify_analysis_result(
+        &admin,
+        &request_id,
+        &false,
+        &String::from_str(&env, "sha256:qa-reject"),
+    );
 
     // Verify both request and result are in rejected state
-    let request = client.get_analysis_request(&request_id).unwrap();
+    let request = client.get_analysis_request(&request_id);
     assert_eq!(request.status, RequestStatus::Rejected);
 
-    let result = client.get_analysis_result(&request_id).unwrap();
+    let result = client.get_analysis_result(&request_id);
     assert_eq!(result.verification_state, VerificationState::Rejected);
 
     // Try to verify again - should fail with InvalidState

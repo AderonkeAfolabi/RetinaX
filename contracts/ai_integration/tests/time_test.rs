@@ -371,7 +371,7 @@ fn test_time_based_request_ordering() {
             &requester,
             &1,
             &patient,
-            &(100 + i as u64),
+            &(100 + i),
             &String::from_str(&env, &format!("input-hash-{}", i)),
             &String::from_str(&env, "diagnosis"),
         );
