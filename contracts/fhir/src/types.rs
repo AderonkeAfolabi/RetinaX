@@ -1,4 +1,32 @@
-use soroban_sdk::{contracttype, Bytes, String};
+use soroban_sdk::{contracttype, Bytes, String, Vec};
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DiagnosticReportStatus {
+    Registered,
+    Partial,
+    Preliminary,
+    Final,
+    Amended,
+    Corrected,
+    Appended,
+    Cancelled,
+    EnteredInError,
+    Unknown,
+}
+
+/// FHIR R4 DiagnosticReport metadata and opaque Observation IDs.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DiagnosticReport {
+    pub id: String,
+    pub status: DiagnosticReportStatus,
+    pub code_system: String,
+    pub code_value: String,
+    pub subject_id: String,
+    pub effective_datetime: u64,
+    pub result_ids: Vec<String>,
+}
 
 /// FHIR R4 Patient projection using an opaque identifier.
 #[contracttype]

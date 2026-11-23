@@ -8,7 +8,7 @@ use soroban_sdk::{
 pub mod types;
 pub mod validation;
 pub use types::FhirError;
-use types::{Gender, MedicationRequest, MinimalPatient, Observation, ObservationStatus, Patient};
+use types::{DiagnosticReport, Gender, MedicationRequest, MinimalPatient, Observation, ObservationStatus, Patient};
 
 use common::migration::{self, FieldTransform, Migration};
 
@@ -190,6 +190,21 @@ impl FhirContract {
     /// Validates a FHIR Patient resource.
     pub fn validate_patient(_env: Env, patient: Patient) -> bool {
         !patient.id.is_empty() && !patient.name.is_empty()
+    }
+
+    /// Validates and returns a metadata-only FHIR R4 DiagnosticReport projection.
+    pub fn map_diagnostic_report(_env: Env, report: DiagnosticReport) -> Result<DiagnosticReport, FhirError> {
+        if !validation::valid_resource_id(&report.id)
+            || !validation::valid_resource_id(&report.subject_id)
+            || report.code_system.is_empty()
+            || report.code_value.is_empty()
+            || report.effective_datetime == 0
+            || report.result_ids.len() > 100
+            || !report.result_ids.iter().all(|id| validation::valid_resource_id(&id))
+        {
+            return Err(FhirError::InvalidRecordData);
+        }
+        Ok(report)
     }
 
     /// Creates a FHIR Observation resource (metadata only).
