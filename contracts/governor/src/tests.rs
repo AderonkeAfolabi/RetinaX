@@ -21,10 +21,9 @@ use soroban_sdk::{
 };
 
 use crate::{
-    delegation,
     proposal::{ProposalAction, ProposalPhase, ProposalType},
     voting::{compute_vote_power, isqrt, loyalty_multiplier_scaled, VoteChoice, SCALE},
-    ContractError, GovernorContract, GovernorContractClient,
+    GovernorContract, GovernorContractClient,
 };
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
@@ -34,7 +33,7 @@ fn create_env() -> Env {
 }
 
 fn register_governor(env: &Env) -> (Address, GovernorContractClient<'_>) {
-    let contract_id = env.register_contract(None, GovernorContract);
+    let contract_id = env.register(GovernorContract, ());
     let client = GovernorContractClient::new(env, &contract_id);
     (contract_id, client)
 }

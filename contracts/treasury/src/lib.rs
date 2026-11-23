@@ -1,4 +1,6 @@
 #![no_std]
+// Retain the existing Soroban event topics and payload layouts for deployed consumers.
+#![allow(deprecated)]
 #![allow(clippy::too_many_arguments)]
 
 #[cfg(test)]

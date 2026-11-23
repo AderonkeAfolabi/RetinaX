@@ -1,4 +1,6 @@
 #![no_std]
+// Retain the existing Soroban event topics and payload layouts for deployed consumers.
+#![allow(deprecated)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 pub mod audit;

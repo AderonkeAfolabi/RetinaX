@@ -50,7 +50,7 @@ fn test_admin_only_function_reverts_for_random_user() {
 
 #[test]
 fn test_initialize_twice_fails() {
-    let (env, client, _admin, random_user) = setup();
+    let (_env, client, _admin, random_user) = setup();
 
     let result = client.try_initialize(&random_user);
 

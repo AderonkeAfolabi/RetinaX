@@ -5,14 +5,8 @@ mod tests {
     use crate::execution::{
         timelock_duration, TIMELOCK_EMERGENCY, TIMELOCK_STANDARD, TIMELOCK_UPGRADE,
     };
-    use crate::proposal::{
-        load, next_id, store, Proposal, ProposalAction, ProposalCategory, ProposalPhase,
-        ProposalType,
-    };
-    use soroban_sdk::{
-        symbol_short, testutils::Address as _, testutils::Ledger as _, Address, BytesN, Env,
-        String, Vec,
-    };
+    use crate::proposal::{load, store, Proposal, ProposalCategory, ProposalPhase, ProposalType};
+    use soroban_sdk::{testutils::Address as _, testutils::Ledger as _, Address, Env, String, Vec};
 
     // -----------------------------------------------------------------------
     // Helpers

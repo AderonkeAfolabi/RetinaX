@@ -1,4 +1,6 @@
 #![no_std]
+// Retain the existing Soroban event topics and payload layouts for deployed consumers.
+#![allow(deprecated)]
 #![allow(clippy::too_many_arguments)]
 
 //! # Governor DAO
@@ -28,9 +30,8 @@ use delegation::Delegation;
 use execution::timelock_duration;
 use proposal::{
     default_category_config, load as load_proposal, load_supply_snapshot, next_id,
-    pass_threshold_bps, quorum_bps, store as store_proposal, store_supply_snapshot,
-    veto_threshold_bps, CategoryConfig, Proposal, ProposalAction, ProposalCategory, ProposalPhase,
-    ProposalType,
+    store as store_proposal, store_supply_snapshot, veto_threshold_bps, CategoryConfig, Proposal,
+    ProposalAction, ProposalCategory, ProposalPhase, ProposalType,
 };
 use voting::{
     compute_vote_power, has_committed, has_voted, load_commit, store_commit, store_vote,
@@ -444,10 +445,9 @@ impl GovernorContract {
             return Err(ContractError::WrongPhase);
         }
         // During timelock only Veto reveals are accepted.
-        if matches!(proposal.phase, ProposalPhase::Timelock) {
-            if !matches!(choice, VoteChoice::Veto) {
-                return Err(ContractError::WrongPhase);
-            }
+        if matches!(proposal.phase, ProposalPhase::Timelock) && !matches!(choice, VoteChoice::Veto)
+        {
+            return Err(ContractError::WrongPhase);
         }
 
         if has_voted(&env, proposal_id, &voter) {
@@ -813,7 +813,7 @@ impl GovernorContract {
     fn hash_commitment(
         env: &Env,
         proposal_id: u64,
-        voter: &Address,
+        _voter: &Address,
         choice: &VoteChoice,
         salt: &BytesN<32>,
     ) -> BytesN<32> {
