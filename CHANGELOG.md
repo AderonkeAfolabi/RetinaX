@@ -5,6 +5,7 @@
 * **ai_integration:** add time-decayed provider reputation (#464).
 * **fhir:** map a minimal pseudonymous Patient projection (#467).
 * **fhir:** validate and map DiagnosticReport metadata and result references (#466).
+* **emr_bridge:** queue failed syncs for bounded exponential retries (#468).
 * **sdk/zk_prover:** add `wasm32-unknown-unknown` WASM build target and browser JS usage guide ([#471](https://github.com/RetinaX-Org/RetinaX/issues/471))
 * **offchain-server:** add cursor pagination and Stellar Ed25519 signature header authentication for `/api/audit-logs` ([#472](https://github.com/RetinaX-Org/RetinaX/issues/472))
 * **offchain-server:** add OpenAPI 3.0 specification, Swagger UI documentation at `/docs`, and database migration tooling ([#473](https://github.com/RetinaX-Org/RetinaX/issues/473))
@@ -68,6 +69,7 @@
 * **ai_integration:** add time-decayed provider reputation (#464).
 * **fhir:** map a minimal pseudonymous Patient projection (#467).
 * **fhir:** validate and map DiagnosticReport metadata and result references (#466).
+* **emr_bridge:** queue failed syncs for bounded exponential retries (#468).
 * **sdk/zk_prover:** add `wasm32-unknown-unknown` WASM build target and browser JS usage guide ([#471](https://github.com/RetinaX-Org/RetinaX/issues/471))
 * **offchain-server:** add cursor pagination and Stellar Ed25519 signature header authentication for `/api/audit-logs` ([#472](https://github.com/RetinaX-Org/RetinaX/issues/472))
 * **offchain-server:** add OpenAPI 3.0 specification, Swagger UI documentation at `/docs`, and database migration tooling ([#473](https://github.com/RetinaX-Org/RetinaX/issues/473))
