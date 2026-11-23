@@ -272,7 +272,7 @@ fn test_multiple_fhir_resources_grouped_under_same_pseudonym() {
 
     // Verify each exchange ID is present in the patient's index.
     for (ex_id, _) in resources {
-        assert!(exchanges.contains(&String::from_str(&s.env, ex_id)));
+        assert!(exchanges.contains(String::from_str(&s.env, ex_id)));
     }
 }
 
@@ -310,11 +310,11 @@ fn test_patient_index_isolation_between_pseudonyms() {
 
     assert_eq!(a_list.len(), 1);
     assert_eq!(b_list.len(), 1);
-    assert!(a_list.contains(&String::from_str(&s.env, "ex-iso-a")));
-    assert!(b_list.contains(&String::from_str(&s.env, "ex-iso-b")));
+    assert!(a_list.contains(String::from_str(&s.env, "ex-iso-a")));
+    assert!(b_list.contains(String::from_str(&s.env, "ex-iso-b")));
     // No cross-contamination.
-    assert!(!a_list.contains(&String::from_str(&s.env, "ex-iso-b")));
-    assert!(!b_list.contains(&String::from_str(&s.env, "ex-iso-a")));
+    assert!(!a_list.contains(String::from_str(&s.env, "ex-iso-b")));
+    assert!(!b_list.contains(String::from_str(&s.env, "ex-iso-a")));
 }
 
 /// A suspended provider must not accept new FHIR data exchanges, preventing
@@ -526,7 +526,7 @@ fn test_sync_verification_reconstructed_from_ledger() {
     assert_eq!(retrieved.exchange_id, exchange_id);
     assert!(!retrieved.is_consistent);
     assert_eq!(retrieved.discrepancies.len(), 2);
-    assert!(retrieved.discrepancies.contains(&String::from_str(
+    assert!(retrieved.discrepancies.contains(String::from_str(
         &s.env,
         "DiagnosticReport.result count differs"
     )));
