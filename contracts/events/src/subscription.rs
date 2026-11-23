@@ -29,6 +29,7 @@ pub struct Subscription {
     pub id: u64,
     pub subscriber: Address,
     pub topic_pattern: String,
+    pub patient: Option<Address>,
     pub created_at: u64,
     pub active: bool,
 }
@@ -113,15 +114,16 @@ pub fn create_subscription(
     env: &Env,
     subscriber: &Address,
     topic_pattern: &String,
+    patient: Option<Address>,
 ) -> Result<u64, EventError> {
     if topic_pattern.is_empty() {
         return Err(EventError::InvalidTopicPattern);
     }
 
-    // Check for duplicate active subscriptions on the same pattern
+    // Check for duplicate active subscriptions on the same pattern and patient
     let existing = get_subscriptions(env, subscriber);
     for sub in existing.iter() {
-        if sub.topic_pattern == *topic_pattern && sub.active {
+        if sub.topic_pattern == *topic_pattern && sub.patient == patient && sub.active {
             return Err(EventError::DuplicateSubscription);
         }
     }
@@ -132,6 +134,7 @@ pub fn create_subscription(
         id: sub_id,
         subscriber: subscriber.clone(),
         topic_pattern: topic_pattern.clone(),
+        patient: patient.clone(),
         created_at: env.ledger().timestamp(),
         active: true,
     };
@@ -402,6 +405,18 @@ pub fn remove_webhook(env: &Env, owner: &Address, webhook_id: u64) -> Result<(),
 
 // ── Topic pattern matching ───────────────────────────────────────────────────
 
+/// Check if a patient filter matches an event's patient.
+///
+/// Returns true if:
+/// - The subscription has no patient filter (None), or
+/// - The subscription patient matches the event's patient exactly
+fn patient_matches(subscription_patient: &Option<Address>, event_patient: &Option<Address>) -> bool {
+    match subscription_patient {
+        None => true,
+        Some(sub_patient) => event_patient.as_ref() == Some(sub_patient),
+    }
+}
+
 /// Match a concrete topic against a subscription pattern.
 ///
 /// Supported patterns:
@@ -499,7 +514,10 @@ pub fn dispatch_to_subscribers(env: &Env, envelope: &EventEnvelope) {
             .persistent()
             .get::<_, Subscription>(&sub_key(sub_id))
         {
-            if sub.active && topic_matches(env, &sub.topic_pattern, &envelope.topic) {
+            if sub.active
+                && topic_matches(env, &sub.topic_pattern, &envelope.topic)
+                && patient_matches(&sub.patient, &envelope.patient)
+            {
                 env.events().publish(
                     (
                         symbol_short!("DISPATCH"),
