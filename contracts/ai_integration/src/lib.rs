@@ -5,6 +5,21 @@
 #[cfg(test)]
 mod test;
 
+#[cfg(test)]
+mod reputation_tests {
+    use super::*;
+
+    #[test]
+    fn decays_one_half_per_complete_period_and_saturates() {
+        let score = Reputation { score: MAX_BPS, updated_at: 100 };
+        assert_eq!(decayed_score(&score, 99), 10_000);
+        assert_eq!(decayed_score(&score, 100 + HALF_LIFE - 1), 10_000);
+        assert_eq!(decayed_score(&score, 100 + HALF_LIFE), 5_000);
+        assert_eq!(decayed_score(&score, 100 + 2 * HALF_LIFE), 2_500);
+        assert_eq!(decayed_score(&score, u64::MAX), 0);
+    }
+}
+
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, symbol_short, Address, Env, String,
     Symbol, Vec,
@@ -28,6 +43,20 @@ const EVT_RESULT_VERIFIED: Symbol = symbol_short!("RES_VFY");
 const EVT_MODEL_VERSION: Symbol = symbol_short!("MDL_VER");
 
 const MAX_BPS: u32 = 10_000;
+const REPUTATION: Symbol = symbol_short!("REPUTE");
+const HALF_LIFE: u64 = 30 * 24 * 60 * 60;
+
+#[contracttype]
+#[derive(Clone)]
+struct Reputation {
+    score: u32,
+    updated_at: u64,
+}
+
+fn decayed_score(reputation: &Reputation, now: u64) -> u32 {
+    let periods = now.saturating_sub(reputation.updated_at) / HALF_LIFE;
+    reputation.score >> periods.min(31) as u32
+}
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -454,6 +483,16 @@ impl AiIntegrationContract {
             .get(&result_key)
             .ok_or(AiIntegrationError::ResultNotFound)?;
 
+        if result.verification_state == VerificationState::Unverified {
+            let key = (REPUTATION, request.provider_id);
+            let now = env.ledger().timestamp();
+            let sample = if accepted { MAX_BPS } else { 0 };
+            let score = env.storage().persistent().get::<_, Reputation>(&key)
+                .map(|old| (decayed_score(&old, now) + sample) / 2)
+                .unwrap_or(sample);
+            env.storage().persistent().set(&key, &Reputation { score, updated_at: now });
+        }
+
         result.verification_state = if accepted {
             VerificationState::Verified
         } else {
@@ -472,6 +511,13 @@ impl AiIntegrationContract {
         env.events()
             .publish((EVT_RESULT_VERIFIED, request_id, accepted), result.clone());
         Ok(())
+    }
+
+    /// Returns the decayed score in basis points, or None before the first review.
+    pub fn get_provider_reputation(env: Env, provider_id: u32) -> Result<Option<u32>, AiIntegrationError> {
+        Self::get_provider(env.clone(), provider_id)?;
+        Ok(env.storage().persistent().get::<_, Reputation>(&(REPUTATION, provider_id))
+            .map(|value| decayed_score(&value, env.ledger().timestamp())))
     }
 
     pub fn get_analysis_request(
