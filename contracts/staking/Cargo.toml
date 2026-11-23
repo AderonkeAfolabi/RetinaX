@@ -13,8 +13,13 @@ doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
-audit       = { path = "../audit" }
 common = { path = "../common", default-features = false }
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+audit = { path = "../audit" }
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+audit = { path = "../audit", features = ["library"] }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
