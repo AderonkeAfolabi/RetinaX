@@ -32,7 +32,7 @@ pub use types::*;
 
 use examination::{EXAM_KEY, EXAM_VERSION_KEY};
 use prescription::{PRESCRIPTION_KEY, RX_VERSION_KEY};
-use soroban_sdk::{contract, contractimpl, Address, Bytes, BytesN, Env, String, Vec};
+use soroban_sdk::{Address, Bytes, BytesN, Env, String, Vec};
 
 #[cfg(not(target_family = "wasm"))]
 use ::fhir as fhir_interface;
@@ -51,10 +51,16 @@ use access_types::Permission;
 use fhir_interface::types::{MedicationRequest, Observation};
 
 /// Soroban contract that stores eye examinations and prescriptions.
-#[contract]
+#[cfg_attr(
+    not(all(target_family = "wasm", feature = "library")),
+    soroban_sdk::contract
+)]
 pub struct ClinicalRecordsContract;
 
-#[contractimpl]
+#[cfg_attr(
+    not(all(target_family = "wasm", feature = "library")),
+    soroban_sdk::contractimpl
+)]
 impl ClinicalRecordsContract {
     /// Initializes the contract once.
     ///
@@ -537,4 +543,18 @@ pub(crate) fn contract_text(value: &soroban_sdk::String) -> alloc::string::Strin
     let mut bytes = alloc::vec![0; value.len() as usize];
     value.copy_into_slice(&mut bytes);
     alloc::string::String::from_utf8_lossy(&bytes).into_owned()
+}
+
+#[cfg(all(target_family = "wasm", feature = "library"))]
+#[soroban_sdk::contractclient(name = "ClinicalRecordsContractClient")]
+#[allow(dead_code)]
+pub trait ClinicalRecordsInterface {
+    fn prepare_add_prescription(
+        env: Env,
+        caller: Address,
+        patient: Address,
+        provider: Address,
+        prescription_data: PrescriptionData,
+    ) -> Result<u64, ContractError>;
+    fn commit_add_prescription(env: Env, caller: Address, rx_id: u64) -> Result<(), ContractError>;
 }

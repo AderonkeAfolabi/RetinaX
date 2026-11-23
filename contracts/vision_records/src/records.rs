@@ -94,15 +94,15 @@ impl VisionRecordsContract {
                 .persistent()
                 .get::<(Symbol, String), String>(&(ENC_KEY, ver.clone()))
             {
-                let hex = sv.to_string();
-                if let Some(bytes) = teye_common::hex_to_bytes(&hex) {
+                let hex = soroban_str_to_std(&sv);
+                if let Some(bytes) = hex_to_bytes(&hex) {
                     master_bytes = bytes;
                 }
             }
         }
         // Build KeyManager and encrypt the provided data_hash
         let km = KeyManager::new(master_bytes);
-        let plaintext: StdString = data_hash.to_string();
+        let plaintext: StdString = soroban_str_to_std(&data_hash);
         let ciphertext = km.encrypt(None, &plaintext);
         let stored_hash = String::from_str(&env, &ciphertext);
         let key_version = current_version;
@@ -235,8 +235,8 @@ impl VisionRecordsContract {
                 .persistent()
                 .get::<(Symbol, String), String>(&(ENC_KEY, ver.clone()))
             {
-                let hex = sv.to_string();
-                if let Some(bytes) = teye_common::hex_to_bytes(&hex) {
+                let hex = soroban_str_to_std(&sv);
+                if let Some(bytes) = hex_to_bytes(&hex) {
                     master_bytes_batch = bytes;
                 }
             }
@@ -257,7 +257,7 @@ impl VisionRecordsContract {
 
             // Encrypt input.data_hash with master bytes
             let km = KeyManager::new(master_bytes);
-            let plaintext: StdString = input.data_hash.to_string();
+            let plaintext: StdString = soroban_str_to_std(&input.data_hash);
             let ciphertext = km.encrypt(None, &plaintext);
             let stored_hash = String::from_str(&env, &ciphertext);
 
@@ -412,8 +412,8 @@ impl VisionRecordsContract {
                         .persistent()
                         .get::<(Symbol, String), String>(&(ENC_KEY, ver.clone()))
                     {
-                        let hex = sv.to_string();
-                        if let Some(bytes) = teye_common::hex_to_bytes(&hex) {
+                        let hex = soroban_str_to_std(&sv);
+                        if let Some(bytes) = hex_to_bytes(&hex) {
                             master_bytes = bytes;
                         }
                     }
@@ -421,7 +421,7 @@ impl VisionRecordsContract {
 
                 if !master_bytes.is_empty() || out_record.key_version.is_none() {
                     let km = KeyManager::new(master_bytes);
-                    let ciphertext = out_record.data_hash.to_string();
+                    let ciphertext = soroban_str_to_std(&out_record.data_hash);
                     if let Some(plain) = km.decrypt(None, &ciphertext) {
                         out_record.data_hash = String::from_str(&env, &plain);
                     }

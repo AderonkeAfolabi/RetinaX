@@ -24,7 +24,7 @@ extern crate alloc;
 ///
 /// `soroban_sdk::String` only implements `Display` when `std` is available, so
 /// `.to_string()` does not compile for the wasm target; this works everywhere.
-pub(crate) fn soroban_str_to_std(s: &soroban_sdk::String) -> alloc::string::String {
+pub fn soroban_str_to_std(s: &soroban_sdk::String) -> alloc::string::String {
     let mut buf = alloc::vec![0u8; s.len() as usize];
     s.copy_into_slice(&mut buf);
     alloc::string::String::from_utf8_lossy(&buf).into_owned()
