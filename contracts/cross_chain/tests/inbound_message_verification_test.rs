@@ -13,8 +13,8 @@
 //!    by tracking processed message IDs.
 
 use cross_chain::{
-    bridge::{self, import_record},
-    CrossChainContract, CrossChainContractClient, CrossChainError, CrossChainMessage,
+    bridge, merkle_tree::FieldEntry, CrossChainContract, CrossChainContractClient, CrossChainError,
+    CrossChainMessage,
 };
 use soroban_sdk::{
     contract, contractimpl, symbol_short, testutils::Address as _, testutils::Ledger, Address,
@@ -35,14 +35,13 @@ impl MockVisionRecords {
         _bridge_caller: Address,
         patient: Address,
         payload: Bytes,
-    ) -> Result<(), ()> {
+    ) {
         env.storage()
             .instance()
             .set(&symbol_short!("LAST_PAT"), &patient);
         env.storage()
             .instance()
             .set(&symbol_short!("LAST_PAY"), &payload);
-        Ok(())
     }
 }
 
@@ -87,7 +86,7 @@ fn test_valid_merkle_proof_accepted() {
     let record_id_bytes = record_id(&env, b"inbound_record_001");
     let record_data = Bytes::from_slice(&env, b"medical_record_payload_001");
 
-    let fields: Vec<bridge::FieldEntry> = Vec::new(&env);
+    let fields: Vec<FieldEntry> = Vec::new(&env);
 
     // Export from source chain (simulated)
     let pkg = bridge::export_record(
@@ -101,11 +100,11 @@ fn test_valid_merkle_proof_accepted() {
 
     // Anchor the state root on target chain
     let exported_root = pkg.state_root.clone();
-    client.anchor_state_root(&exported_root, symbol_short!("ETH"));
+    client.anchor_state_root(&admin, &exported_root, &symbol_short!("ETH"));
 
     // Advance ledger beyond finality window
     env.ledger().with_mut(|l| {
-        l.sequence_number = l.sequence_number + 50;
+        l.sequence_number += 50;
     });
 
     // Import should succeed with valid proof
@@ -133,7 +132,7 @@ fn test_invalid_merkle_proof_rejected() {
     // Create a valid export package
     let record_id_bytes = record_id(&env, b"inbound_record_002");
     let record_data = Bytes::from_slice(&env, b"medical_record_payload_002");
-    let fields: Vec<bridge::FieldEntry> = Vec::new(&env);
+    let fields: Vec<FieldEntry> = Vec::new(&env);
 
     let mut pkg = bridge::export_record(
         &env,
@@ -145,13 +144,13 @@ fn test_invalid_merkle_proof_rejected() {
     );
 
     let exported_root = pkg.state_root.clone();
-    client.anchor_state_root(&exported_root, symbol_short!("ETH"));
+    client.anchor_state_root(&admin, &exported_root, &symbol_short!("ETH"));
 
     // Tamper with the record data to invalidate the proof
     pkg.record_data = Bytes::from_slice(&env, b"tampered_payload");
 
     env.ledger().with_mut(|l| {
-        l.sequence_number = l.sequence_number + 50;
+        l.sequence_number += 50;
     });
 
     // Import should fail with invalid proof
@@ -179,7 +178,7 @@ fn test_proof_against_unregistered_root_rejected() {
     // Create export package
     let record_id_bytes = record_id(&env, b"inbound_record_003");
     let record_data = Bytes::from_slice(&env, b"medical_record_payload_003");
-    let fields: Vec<bridge::FieldEntry> = Vec::new(&env);
+    let fields: Vec<FieldEntry> = Vec::new(&env);
 
     let pkg = bridge::export_record(
         &env,
@@ -194,7 +193,7 @@ fn test_proof_against_unregistered_root_rejected() {
     let fake_root = record_id(&env, b"fake_root");
 
     env.ledger().with_mut(|l| {
-        l.sequence_number = l.sequence_number + 50;
+        l.sequence_number += 50;
     });
 
     // Import should fail - root not anchored
@@ -229,7 +228,7 @@ fn test_message_within_finality_window_rejected() {
     // Create and anchor at ledger 1000
     let record_id_bytes = record_id(&env, b"inbound_record_004");
     let record_data = Bytes::from_slice(&env, b"medical_record_payload_004");
-    let fields: Vec<bridge::FieldEntry> = Vec::new(&env);
+    let fields: Vec<FieldEntry> = Vec::new(&env);
 
     let pkg = bridge::export_record(
         &env,
@@ -241,7 +240,7 @@ fn test_message_within_finality_window_rejected() {
     );
 
     let exported_root = pkg.state_root.clone();
-    client.anchor_state_root(&exported_root, symbol_short!("ETH"));
+    client.anchor_state_root(&admin, &exported_root, &symbol_short!("ETH"));
 
     // Try to import immediately (within finality window)
     // Default finality check should reject this
@@ -272,7 +271,7 @@ fn test_message_after_finality_window_accepted() {
     // Create and anchor at ledger 1000
     let record_id_bytes = record_id(&env, b"inbound_record_005");
     let record_data = Bytes::from_slice(&env, b"medical_record_payload_005");
-    let fields: Vec<bridge::FieldEntry> = Vec::new(&env);
+    let fields: Vec<FieldEntry> = Vec::new(&env);
 
     let pkg = bridge::export_record(
         &env,
@@ -284,11 +283,11 @@ fn test_message_after_finality_window_accepted() {
     );
 
     let exported_root = pkg.state_root.clone();
-    client.anchor_state_root(&exported_root, symbol_short!("ETH"));
+    client.anchor_state_root(&admin, &exported_root, &symbol_short!("ETH"));
 
     // Advance well beyond finality window (e.g., 100 ledgers)
     env.ledger().with_mut(|l| {
-        l.sequence_number = l.sequence_number + 100;
+        l.sequence_number += 100;
     });
 
     // Should now be accepted
@@ -322,7 +321,7 @@ fn test_out_of_order_messages_handled() {
     let record2_id = record_id(&env, b"inbound_record_B");
     let record2_data = Bytes::from_slice(&env, b"record_B");
 
-    let fields: Vec<bridge::FieldEntry> = Vec::new(&env);
+    let fields: Vec<FieldEntry> = Vec::new(&env);
 
     let pkg1 = bridge::export_record(
         &env,
@@ -345,12 +344,12 @@ fn test_out_of_order_messages_handled() {
     // Anchor both roots
     let root1 = pkg1.state_root.clone();
     let root2 = pkg2.state_root.clone();
-    client.anchor_state_root(&root1, symbol_short!("ETH"));
-    client.anchor_state_root(&root2, symbol_short!("ETH"));
+    client.anchor_state_root(&admin, &root1, &symbol_short!("ETH"));
+    client.anchor_state_root(&admin, &root2, &symbol_short!("ETH"));
 
     // Advance beyond finality
     env.ledger().with_mut(|l| {
-        l.sequence_number = l.sequence_number + 50;
+        l.sequence_number += 50;
     });
 
     // Process record B first (out of order)
@@ -472,7 +471,7 @@ fn test_duplicate_record_import_prevented() {
     // Create and export a record
     let record_id_bytes = record_id(&env, b"duplicate_test_record");
     let record_data = Bytes::from_slice(&env, b"record_data");
-    let fields: Vec<bridge::FieldEntry> = Vec::new(&env);
+    let fields: Vec<FieldEntry> = Vec::new(&env);
 
     let pkg = bridge::export_record(
         &env,
@@ -484,10 +483,10 @@ fn test_duplicate_record_import_prevented() {
     );
 
     let exported_root = pkg.state_root.clone();
-    client.anchor_state_root(&exported_root, symbol_short!("ETH"));
+    client.anchor_state_root(&admin, &exported_root, &symbol_short!("ETH"));
 
     env.ledger().with_mut(|l| {
-        l.sequence_number = l.sequence_number + 50;
+        l.sequence_number += 50;
     });
 
     // First import should succeed
@@ -522,7 +521,7 @@ fn test_zero_finality_depth_immediate_import() {
     // Create and anchor
     let record_id_bytes = record_id(&env, b"immediate_record");
     let record_data = Bytes::from_slice(&env, b"data");
-    let fields: Vec<bridge::FieldEntry> = Vec::new(&env);
+    let fields: Vec<FieldEntry> = Vec::new(&env);
 
     let pkg = bridge::export_record(
         &env,
@@ -534,7 +533,7 @@ fn test_zero_finality_depth_immediate_import() {
     );
 
     let exported_root = pkg.state_root.clone();
-    client.anchor_state_root(&exported_root, symbol_short!("ETH"));
+    client.anchor_state_root(&admin, &exported_root, &symbol_short!("ETH"));
 
     // With finality_depth=0, should succeed immediately
     // This tests the boundary condition
@@ -564,12 +563,12 @@ fn test_field_proof_verification_on_import() {
     let record_id_bytes = record_id(&env, b"field_proof_record");
     let record_data = Bytes::from_slice(&env, b"full_record_data");
 
-    let mut fields: Vec<bridge::FieldEntry> = Vec::new(&env);
-    fields.push_back(bridge::FieldEntry {
+    let mut fields: Vec<FieldEntry> = Vec::new(&env);
+    fields.push_back(FieldEntry {
         key: Bytes::from_slice(&env, b"diagnosis"),
         value: Bytes::from_slice(&env, b"myopia"),
     });
-    fields.push_back(bridge::FieldEntry {
+    fields.push_back(FieldEntry {
         key: Bytes::from_slice(&env, b"prescription"),
         value: Bytes::from_slice(&env, b"-2.50"),
     });
@@ -588,10 +587,10 @@ fn test_field_proof_verification_on_import() {
     );
 
     let exported_root = pkg.state_root.clone();
-    client.anchor_state_root(&exported_root, symbol_short!("ETH"));
+    client.anchor_state_root(&admin, &exported_root, &symbol_short!("ETH"));
 
     env.ledger().with_mut(|l| {
-        l.sequence_number = l.sequence_number + 50;
+        l.sequence_number += 50;
     });
 
     // Import with valid field proofs should succeed

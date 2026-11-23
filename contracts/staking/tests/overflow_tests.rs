@@ -3,7 +3,6 @@
 
 #[cfg(test)]
 mod overflow_boundary_tests {
-    use super::*;
 
     #[test]
     #[should_panic(expected = "overflow")]
@@ -110,12 +109,7 @@ mod overflow_boundary_tests {
         let reward = 1000u64;
         let total_stake = 0u64;
 
-        if total_stake == 0 {
-            // Should not attempt division
-            assert!(true, "Division by zero avoided");
-        } else {
-            let _share = reward / total_stake;
-        }
+        assert_eq!(reward.checked_div(total_stake), None);
     }
 
     #[test]

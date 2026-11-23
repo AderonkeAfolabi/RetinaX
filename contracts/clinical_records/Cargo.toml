@@ -15,11 +15,12 @@ name = "clinical_records_test"
 path = "tests/clinical_records_test.rs"
 
 [dependencies]
-soroban-sdk = { workspace = true }
-fhir = { path = "../fhir" }
-access_control = { path = "../access_control" }
+soroban-sdk = { workspace = true, features = ["alloc"] }
 common = { path = "../common", default-features = false }
 
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+fhir = { path = "../fhir" }
+access_control = { path = "../access_control" }
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
 serde_json = "1.0.149"

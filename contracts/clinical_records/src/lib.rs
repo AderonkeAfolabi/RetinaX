@@ -34,9 +34,21 @@ use examination::{EXAM_KEY, EXAM_VERSION_KEY};
 use prescription::{PRESCRIPTION_KEY, RX_VERSION_KEY};
 use soroban_sdk::{contract, contractimpl, Address, Bytes, BytesN, Env, String, Vec};
 
-// `::fhir` is the fhir contract crate; plain `fhir` here would be this crate's
-// FHIR JSON export module.
-use ::fhir::types::{MedicationRequest, Observation};
+#[cfg(not(target_family = "wasm"))]
+use ::fhir as fhir_interface;
+#[cfg(not(target_family = "wasm"))]
+use access_control::Permission;
+
+#[cfg(target_family = "wasm")]
+#[path = "../../access_control/src/types.rs"]
+mod access_types;
+#[cfg(target_family = "wasm")]
+#[path = "fhir_interface.rs"]
+mod fhir_interface;
+#[cfg(target_family = "wasm")]
+use access_types::Permission;
+
+use fhir_interface::types::{MedicationRequest, Observation};
 
 /// Soroban contract that stores eye examinations and prescriptions.
 #[contract]

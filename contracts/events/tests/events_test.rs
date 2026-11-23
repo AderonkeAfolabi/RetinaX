@@ -128,7 +128,7 @@ fn test_publish_event_emits_event() {
     let topic = String::from_str(&env, "records.vision.create");
     let payload = String::from_str(&env, "payload_hash_1");
 
-    client.publish_event(&admin, &topic, &1, &payload);
+    client.publish_event(&admin, &topic, &1, &payload, &None);
 
     let binding = env.events().all();
     let events = binding.events();
@@ -148,7 +148,7 @@ fn test_multiple_publishes_emit_multiple_events() {
     let payload = String::from_str(&env, "p");
 
     for i in 0..3u32 {
-        client.publish_event(&admin, &topic, &1, &payload);
+        client.publish_event(&admin, &topic, &1, &payload, &None);
         let binding = env.events().all();
         let events = binding.events();
         assert!(
@@ -170,7 +170,7 @@ fn test_registered_source_publish_emits_event() {
     let topic = String::from_str(&env, "records.vision.create");
     let payload = String::from_str(&env, "source_payload");
 
-    client.publish_event(&source, &topic, &1, &payload);
+    client.publish_event(&source, &topic, &1, &payload, &None);
 
     let binding = env.events().all();
     let events = binding.events();
@@ -311,7 +311,7 @@ fn test_full_flow_emits_events_at_each_step() {
 
     // Step 3: publish event
     let payload = String::from_str(&env, "p1");
-    client.publish_event(&admin, &topic, &1, &payload);
+    client.publish_event(&admin, &topic, &1, &payload, &None);
     let e3_ev = env.events().all();
     let e3 = e3_ev.events().len();
     assert!(e3 > 0, "publish_event must emit events");

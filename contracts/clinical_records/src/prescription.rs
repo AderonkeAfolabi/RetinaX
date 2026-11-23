@@ -4,14 +4,16 @@ use crate::admin::{
 };
 use crate::errors::ContractError;
 use crate::examination::validate_string;
+use crate::fhir_interface::types::{
+    MedicationRequest, MedicationRequestIntent, MedicationRequestStatus,
+};
+use crate::fhir_interface::validation;
 use crate::migration;
 use crate::session::{resolve_caller, PRESCRIPTION_LEVEL};
 use crate::types::{
     BatchPrescriptionInput, LensType, OptionalContactLensData, Prescription, PrescriptionData,
 };
-use access_control::Permission;
-use fhir::types::{MedicationRequest, MedicationRequestIntent, MedicationRequestStatus};
-use fhir::validation;
+use crate::Permission;
 use soroban_sdk::{symbol_short, Address, Env, String, Symbol, Vec};
 
 pub const PRESCRIPTION_KEY: Symbol = symbol_short!("RX");

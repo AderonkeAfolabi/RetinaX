@@ -7,7 +7,7 @@ use governor::{GovernorContract, GovernorContractClient};
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Ledger},
-    vec, Address, BytesN, Env, String, Vec,
+    vec, Address, BytesN, Env, String,
 };
 
 fn setup() -> (Env, Address, GovernorContractClient<'static>, Address) {
@@ -86,7 +86,7 @@ fn test_discussion_to_voting_requires_time() {
 
 #[test]
 fn test_timelock_requires_timestamp_to_expire() {
-    let (env, contract_id, client, proposer) = setup();
+    let (env, contract_id, client, _proposer) = setup();
 
     let proposer = Address::generate(&env);
     set_mock_stake(&env, &contract_id, &proposer, 250_000_000);

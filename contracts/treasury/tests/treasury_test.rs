@@ -111,7 +111,7 @@ fn test_initialization_lifecycle_and_validation() {
     let admin = Address::generate(&env);
     let s1 = Address::generate(&env);
 
-    let mut empty_signers = Vec::new(&env);
+    let empty_signers = Vec::new(&env);
     assert_eq!(
         client.try_initialize(&admin, &empty_signers, &1),
         Err(Ok(ContractError::NoSigners))
@@ -207,15 +207,25 @@ fn test_governor_spend_lifecycle_and_balance_invariants() {
     // Unauthorized caller cannot spend
     let impostor = Address::generate(&ctx.env);
     assert_eq!(
-        ctx.client
-            .try_governor_spend(&impostor, &ctx.token1, &recipient, &spend_amount),
+        ctx.client.try_governor_spend(
+            &impostor,
+            &ctx.token1,
+            &recipient,
+            &spend_amount,
+            &symbol_short!("GOVERN")
+        ),
         Err(Ok(ContractError::NotAuthorizedCaller))
     );
 
     // Zero / negative amount rejected
     assert_eq!(
-        ctx.client
-            .try_governor_spend(&governor, &ctx.token1, &recipient, &0i128),
+        ctx.client.try_governor_spend(
+            &governor,
+            &ctx.token1,
+            &recipient,
+            &0i128,
+            &symbol_short!("GOVERN")
+        ),
         Err(Ok(ContractError::PositiveAmountRequired))
     );
 
@@ -223,17 +233,26 @@ fn test_governor_spend_lifecycle_and_balance_invariants() {
     ctx.client
         .set_asset_limit(&ctx.admin, &ctx.token1, &10_000i128);
     assert_eq!(
-        ctx.client
-            .try_governor_spend(&governor, &ctx.token1, &recipient, &spend_amount),
+        ctx.client.try_governor_spend(
+            &governor,
+            &ctx.token1,
+            &recipient,
+            &spend_amount,
+            &symbol_short!("GOVERN")
+        ),
         Err(Ok(ContractError::LimitExceeded))
     );
 
     // Reset limit and execute valid spend
     ctx.client
         .set_asset_limit(&ctx.admin, &ctx.token1, &100_000i128);
-    let spend_res =
-        ctx.client
-            .try_governor_spend(&governor, &ctx.token1, &recipient, &spend_amount);
+    let spend_res = ctx.client.try_governor_spend(
+        &governor,
+        &ctx.token1,
+        &recipient,
+        &spend_amount,
+        &symbol_short!("GOVERN"),
+    );
     assert!(spend_res.is_ok());
 
     // Balance invariant: initial = spent + remaining

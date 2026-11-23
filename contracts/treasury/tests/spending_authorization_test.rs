@@ -169,6 +169,7 @@ fn test_governor_spending_proposal_passes_and_executes() {
         &ctx.token_a,
         &recipient,
         &spend_amount,
+        &symbol_short!("GOVERN"),
     );
     assert!(spend_res.is_ok());
 
@@ -196,9 +197,13 @@ fn test_direct_treasury_withdrawal_without_governor_rejected() {
     let recipient = Address::generate(&ctx.env);
 
     // 1. Random attacker calling governor_spend is rejected
-    let res =
-        ctx.treasury_client
-            .try_governor_spend(&attacker, &ctx.token_a, &recipient, &10_000i128);
+    let res = ctx.treasury_client.try_governor_spend(
+        &attacker,
+        &ctx.token_a,
+        &recipient,
+        &10_000i128,
+        &symbol_short!("GOVERN"),
+    );
     assert_eq!(res, Err(Ok(ContractError::NotAuthorizedCaller)));
 
     // 2. Even a multisig signer calling governor_spend directly is rejected
@@ -207,13 +212,18 @@ fn test_direct_treasury_withdrawal_without_governor_rejected() {
         &ctx.token_a,
         &recipient,
         &10_000i128,
+        &symbol_short!("GOVERN"),
     );
     assert_eq!(signer_attempt, Err(Ok(ContractError::NotAuthorizedCaller)));
 
     // 3. Admin calling governor_spend directly is rejected (must go through governor)
-    let admin_attempt =
-        ctx.treasury_client
-            .try_governor_spend(&ctx.admin, &ctx.token_a, &recipient, &10_000i128);
+    let admin_attempt = ctx.treasury_client.try_governor_spend(
+        &ctx.admin,
+        &ctx.token_a,
+        &recipient,
+        &10_000i128,
+        &symbol_short!("GOVERN"),
+    );
     assert_eq!(admin_attempt, Err(Ok(ContractError::NotAuthorizedCaller)));
 }
 
@@ -225,9 +235,13 @@ fn test_spending_proposal_exceeding_balance_or_limit_rejected() {
     let recipient = Address::generate(&ctx.env);
 
     // 1. Non-positive spend amount rejected
-    let res_zero =
-        ctx.treasury_client
-            .try_governor_spend(&ctx.governor_id, &ctx.token_a, &recipient, &0i128);
+    let res_zero = ctx.treasury_client.try_governor_spend(
+        &ctx.governor_id,
+        &ctx.token_a,
+        &recipient,
+        &0i128,
+        &symbol_short!("GOVERN"),
+    );
     assert_eq!(res_zero, Err(Ok(ContractError::PositiveAmountRequired)));
 
     let res_neg = ctx.treasury_client.try_governor_spend(
@@ -235,6 +249,7 @@ fn test_spending_proposal_exceeding_balance_or_limit_rejected() {
         &ctx.token_a,
         &recipient,
         &-100i128,
+        &symbol_short!("GOVERN"),
     );
     assert_eq!(res_neg, Err(Ok(ContractError::PositiveAmountRequired)));
 
@@ -248,13 +263,20 @@ fn test_spending_proposal_exceeding_balance_or_limit_rejected() {
         &ctx.token_a,
         &recipient,
         &50_001i128,
+        &symbol_short!("GOVERN"),
     );
     assert_eq!(res_limit, Err(Ok(ContractError::LimitExceeded)));
 
     // Spend of 50,000 within limit succeeds
     assert!(ctx
         .treasury_client
-        .try_governor_spend(&ctx.governor_id, &ctx.token_a, &recipient, &50_000i128)
+        .try_governor_spend(
+            &ctx.governor_id,
+            &ctx.token_a,
+            &recipient,
+            &50_000i128,
+            &symbol_short!("GOVERN")
+        )
         .is_ok());
 
     // 3. Transfer proposal exceeding limit is rejected
@@ -291,8 +313,13 @@ fn test_multi_token_treasury_management() {
     assert_eq!(ctx.treasury_client.get_limit(&ctx.token_c), i128::MAX);
 
     // 1. Governor spend for Token A
-    ctx.treasury_client
-        .governor_spend(&ctx.governor_id, &ctx.token_a, &recipient_a, &30_000i128);
+    ctx.treasury_client.governor_spend(
+        &ctx.governor_id,
+        &ctx.token_a,
+        &recipient_a,
+        &30_000i128,
+        &symbol_short!("GOVERN"),
+    );
 
     // 2. Multisig transfer proposal for Token B
     let prop_b = ctx.treasury_client.create_transfer_proposal(
@@ -364,8 +391,13 @@ fn test_balance_invariants_and_category_allocation_tracking() {
     let rec2 = Address::generate(&ctx.env);
 
     // Operation 1: Governor Spend (20,000)
-    ctx.treasury_client
-        .governor_spend(&ctx.governor_id, &ctx.token_a, &rec1, &20_000i128);
+    ctx.treasury_client.governor_spend(
+        &ctx.governor_id,
+        &ctx.token_a,
+        &rec1,
+        &20_000i128,
+        &symbol_short!("GOVERN"),
+    );
 
     // Operation 2: Multisig Transfer (50,000)
     let prop = ctx.treasury_client.create_transfer_proposal(

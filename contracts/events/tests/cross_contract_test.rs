@@ -25,7 +25,7 @@ fn test_cross_contract_calling_invariants() {
 
     // Ensure we can publish parsing cross contract mock
     let payload = String::from_str(&env, "payload");
-    client.publish_event(&admin, &topic, &1, &payload);
+    client.publish_event(&admin, &topic, &1, &payload, &None);
 
     let all_events = env.events().all();
     assert!(
@@ -65,7 +65,7 @@ fn test_cross_contract_subscription_notification_flow() {
 
     // Publish event that matches the subscription pattern
     let payload = String::from_str(&env, "crosschain_payload_data");
-    let event_id = client.publish_event(&admin, &topic, &1, &payload);
+    let event_id = client.publish_event(&admin, &topic, &1, &payload, &None);
     assert!(event_id > 0, "Event should be published");
 
     // Verify events were emitted
@@ -109,8 +109,8 @@ fn test_subscription_notification_flow_end_to_end() {
 
     // Publish events - some match, some don't
     let payload = String::from_str(&env, "payload");
-    client.publish_event(&admin, &topic1, &1, &payload); // matches both
-    client.publish_event(&admin, &topic2, &1, &payload); // matches only first
+    client.publish_event(&admin, &topic1, &1, &payload, &None); // matches both
+    client.publish_event(&admin, &topic2, &1, &payload, &None); // matches only first
 
     let all_events = env.events().all();
     assert!(
@@ -137,7 +137,7 @@ fn test_dead_letter_queue_end_to_end() {
     client.register_schema(&admin, &topic, &1, &hash);
 
     let payload = String::from_str(&env, "error_payload");
-    let event_id = client.publish_event(&admin, &topic, &1, &payload);
+    let event_id = client.publish_event(&admin, &topic, &1, &payload, &None);
 
     // Create subscriber
     let subscriber = Address::generate(&env);
@@ -192,9 +192,9 @@ fn test_dead_letter_queue_multiple_entries() {
     client.register_schema(&admin, &topic, &1, &hash);
 
     let payload = String::from_str(&env, "payload");
-    let event_id1 = client.publish_event(&admin, &topic, &1, &payload);
-    let event_id2 = client.publish_event(&admin, &topic, &1, &payload);
-    let event_id3 = client.publish_event(&admin, &topic, &1, &payload);
+    let event_id1 = client.publish_event(&admin, &topic, &1, &payload, &None);
+    let event_id2 = client.publish_event(&admin, &topic, &1, &payload, &None);
+    let event_id3 = client.publish_event(&admin, &topic, &1, &payload, &None);
 
     let subscriber1 = Address::generate(&env);
     let subscriber2 = Address::generate(&env);
@@ -256,7 +256,7 @@ fn test_cross_contract_event_emission_with_registered_source() {
 
     // External contract publishes event
     let payload = String::from_str(&env, "external_payload");
-    let event_id = client.publish_event(&external_contract, &topic, &1, &payload);
+    let event_id = client.publish_event(&external_contract, &topic, &1, &payload, &None);
     assert!(event_id > 0);
 
     let all_events = env.events().all();
@@ -286,7 +286,7 @@ fn test_cross_contract_unauthorized_publish_fails() {
     let unauthorized = Address::generate(&env);
     let payload = String::from_str(&env, "payload");
 
-    let result = client.try_publish_event(&unauthorized, &topic, &1, &payload);
+    let result = client.try_publish_event(&unauthorized, &topic, &1, &payload, &None);
     assert!(result.is_err(), "Unauthorized publish should fail");
 }
 
@@ -322,7 +322,7 @@ fn test_cross_contract_consumer_group_distribution() {
     // Publish multiple events
     let payload = String::from_str(&env, "event_data");
     for _ in 0..5 {
-        client.publish_event(&admin, &topic, &1, &payload);
+        client.publish_event(&admin, &topic, &1, &payload, &None);
     }
 
     let all_events = env.events().all();
@@ -352,7 +352,7 @@ fn test_dead_letter_queue_retry_invalid_index() {
     let topic = String::from_str(&env, "test");
     let hash = String::from_str(&env, "sha256:test");
     client.register_schema(&admin, &topic, &1, &hash);
-    let event_id = client.publish_event(&admin, &topic, &1, &String::from_str(&env, "p"));
+    let event_id = client.publish_event(&admin, &topic, &1, &String::from_str(&env, "p"), &None);
     client.push_dead_letter(
         &admin,
         &event_id,

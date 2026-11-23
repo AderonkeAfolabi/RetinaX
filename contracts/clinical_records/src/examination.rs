@@ -3,15 +3,15 @@ use crate::admin::{
     require_initialized,
 };
 use crate::errors::ContractError;
+use crate::fhir_interface::types::{Observation, ObservationStatus};
+use crate::fhir_interface::validation;
 use crate::migration;
 use crate::session::{resolve_caller, EXAM_WRITE_LEVEL, READ_LEVEL};
 use crate::types::{
     EyeExamination, IntraocularPressure, OptFundusPhotography, OptPhysicalMeasurement,
     OptRetinalImaging, OptVisualField, PhysicalMeasurement, SlitLampFindings, VisualAcuity,
 };
-use access_control::Permission;
-use fhir::types::{Observation, ObservationStatus};
-use fhir::validation;
+use crate::Permission;
 use soroban_sdk::{symbol_short, Address, Env, String, Symbol, Vec};
 
 pub const EXAM_KEY: Symbol = symbol_short!("EXAM");
