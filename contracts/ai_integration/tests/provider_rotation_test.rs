@@ -16,49 +16,19 @@ use ai_integration::{
     AiIntegrationContract, AiIntegrationContractClient, AiIntegrationError, ProviderStatus,
 };
 use soroban_sdk::{
-    contract, contractimpl, symbol_short, testutils::Address as _, testutils::Ledger, Address, Env,
-    String, Vec,
+    symbol_short,
+    testutils::{Address as _, Events as _, Ledger},
+    vec,
+    xdr::{ContractEventBody, ScVal},
+    Address, Env, String, Symbol, TryFromVal, Vec,
 };
 
-// ---------------------------------------------------------------------------
-// Mock AI Provider contracts for simulating different provider behaviors
-// ---------------------------------------------------------------------------
-
-#[contract]
-struct MockPrimaryProvider;
-
-#[contractimpl]
-impl MockPrimaryProvider {
-    /// Simulates successful analysis (primary provider working)
-    pub fn analyze(env: Env, _request_id: u64, success: bool) -> Result<String, ()> {
-        if success {
-            Ok(String::from_str(&env, "primary_result_hash"))
-        } else {
-            Err(())
-        }
-    }
-}
-
-#[contract]
-struct MockSecondaryProvider;
-
-#[contractimpl]
-impl MockSecondaryProvider {
-    /// Secondary provider (fallback)
-    pub fn analyze(env: Env, _request_id: u64) -> Result<String, ()> {
-        Ok(String::from_str(&env, "secondary_result_hash"))
-    }
-}
-
-#[contract]
-struct MockTertiaryProvider;
-
-#[contractimpl]
-impl MockTertiaryProvider {
-    /// Tertiary provider (last resort)
-    pub fn analyze(env: Env, _request_id: u64) -> Result<String, ()> {
-        Ok(String::from_str(&env, "tertiary_result_hash"))
-    }
+fn has_event(env: &Env, topic: Symbol) -> bool {
+    let expected = ScVal::try_from_val(env, &topic).expect("event topic");
+    env.events().all().events().iter().any(|event| {
+        let ContractEventBody::V0(body) = &event.body;
+        body.topics.as_slice().first() == Some(&expected)
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -75,7 +45,7 @@ fn setup_with_providers(env: &Env) -> (AiIntegrationContractClient, Address, Vec
     let client = AiIntegrationContractClient::new(env, &contract_id);
 
     // Initialize with 50% anomaly threshold (5000 bps)
-    client.initialize(&admin, 5000);
+    client.initialize(&admin, &5000);
 
     // Register three providers with different priorities
     let provider_ids = vec![env, 1u32, 2u32, 3u32];
@@ -339,7 +309,7 @@ fn test_weight_based_selection_highest_weight_first() {
     let contract_id = env.register(AiIntegrationContract, ());
     let client = AiIntegrationContractClient::new(&env, &contract_id);
 
-    client.initialize(&admin, 5000);
+    client.initialize(&admin, &5000);
 
     // Register providers with implicit weights (by order/priority)
     // In a weight-based system, we'd assign explicit weights
@@ -412,7 +382,7 @@ fn test_equal_weight_round_robin() {
     let contract_id = env.register(AiIntegrationContract, ());
     let client = AiIntegrationContractClient::new(&env, &contract_id);
 
-    client.initialize(&admin, 5000);
+    client.initialize(&admin, &5000);
 
     // Register two equal-priority providers
     let op1 = Address::generate(&env);
@@ -542,36 +512,8 @@ fn test_event_emission_on_provider_status_change() {
 
     let (client, admin, _provider_ids) = setup_with_providers(&env);
 
-    // Monitor events before status change
-    let initial_event_count = env.events().all().len();
-
-    // Change provider status (should emit event)
     client.set_provider_status(&admin, &1u32, &ProviderStatus::Paused);
-
-    // Verify event was emitted
-    let events = env.events().all();
-    assert!(
-        events.len() > initial_event_count,
-        "Status change should emit event"
-    );
-
-    // Find the provider status event
-    let mut found_status_event = false;
-    for event in events.iter() {
-        // Events are tuples of (topics, data)
-        // We're looking for EVT_PROVIDER_STATUS
-        if let Ok(event_topics) = event.0.try_into_val::<Vec<String>>(&env) {
-            if event_topics
-                .iter()
-                .any(|t| t == String::from_str(&env, "PRV_STS"))
-            {
-                found_status_event = true;
-                break;
-            }
-        }
-    }
-
-    assert!(found_status_event, "Should emit provider status event");
+    assert!(has_event(&env, symbol_short!("PRV_STS")));
 }
 
 /// Test event emission during request submission (rotation trigger)
@@ -587,8 +529,6 @@ fn test_event_emission_during_request_submission() {
     let requester = Address::generate(&env);
     let patient = Address::generate(&env);
 
-    let initial_events = env.events().all().len();
-
     // Submit request
     let request_id = client.submit_analysis_request(
         &requester,
@@ -599,26 +539,8 @@ fn test_event_emission_during_request_submission() {
         &s(&env, "diagnosis"),
     );
 
-    // Verify request submission event was emitted
-    let events = env.events().all();
-    assert!(
-        events.len() > initial_events,
-        "Request submission should emit event"
-    );
-
-    // Look for REQ_SUB event
-    let mut found_request_event = false;
-    for event in events.iter() {
-        if let Ok(event_data) = event.1.try_into_val::<String>(&env) {
-            // Event data contains request details
-            if !event_data.is_empty() && request_id > 0 {
-                found_request_event = true;
-                break;
-            }
-        }
-    }
-
-    assert!(found_request_event, "Should emit request submission event");
+    assert!(request_id > 0);
+    assert!(has_event(&env, symbol_short!("REQ_SUB")));
 }
 
 /// Test event sequence during complete fallback scenario
@@ -634,11 +556,9 @@ fn test_complete_fallback_event_sequence() {
     let requester = Address::generate(&env);
     let patient = Address::generate(&env);
 
-    // Clear initial events
-    let _ = env.events().all();
-
     // Step 1: Pause primary provider
     client.set_provider_status(&admin, &1u32, &ProviderStatus::Paused);
+    assert!(has_event(&env, symbol_short!("PRV_STS")));
 
     // Step 2: Submit to secondary provider
     let request_id = client.submit_analysis_request(
@@ -650,16 +570,7 @@ fn test_complete_fallback_event_sequence() {
         &s(&env, "diagnosis"),
     );
 
-    // Verify event sequence
-    let events = env.events().all();
-
-    // Should have at least:
-    // 1. Provider status change event
-    // 2. Request submission event
-    assert!(
-        events.len() >= 2,
-        "Fallback scenario should emit multiple events"
-    );
+    assert!(has_event(&env, symbol_short!("REQ_SUB")));
 
     // Verify request was successfully created
     let request = client.get_analysis_request(&request_id);
