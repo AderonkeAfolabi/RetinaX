@@ -29,6 +29,7 @@ pub struct Tx {
 const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
 const QUEUE_KEY: Symbol = symbol_short!("QUEUE");
 const MIN_DELAY_KEY: Symbol = symbol_short!("MIN_DLY");
+const GUARDIAN_KEY: Symbol = symbol_short!("GUARD");
 
 #[contract]
 pub struct TimelockContract;
@@ -224,7 +225,7 @@ impl TimelockContract {
         Ok(())
     }
 
-    pub fn cancel_tx(env: Env, caller: Address, id: BytesN<32>) -> Result<(), TimelockError> {
+    pub fn set_guardian(env: Env, caller: Address, guardian: Address) -> Result<(), TimelockError> {
         caller.require_auth();
         let admin: Address = env
             .storage()
@@ -232,6 +233,28 @@ impl TimelockContract {
             .get(&ADMIN_KEY)
             .ok_or(TimelockError::NotInitialized)?;
         if caller != admin {
+            return Err(TimelockError::Unauthorized);
+        }
+        env.storage().instance().set(&GUARDIAN_KEY, &guardian);
+        Ok(())
+    }
+
+    pub fn get_guardian(env: Env) -> Result<Address, TimelockError> {
+        env.storage()
+            .instance()
+            .get(&GUARDIAN_KEY)
+            .ok_or(TimelockError::NotInitialized)
+    }
+
+    pub fn cancel_tx(env: Env, caller: Address, id: BytesN<32>) -> Result<(), TimelockError> {
+        caller.require_auth();
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&ADMIN_KEY)
+            .ok_or(TimelockError::NotInitialized)?;
+        let guardian: Option<Address> = env.storage().instance().get(&GUARDIAN_KEY);
+        if caller != admin && Some(caller.clone()) != guardian {
             return Err(TimelockError::Unauthorized);
         }
 
@@ -261,6 +284,48 @@ impl TimelockContract {
         #[allow(deprecated)]
         env.events()
             .publish((symbol_short!("TX_CNCL"), id, caller), ());
+
+        Ok(())
+    }
+
+    pub fn veto_tx(env: Env, caller: Address, id: BytesN<32>) -> Result<(), TimelockError> {
+        caller.require_auth();
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&ADMIN_KEY)
+            .ok_or(TimelockError::NotInitialized)?;
+        let guardian: Option<Address> = env.storage().instance().get(&GUARDIAN_KEY);
+        if caller != admin && Some(caller.clone()) != guardian {
+            return Err(TimelockError::Unauthorized);
+        }
+
+        let queue: Vec<Tx> = env
+            .storage()
+            .instance()
+            .get(&QUEUE_KEY)
+            .unwrap_or(Vec::new(&env));
+
+        let mut found = false;
+        let mut updated_queue: Vec<Tx> = Vec::new(&env);
+
+        for tx in queue.iter() {
+            if tx.id == id {
+                found = true;
+            } else {
+                updated_queue.push_back(tx);
+            }
+        }
+
+        if !found {
+            return Err(TimelockError::TxNotFound);
+        }
+
+        env.storage().instance().set(&QUEUE_KEY, &updated_queue);
+
+        #[allow(deprecated)]
+        env.events()
+            .publish((symbol_short!("TX_VETO"), id, caller), ());
 
         Ok(())
     }

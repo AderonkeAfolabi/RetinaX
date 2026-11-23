@@ -84,6 +84,22 @@ pub struct AllocationSummary {
     pub total_spent: i128,
 }
 
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Stream {
+    pub id: u64,
+    pub sender: Address,
+    pub recipient: Address,
+    pub asset: Address,
+    pub deposit: i128,
+    pub rate: i128,
+    pub start_time: u64,
+    pub stop_time: u64,
+    pub cliff: u64,
+    pub claimed_amount: i128,
+    pub canceled: bool,
+}
+
 #[soroban_sdk::contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u32)]
@@ -106,6 +122,11 @@ pub enum ContractError {
     InvalidPath = 16,
     DexRouterNotConfigured = 17,
     SwapFailed = 18,
+    StreamNotFound = 19,
+    StreamAlreadyCanceled = 20,
+    CliffNotReached = 21,
+    NoClaimableTokens = 22,
+    InvalidStreamSchedule = 23,
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -131,6 +152,17 @@ fn next_proposal_id(env: &Env) -> u64 {
     let next = current.saturating_add(1);
     env.storage().instance().set(&PROPOSAL_CTR, &next);
     next
+}
+
+fn next_stream_id(env: &Env) -> u64 {
+    let current: u64 = env.storage().instance().get(&STREAM_CTR).unwrap_or(0);
+    let next = current.saturating_add(1);
+    env.storage().instance().set(&STREAM_CTR, &next);
+    next
+}
+
+fn stream_key(id: u64) -> (Symbol, u64) {
+    (STREAM, id)
 }
 
 fn proposal_key(id: u64) -> (Symbol, u64) {
