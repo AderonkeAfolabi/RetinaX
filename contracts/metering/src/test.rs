@@ -15,7 +15,10 @@
 #![allow(unused_variables, unused_imports)]
 extern crate std;
 
-use soroban_sdk::{testutils::{Address as _, ContractEvents, Events}, vec, Address, Env, IntoVal, TryFromVal, Vec};
+use soroban_sdk::{
+    testutils::{Address as _, ContractEvents, Events},
+    vec, Address, Env, IntoVal, TryFromVal, Vec,
+};
 
 use crate::{
     billing::{BillingModel, CycleStatus},
@@ -875,7 +878,8 @@ fn test_tenant_registered_event_emitted() {
     let events = collect_events(&env);
     assert_eq!(events.events().len(), 1);
 
-    let expected_topics = vec![&env,
+    let expected_topics = vec![
+        &env,
         soroban_sdk::symbol_short!("METER").into_val(&env),
         soroban_sdk::Symbol::new(&env, "TenantReg").into_val(&env),
     ];
@@ -955,7 +959,7 @@ fn test_quota_breach_rolls_back_contract_events() {
 
     // First read succeeds
     client.record_gas(&admin, &org, &OperationType::Read);
-        // The failed invocation rolls back contract events.
+    // The failed invocation rolls back contract events.
     let result = client.try_record_gas(&admin, &org, &OperationType::Read);
     assert!(result.is_err());
     assert!(collect_events(&env).events().is_empty());
