@@ -11,6 +11,8 @@ use soroban_sdk::{
 
 // ── Storage keys ────────────────────────────────────────────────────────────────
 
+const STREAM_CTR: Symbol = symbol_short!("STRM_CTR");
+const STREAM: Symbol = symbol_short!("STREAM");
 const CONFIG: Symbol = symbol_short!("CONFIG");
 const PROPOSAL_CTR: Symbol = symbol_short!("PR_CTR");
 const PROPOSAL: Symbol = symbol_short!("PROPOSAL");
@@ -742,5 +744,222 @@ impl TreasuryContract {
         let now = env.ledger().timestamp();
         let period_start = get_period_start(&env, now);
         get_category_spent(&env, &category, period_start)
+    }
+
+    pub fn create_stream(
+        env: Env,
+        caller: Address,
+        recipient: Address,
+        asset: Address,
+        deposit: i128,
+        start_time: u64,
+        stop_time: u64,
+        rate: i128,
+        cliff: u64,
+    ) -> Result<u64, ContractError> {
+        caller.require_auth();
+
+        let governor: Option<Address> = env.storage().instance().get(&GOVERNOR);
+        let cfg = load_config(&env)?;
+        if Some(caller.clone()) != governor && caller != cfg.admin {
+            return Err(ContractError::NotAuthorizedCaller);
+        }
+
+        if deposit <= 0 || rate <= 0 {
+            return Err(ContractError::PositiveAmountRequired);
+        }
+
+        if start_time >= stop_time || cliff > stop_time || cliff < start_time {
+            return Err(ContractError::InvalidStreamSchedule);
+        }
+
+        let limit = get_asset_limit(&env, &asset);
+        if deposit > limit {
+            return Err(ContractError::LimitExceeded);
+        }
+
+        let category = symbol_short!("STREAM");
+        let period_start = get_period_start(&env, env.ledger().timestamp());
+        let spent = get_category_spent(&env, &category, period_start);
+        if spent.saturating_add(deposit) > get_category_limit(&env, &category) {
+            return Err(ContractError::LimitExceeded);
+        }
+
+        let id = next_stream_id(&env);
+        let stream = Stream {
+            id,
+            sender: caller.clone(),
+            recipient: recipient.clone(),
+            asset: asset.clone(),
+            deposit,
+            rate,
+            start_time,
+            stop_time,
+            cliff,
+            claimed_amount: 0,
+            canceled: false,
+        };
+
+        env.storage().persistent().set(&stream_key(id), &stream);
+
+        env.storage().instance().set(
+            &category_spent_key(&category, period_start),
+            &spent.saturating_add(deposit),
+        );
+        let key = allocation_key(&asset, &category);
+        let mut spent: i128 = env.storage().instance().get(&key).unwrap_or(0);
+        spent = spent.saturating_add(deposit);
+        env.storage().instance().set(&key, &spent);
+
+        env.events().publish(
+            (symbol_short!("stream"), symbol_short!("create")),
+            (id, recipient, deposit),
+        );
+
+        Ok(id)
+    }
+
+    pub fn claim(env: Env, recipient: Address, stream_id: u64) -> Result<i128, ContractError> {
+        recipient.require_auth();
+
+        let mut stream: Stream = env
+            .storage()
+            .persistent()
+            .get(&stream_key(stream_id))
+            .ok_or(ContractError::StreamNotFound)?;
+
+        if recipient != stream.recipient {
+            return Err(ContractError::NotAuthorizedCaller);
+        }
+
+        if stream.canceled {
+            return Err(ContractError::StreamAlreadyCanceled);
+        }
+
+        let now = env.ledger().timestamp();
+        if now < stream.cliff {
+            return Err(ContractError::CliffNotReached);
+        }
+
+        let time_elapsed = if now >= stream.stop_time {
+            stream.stop_time.saturating_sub(stream.start_time)
+        } else {
+            now.saturating_sub(stream.start_time)
+        };
+
+        let total_vested = (time_elapsed as i128)
+            .saturating_mul(stream.rate)
+            .min(stream.deposit);
+
+        let claimable = total_vested.saturating_sub(stream.claimed_amount);
+        if claimable <= 0 {
+            return Err(ContractError::NoClaimableTokens);
+        }
+
+        token::Client::new(&env, &stream.asset).transfer(
+            &env.current_contract_address(),
+            &stream.recipient,
+            &claimable,
+        );
+
+        stream.claimed_amount = stream.claimed_amount.saturating_add(claimable);
+        env.storage()
+            .persistent()
+            .set(&stream_key(stream_id), &stream);
+
+        env.events().publish(
+            (symbol_short!("stream"), symbol_short!("claim")),
+            (stream_id, recipient, claimable),
+        );
+
+        Ok(claimable)
+    }
+
+    pub fn cancel_stream(env: Env, caller: Address, stream_id: u64) -> Result<(), ContractError> {
+        caller.require_auth();
+
+        let mut stream: Stream = env
+            .storage()
+            .persistent()
+            .get(&stream_key(stream_id))
+            .ok_or(ContractError::StreamNotFound)?;
+
+        if stream.canceled {
+            return Err(ContractError::StreamAlreadyCanceled);
+        }
+
+        let cfg = load_config(&env)?;
+        let governor: Option<Address> = env.storage().instance().get(&GOVERNOR);
+        if caller != stream.sender && caller != cfg.admin && Some(caller.clone()) != governor {
+            return Err(ContractError::NotAuthorizedCaller);
+        }
+
+        let now = env.ledger().timestamp();
+        if now >= stream.cliff {
+            let time_elapsed = if now >= stream.stop_time {
+                stream.stop_time.saturating_sub(stream.start_time)
+            } else {
+                now.saturating_sub(stream.start_time)
+            };
+
+            let total_vested = (time_elapsed as i128)
+                .saturating_mul(stream.rate)
+                .min(stream.deposit);
+
+            let claimable = total_vested.saturating_sub(stream.claimed_amount);
+            if claimable > 0 {
+                token::Client::new(&env, &stream.asset).transfer(
+                    &env.current_contract_address(),
+                    &stream.recipient,
+                    &claimable,
+                );
+                stream.claimed_amount = stream.claimed_amount.saturating_add(claimable);
+            }
+        }
+
+        stream.canceled = true;
+        env.storage()
+            .persistent()
+            .set(&stream_key(stream_id), &stream);
+
+        env.events().publish(
+            (symbol_short!("stream"), symbol_short!("cancel")),
+            (stream_id, caller),
+        );
+
+        Ok(())
+    }
+
+    pub fn get_stream(env: Env, stream_id: u64) -> Option<Stream> {
+        env.storage().persistent().get(&stream_key(stream_id))
+    }
+
+    pub fn get_claimable_amount(env: Env, stream_id: u64) -> Result<i128, ContractError> {
+        let stream: Stream = env
+            .storage()
+            .persistent()
+            .get(&stream_key(stream_id))
+            .ok_or(ContractError::StreamNotFound)?;
+
+        if stream.canceled {
+            return Ok(0);
+        }
+
+        let now = env.ledger().timestamp();
+        if now < stream.cliff {
+            return Ok(0);
+        }
+
+        let time_elapsed = if now >= stream.stop_time {
+            stream.stop_time.saturating_sub(stream.start_time)
+        } else {
+            now.saturating_sub(stream.start_time)
+        };
+
+        let total_vested = (time_elapsed as i128)
+            .saturating_mul(stream.rate)
+            .min(stream.deposit);
+
+        Ok(total_vested.saturating_sub(stream.claimed_amount))
     }
 }
