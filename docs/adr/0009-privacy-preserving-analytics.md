@@ -36,3 +36,5 @@ The platform needs analytics and reporting over sensitive vision care data witho
 
 - Privacy budgets are tracked per metric domain and time window.
 - Encrypted aggregates are stored with associated metadata for auditing.
+- Noise parameters are admin-configured within fixed bounds (epsilon 1 to 10, sensitivity 1 to 1,000,000). See
+  `set_dp_params` in `docs/analytics.md` (#463).

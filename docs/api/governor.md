@@ -8,6 +8,20 @@ Implements OpenZeppelin Governor pattern for decentralized governance. Enables t
 
 The Governor contract coordinates:
 
+## Architecture at a Glance
+
+```mermaid
+flowchart TD
+    Holder[Token holder] -->|propose| Proposal[Proposal]
+    Proposal --> Delay[Voting delay]
+    Delay --> Vote[For / Against / Abstain voting]
+    Vote --> Quorum{Quorum and majority reached?}
+    Quorum -- No --> Rejected[Proposal rejected]
+    Quorum -- Yes --> Queue[Timelock queue]
+    Queue --> Execute[Execute action]
+    Execute --> Treasury[Treasury or parameter change]
+```
+
 1. **Proposal Creation:** Token holders propose actions
 2. **Voting:** Token-weighted voting aligned with staking
 3. **Timelock:** Delay before execution (security/governance pause)
@@ -320,7 +334,7 @@ Day 3: Timelock expired
 
 ## Related Documentation
 
-- [Governance Design](../docs/governance.md)
+- [Governance Design](../governance.md)
 - [Treasury Integration](./treasury.md)
 - [Staking (Voting Power)](./staking.md)
 - [OpenZeppelin Governor Docs](https://docs.openzeppelin.com/contracts/4.x/governance)

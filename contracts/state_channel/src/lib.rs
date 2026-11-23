@@ -10,6 +10,8 @@ pub mod settlement;
 
 #[cfg(test)]
 mod test;
+#[cfg(test)]
+mod test_signature_validation;
 
 const VISION_RECORDS: Symbol = symbol_short!("V_REC");
 const ADMIN: Symbol = symbol_short!("ADMIN");

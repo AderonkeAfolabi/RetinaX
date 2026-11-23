@@ -27,9 +27,10 @@ use soroban_sdk::{
 use delegation::Delegation;
 use execution::timelock_duration;
 use proposal::{
-    load as load_proposal, load_supply_snapshot, next_id, pass_threshold_bps, quorum_bps,
-    store as store_proposal, store_supply_snapshot, veto_threshold_bps, Proposal, ProposalAction,
-    ProposalPhase, ProposalType,
+    default_category_config, load as load_proposal, load_supply_snapshot, next_id,
+    pass_threshold_bps, quorum_bps, store as store_proposal, store_supply_snapshot,
+    veto_threshold_bps, CategoryConfig, Proposal, ProposalAction, ProposalCategory, ProposalPhase,
+    ProposalType,
 };
 use voting::{
     compute_vote_power, has_committed, has_voted, load_commit, store_commit, store_vote,
@@ -44,6 +45,7 @@ const STAKING_CONTRACT: Symbol = symbol_short!("STK_CTR");
 const TREASURY_CONTRACT: Symbol = symbol_short!("TRES_CTR");
 const TOTAL_VOTE_SUPPLY: Symbol = symbol_short!("TOT_VS");
 const VOTING_SECS: Symbol = symbol_short!("VOTE_SEC");
+const GUARDIAN: Symbol = symbol_short!("GUARDIAN");
 
 /// Default Discussion phase length in seconds (3 days).
 const DEFAULT_DISCUSSION_SECS: u64 = 259_200;
@@ -85,6 +87,7 @@ pub struct ProposalSummary {
     pub id: u64,
     pub phase: ProposalPhase,
     pub proposal_type: ProposalType,
+    pub category: ProposalCategory,
     pub votes_for: i128,
     pub votes_against: i128,
     pub votes_veto: i128,
@@ -156,6 +159,19 @@ impl GovernorContract {
         title: String,
         actions: Vec<ProposalAction>,
     ) -> Result<u64, ContractError> {
+        let category = ProposalCategory::from_proposal_type(&proposal_type);
+        Self::create_proposal_with_category(env, proposer, proposal_type, category, title, actions)
+    }
+
+    /// Create a proposal with a specific proposal category.
+    pub fn create_proposal_with_category(
+        env: Env,
+        proposer: Address,
+        proposal_type: ProposalType,
+        category: ProposalCategory,
+        title: String,
+        actions: Vec<ProposalAction>,
+    ) -> Result<u64, ContractError> {
         Self::require_initialized(&env)?;
         proposer.require_auth();
 
@@ -179,6 +195,7 @@ impl GovernorContract {
         let proposal = Proposal {
             id,
             proposal_type,
+            category,
             phase: ProposalPhase::Draft,
             proposer: proposer.clone(),
             title,
@@ -251,23 +268,22 @@ impl GovernorContract {
                 if now < proposal.voting_ends {
                     return Err(ContractError::PhaseNotAdvanceable);
                 }
-                // Check quorum.
+                // Check quorum according to proposal category config.
+                let cat_cfg = Self::get_category_config(env.clone(), proposal.category);
                 let total_supply = load_supply_snapshot(&env, proposal_id)
                     .unwrap_or_else(|| Self::current_vote_supply(&env));
                 let total_votes = proposal
                     .votes_for
                     .saturating_add(proposal.votes_against)
                     .saturating_add(proposal.votes_veto);
-                let quorum_needed =
-                    total_supply * quorum_bps(&proposal.proposal_type) as i128 / 10_000;
+                let quorum_needed = total_supply * cat_cfg.quorum_bps as i128 / 10_000;
 
                 if total_votes < quorum_needed {
                     ProposalPhase::Expired
                 } else {
-                    // Check simple majority among for/against.
+                    // Check pass threshold according to proposal category config.
                     let decisive = proposal.votes_for.saturating_add(proposal.votes_against);
-                    let pass_needed =
-                        decisive * pass_threshold_bps(&proposal.proposal_type) as i128 / 10_000;
+                    let pass_needed = decisive * cat_cfg.pass_threshold_bps as i128 / 10_000;
                     if proposal.votes_for >= pass_needed {
                         ProposalPhase::Timelock
                     } else {
@@ -550,6 +566,84 @@ impl GovernorContract {
         Ok(())
     }
 
+    /// Set the emergency veto guardian address.
+    pub fn set_guardian(env: Env, caller: Address, guardian: Address) -> Result<(), ContractError> {
+        Self::require_initialized(&env)?;
+        caller.require_auth();
+        Self::require_admin(&env, &caller)?;
+        env.storage().instance().set(&GUARDIAN, &guardian);
+        Ok(())
+    }
+
+    /// Return the current emergency veto guardian, if configured.
+    pub fn get_guardian(env: Env) -> Option<Address> {
+        env.storage().instance().get(&GUARDIAN)
+    }
+
+    /// Emergency veto of a queued proposal by the guardian during the timelock window.
+    pub fn veto(env: Env, caller: Address, proposal_id: u64) -> Result<(), ContractError> {
+        Self::require_initialized(&env)?;
+        caller.require_auth();
+
+        let guardian: Address = env
+            .storage()
+            .instance()
+            .get(&GUARDIAN)
+            .ok_or(ContractError::Unauthorized)?;
+
+        if caller != guardian {
+            return Err(ContractError::Unauthorized);
+        }
+
+        let mut proposal =
+            load_proposal(&env, proposal_id).ok_or(ContractError::ProposalNotFound)?;
+
+        // Proposal can only be vetoed while queued in timelock
+        if !matches!(proposal.phase, ProposalPhase::Timelock) {
+            return Err(ContractError::WrongPhase);
+        }
+
+        proposal.phase = ProposalPhase::Rejected;
+        store_proposal(&env, &proposal);
+        events::publish_proposal_vetoed(&env, proposal_id, &caller);
+
+        Ok(())
+    }
+
+    /// Configure quorum and threshold for a proposal category.
+    pub fn set_category_config(
+        env: Env,
+        caller: Address,
+        category: ProposalCategory,
+        quorum_bps: u32,
+        pass_threshold_bps: u32,
+    ) -> Result<(), ContractError> {
+        Self::require_initialized(&env)?;
+        caller.require_auth();
+        Self::require_admin(&env, &caller)?;
+
+        if quorum_bps > 10_000 || pass_threshold_bps > 10_000 || pass_threshold_bps == 0 {
+            return Err(ContractError::InvalidInput);
+        }
+
+        let cfg = CategoryConfig {
+            quorum_bps,
+            pass_threshold_bps,
+        };
+        let key = (symbol_short!("CAT_CFG"), category);
+        env.storage().instance().set(&key, &cfg);
+        Ok(())
+    }
+
+    /// Return the config for a proposal category (or default).
+    pub fn get_category_config(env: Env, category: ProposalCategory) -> CategoryConfig {
+        let key = (symbol_short!("CAT_CFG"), category);
+        env.storage()
+            .instance()
+            .get(&key)
+            .unwrap_or_else(|| default_category_config(&category))
+    }
+
     // ── Admin ─────────────────────────────────────────────────────────────────
 
     /// Update the total vote supply used for quorum calculations.
@@ -613,6 +707,7 @@ impl GovernorContract {
             id: p.id,
             phase: p.phase,
             proposal_type: p.proposal_type,
+            category: p.category,
             votes_for: p.votes_for,
             votes_against: p.votes_against,
             votes_veto: p.votes_veto,

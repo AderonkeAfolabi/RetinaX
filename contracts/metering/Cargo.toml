@@ -20,6 +20,14 @@ path = "tests/init_test.rs"
 name = "validation_test"
 path = "tests/validation_test.rs"
 
+[[test]]
+name = "quota_boundary_test"
+path = "tests/quota_boundary_test.rs"
+
+[[test]]
+name = "billing_rollover_test"
+path = "tests/billing_rollover_test.rs"
+
 [dependencies]
 soroban-sdk = { workspace = true }
 retinax-common = { path = "../common", package = "common" }

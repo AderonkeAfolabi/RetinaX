@@ -104,7 +104,7 @@ This script scans all contracts for `symbol_short!()` declarations and reports a
 
 The storage key check is integrated into CI pipeline to automatically detect collisions on every PR.
 
-See: `.github/workflows/ci.yml`
+See: `.github/workflows/storage-keys-check.yml`
 
 ---
 

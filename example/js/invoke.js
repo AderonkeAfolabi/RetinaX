@@ -1,8 +1,8 @@
 /**
- * RetinaX: Node.js Integration Example
+ * Teye-Contracts: Node.js Integration Example
  * ----------------------------------------------
  * Demonstrates how to authenticate, simulate, and submit
- * a transaction to a RetinaX-Contract.
+ * a transaction to a Teye-Contract.
  * * Install: npm install @stellar/stellar-sdk dotenv
  */
 
@@ -13,17 +13,17 @@ dotenv.config(); // Load environment variables
 
 const RPC_URL = process.env.RPC_URL || "https://soroban-testnet.stellar.org";
 const NETWORK_PASSPHRASE = process.env.NETWORK_PASSPHRASE || Networks.TESTNET;
-const CONTRACT_ID = process.env.RETINAX_CONTRACT_ID;
+const CONTRACT_ID = process.env.TEYE_CONTRACT_ID;
 
 // DO NOT commit your secret key to source control!
 // Provide it via environment variables instead.
 const SECRET_KEY = process.env.SERVER_SECRET_KEY;
 
 if (!CONTRACT_ID || !SECRET_KEY) {
-    throw new Error("Missing required environment variables (RETINAX_CONTRACT_ID or SERVER_SECRET_KEY). Please check your .env file.");
+    throw new Error("Missing required environment variables (TEYE_CONTRACT_ID or SERVER_SECRET_KEY). Please check your .env file.");
 }
 
-async function invokeRetinaXContract() {
+async function invokeTeyeContract() {
     console.log("Initializing connection...");
     const rpc = new SorobanRpc.Server(RPC_URL);
     const sourceKeypair = Keypair.fromSecret(SECRET_KEY);
@@ -86,4 +86,124 @@ async function invokeRetinaXContract() {
     }
 }
 
-invokeRetinaXContract().catch(console.error);
+invokeTeyeContract().catch(console.error);
+
+// ─── Issue #488: Grant / Revoke consent flow ────────────────────────────────
+
+/**
+ * Grant record-sharing consent from a patient to a provider.
+ *
+ * Uses the same build → simulate → assemble → sign → submit → poll
+ * pattern as invokeTeyeContract above, so error handling is identical.
+ *
+ * @param {string} patientSecret - Patient's Stellar secret key (never commit).
+ * @param {string} providerAddress - Provider's Stellar public key.
+ * @param {string[]} permissions - e.g. ["read", "write"].
+ * @param {number|null} durationMs - Consent window in ms, or null for indefinite.
+ */
+async function grantConsent(patientSecret, providerAddress, permissions = ["read"], durationMs = null) {
+  console.log("Granting consent to provider:", providerAddress);
+  const rpc = new SorobanRpc.Server(RPC_URL);
+  const patientKeypair = Keypair.fromSecret(patientSecret);
+  const account = await rpc.getAccount(patientKeypair.publicKey());
+  const contract = new Contract(CONTRACT_ID);
+
+  const expiresAt = durationMs ? Date.now() + durationMs : null;
+
+  const tx = new TransactionBuilder(account, {
+    fee: "100",
+    networkPassphrase: NETWORK_PASSPHRASE,
+  })
+    .addOperation(
+      contract.call(
+        "grant_consent",
+        nativeToScVal(patientKeypair.publicKey()),
+        nativeToScVal(providerAddress),
+        nativeToScVal(permissions),
+        nativeToScVal(expiresAt),
+      ),
+    )
+    .setTimeout(30)
+    .build();
+
+  const simulation = await rpc.simulateTransaction(tx);
+  if (SorobanRpc.Api.isSimulationError(simulation)) {
+    throw new Error(`Simulation failed: ${simulation.error}`);
+  }
+
+  const assembledTx = SorobanRpc.assembleTransaction(tx, simulation).build();
+  assembledTx.sign(patientKeypair);
+
+  const response = await rpc.sendTransaction(assembledTx);
+  if (response.status === "ERROR") {
+    console.error(`❌ grant_consent failed. XDR: ${response.errorResultXdr}`);
+    throw new Error("Transaction rejected by the network.");
+  }
+
+  await pollUntilDone(rpc, response.hash);
+  console.log(`✅ Consent granted to ${providerAddress} (permissions: ${permissions.join(", ")})`);
+}
+
+/**
+ * Revoke a previously granted consent.
+ *
+ * @param {string} patientSecret - Patient's Stellar secret key.
+ * @param {string} providerAddress - Provider whose access should be removed.
+ */
+async function revokeConsent(patientSecret, providerAddress) {
+  console.log("Revoking consent for provider:", providerAddress);
+  const rpc = new SorobanRpc.Server(RPC_URL);
+  const patientKeypair = Keypair.fromSecret(patientSecret);
+  const account = await rpc.getAccount(patientKeypair.publicKey());
+  const contract = new Contract(CONTRACT_ID);
+
+  const tx = new TransactionBuilder(account, {
+    fee: "100",
+    networkPassphrase: NETWORK_PASSPHRASE,
+  })
+    .addOperation(
+      contract.call(
+        "revoke_consent",
+        nativeToScVal(patientKeypair.publicKey()),
+        nativeToScVal(providerAddress),
+      ),
+    )
+    .setTimeout(30)
+    .build();
+
+  const simulation = await rpc.simulateTransaction(tx);
+  if (SorobanRpc.Api.isSimulationError(simulation)) {
+    throw new Error(`Simulation failed: ${simulation.error}`);
+  }
+
+  const assembledTx = SorobanRpc.assembleTransaction(tx, simulation).build();
+  assembledTx.sign(patientKeypair);
+
+  const response = await rpc.sendTransaction(assembledTx);
+  if (response.status === "ERROR") {
+    console.error(`❌ revoke_consent failed. XDR: ${response.errorResultXdr}`);
+    throw new Error("Transaction rejected by the network.");
+  }
+
+  await pollUntilDone(rpc, response.hash);
+  console.log(`✅ Consent revoked for ${providerAddress}`);
+}
+
+/** Shared poll helper — bounded at 30 s to avoid infinite loops. */
+async function pollUntilDone(rpc, hash) {
+  const startTime = Date.now();
+  let txStatus = await rpc.getTransaction(hash);
+  while (txStatus.status === "NOT_FOUND") {
+    if (Date.now() - startTime > 30_000) {
+      throw new Error("Transaction polling timed out after 30 seconds.");
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    txStatus = await rpc.getTransaction(hash);
+  }
+  if (txStatus.status !== "SUCCESS") {
+    throw new Error(`Transaction failed on-chain (status: ${txStatus.status}).`);
+  }
+  return txStatus;
+}
+
+export { grantConsent, revokeConsent };

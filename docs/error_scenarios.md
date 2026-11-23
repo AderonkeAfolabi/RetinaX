@@ -1,42 +1,26 @@
-# Error Handling & Negative Test Scenarios
+# Error Handling and Negative Test Scenarios
 
-## 1. Unauthorized Access
+This file defines the roles of negative tests. Variant names and codes belong in [Contract Error Code Reference](error-codes.md); handling and recovery patterns belong in [Error Handling and Recovery](error-handling.md).
 
-Expected Behavior:
+## Scenario Matrix
 
-- Caller not equal to owner
-- Function returns: ContractError::Unauthorized
+| Scenario | Expected behavior | Reference error |
+|---|---|---|
+| Unauthorized caller | Operation is rejected and no state changes | Contract-specific authorization variant |
+| Invalid input | Operation rejects malformed or out-of-range data | `InvalidInput` |
+| Missing resource | Operation reports that the entity does not exist | `UserNotFound`, `RecordNotFound`, or contract-specific not-found variant |
+| State conflict | Operation is rejected without overwriting current state | `AlreadyInitialized`, `DuplicateRecord`, or contract-specific conflict variant |
+| Transient failure | Operation can be retried with bounded backoff | `TransientFailure`, `StorageError`, or contract-specific transient variant |
 
----
+## Test Location
 
-## 2. Invalid Input
+Workspace negative and upgrade scenarios are maintained under [`test/negative/`](../test/negative) and [`test/upgrade/`](../test/upgrade). Contract-specific integration scenarios belong in the affected contract's `tests/` directory.
 
-Expected Behavior:
+## Test Requirements
 
-- Value exceeds allowed range
-- Returns: ContractError::InvalidInput
+Each scenario must:
 
----
-
-## 3. Resource Exhaustion
-
-Expected Behavior:
-
-- Resource request exceeds threshold
-- Returns: ContractError::ResourceExhausted
-
----
-
-## 4. Race Conditions
-
-Expected Behavior:
-
-- Concurrent access protected via Mutex
-- No data race
-- Counter increments safely
-
----
-
-All negative tests located in:
-
-tests/negative/
+- Exercise the public contract operation, not only a helper
+- Assert the exact exported error variant or code
+- Verify state preservation after the failure
+- Avoid placeholder assertions or tests that cannot fail

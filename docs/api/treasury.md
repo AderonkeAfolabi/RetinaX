@@ -4,6 +4,22 @@
 
 Manages DAO fund allocation and spending with multisig approval or direct governance authorization. Tracks budget allocations by category and provides governance integration for decentralized fund management.
 
+## Architecture at a Glance
+
+```mermaid
+flowchart TD
+    Requester[Requester] -->|create_transfer_proposal| Spend[Spend proposal]
+    Spend --> Path{Authorization path}
+    Path -->|multisig| Signers[Signers approve]
+    Signers --> Threshold{Threshold reached?}
+    Threshold -- No --> Pending[Pending approvals]
+    Threshold -- Yes --> Transfer[Token transfer]
+    Path -->|governor| Governor[governor_spend]
+    Governor --> Transfer
+    Transfer --> Budget[Budget category update]
+    Transfer --> Events[Treasury events]
+```
+
 ## Initialization
 
 ### `initialize(env: Env, admin: Address, token: Address, signers: Vec<Address>, threshold: u32) -> Result<(), ContractError>`
@@ -372,5 +388,5 @@ pub struct AllocationSummary {
 ## Related Documentation
 
 - [Governor DAO Integration](./governor.md)
-- [Multisig Pattern](../security/overview.md#multisig)
-- [Governance](../docs/governance.md)
+- [Multisig Pattern](../security.md#multisig)
+- [Governance](../governance.md)

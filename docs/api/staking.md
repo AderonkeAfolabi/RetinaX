@@ -4,6 +4,20 @@
 
 Manages token staking with reward accumulation and timelocked withdrawal. Integrates with admin tier system and multisig for governance participation. Supports time-weighted loyalty calculations for DAO governance voting power.
 
+## Architecture at a Glance
+
+```mermaid
+flowchart TD
+    Staker[Staker] -->|stake| Pool[Staking pool]
+    Pool --> Accumulator[Global reward accumulator]
+    Accumulator --> Rewards[Pending rewards]
+    Staker -->|claim_rewards| Rewards
+    Staker -->|unstake| Lock[Lock period]
+    Lock --> Unlocked[Withdraw stake]
+    Pool --> Tiers[Admin tiers]
+    Tiers --> Voting[Governance voting power]
+```
+
 ## Initialization
 
 ### `initialize(env: Env, admin: Address, stake_token: Address, reward_token: Address, reward_rate: i128, lock_period: u64) -> Result<(), ContractError>`
@@ -464,6 +478,6 @@ pub struct RateChangeProposal {
 
 ## Related Documentation
 
-- [Admin Tier System](../docs/governance.md#admin-tiers)
-- [MultiSig Pattern](../security/overview.md#multisig)
+- [Admin Tier System](../governance.md#admin-tiers)
+- [MultiSig Pattern](../security.md#multisig)
 - [Treasury Integration](./treasury.md) — connected via Governor

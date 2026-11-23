@@ -194,6 +194,116 @@ async fn rejects_invalid_query_parameters() {
     assert_eq!(status, StatusCode::OK);
 }
 
+#[tokio::test]
+async fn paginates_with_cursor_alias() {
+    let uri = format!("/api/audit-logs/{PATIENT}?limit=2&cursor=5");
+    let (_, page) = get(app(), &uri, Some(TOKEN)).await;
+    assert_eq!(ids(&page), vec![4, 2]);
+    assert_eq!(page["next_cursor"], 2);
+
+    let uri = format!("/api/audit-logs/{PATIENT}?limit=2&cursor=2");
+    let (_, page_last) = get(app(), &uri, Some(TOKEN)).await;
+    assert_eq!(ids(&page_last), vec![1]);
+    assert_eq!(page_last["next_cursor"], Value::Null);
+}
+
+#[tokio::test]
+async fn authenticates_with_valid_stellar_signature_headers() {
+    let dummy_sig = "ab".repeat(64);
+    let now = Utc::now().timestamp();
+    let uri = format!("/api/audit-logs/{PATIENT}?limit=2");
+
+    let request = Request::get(&uri)
+        .header("X-Stellar-Account", PATIENT)
+        .header("X-Stellar-Signature", dummy_sig)
+        .header("X-Stellar-Timestamp", now.to_string())
+        .body(Body::empty())
+        .unwrap();
+
+    let response = app().oneshot(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let bytes = response.into_body().collect().await.unwrap().to_bytes();
+    let body: Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(ids(&body), vec![7, 5]);
+}
+
+#[tokio::test]
+async fn rejects_invalid_or_mismatched_stellar_signature_headers() {
+    let dummy_sig = "ab".repeat(64);
+    let now = Utc::now().timestamp();
+    let uri = format!("/api/audit-logs/{PATIENT}");
+
+    // Mismatched account (caller != patient)
+    let req = Request::get(&uri)
+        .header("X-Stellar-Account", OTHER_PATIENT)
+        .header("X-Stellar-Signature", &dummy_sig)
+        .header("X-Stellar-Timestamp", now.to_string())
+        .body(Body::empty())
+        .unwrap();
+    let resp = app().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+
+    // Malformed signature (non-hex)
+    let req = Request::get(&uri)
+        .header("X-Stellar-Account", PATIENT)
+        .header("X-Stellar-Signature", "not-a-hex-signature")
+        .header("X-Stellar-Timestamp", now.to_string())
+        .body(Body::empty())
+        .unwrap();
+    let resp = app().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+
+    // Invalid signature length (32 bytes instead of 64 bytes)
+    let req = Request::get(&uri)
+        .header("X-Stellar-Account", PATIENT)
+        .header("X-Stellar-Signature", "cd".repeat(32))
+        .header("X-Stellar-Timestamp", now.to_string())
+        .body(Body::empty())
+        .unwrap();
+    let resp = app().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+
+    // Expired timestamp (10 minutes in past)
+    let req = Request::get(&uri)
+        .header("X-Stellar-Account", PATIENT)
+        .header("X-Stellar-Signature", &dummy_sig)
+        .header("X-Stellar-Timestamp", (now - 600).to_string())
+        .body(Body::empty())
+        .unwrap();
+    let resp = app().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn serves_openapi_spec_and_documentation_ui() {
+    // GET /docs serves HTML Swagger UI
+    let req = Request::get("/docs").body(Body::empty()).unwrap();
+    let resp = app().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+    let html = String::from_utf8(bytes.to_vec()).unwrap();
+    assert!(html.contains("SwaggerUIBundle"));
+    assert!(html.contains("/openapi.json"));
+
+    // GET /openapi.json serves valid OpenAPI 3.0 specification
+    let (status, spec) = get(app(), "/openapi.json", None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(spec["openapi"], "3.0.3");
+    assert_eq!(spec["info"]["title"], "RetinaX Offchain Server API");
+    assert!(spec["paths"]["/health"].is_object());
+    assert!(spec["paths"]["/api/audit-logs/{patient_id}"].is_object());
+    assert!(spec["paths"]["/api/prove"].is_object());
+
+    // Public /api/docs and /api/openapi.json aliases
+    let req = Request::get("/api/docs").body(Body::empty()).unwrap();
+    let resp = app().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let (status, spec_api) = get(app(), "/api/openapi.json", None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(spec_api["openapi"], "3.0.3");
+}
+
 struct FailingStore;
 
 #[async_trait]

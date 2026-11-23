@@ -32,6 +32,61 @@ pub enum ProposalType {
     TreasurySpend,
 }
 
+/// Category classifying proposals with specific governance requirements.
+#[contracttype]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum ProposalCategory {
+    ParameterChange,
+    TreasurySpend,
+    ContractUpgrade,
+    General,
+    Emergency,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CategoryConfig {
+    pub quorum_bps: u32,
+    pub pass_threshold_bps: u32,
+}
+
+impl ProposalCategory {
+    pub fn from_proposal_type(t: &ProposalType) -> Self {
+        match t {
+            ProposalType::ParameterChange => ProposalCategory::ParameterChange,
+            ProposalType::TreasurySpend => ProposalCategory::TreasurySpend,
+            ProposalType::ContractUpgrade => ProposalCategory::ContractUpgrade,
+            ProposalType::EmergencyAction => ProposalCategory::Emergency,
+            ProposalType::PolicyModification => ProposalCategory::General,
+        }
+    }
+}
+
+pub fn default_category_config(category: &ProposalCategory) -> CategoryConfig {
+    match category {
+        ProposalCategory::TreasurySpend => CategoryConfig {
+            quorum_bps: 1_000,
+            pass_threshold_bps: 5_100,
+        },
+        ProposalCategory::ParameterChange => CategoryConfig {
+            quorum_bps: 1_500,
+            pass_threshold_bps: 5_100,
+        },
+        ProposalCategory::ContractUpgrade => CategoryConfig {
+            quorum_bps: 3_000,
+            pass_threshold_bps: 5_100,
+        },
+        ProposalCategory::General => CategoryConfig {
+            quorum_bps: 2_000,
+            pass_threshold_bps: 5_100,
+        },
+        ProposalCategory::Emergency => CategoryConfig {
+            quorum_bps: 500,
+            pass_threshold_bps: 5_100,
+        },
+    }
+}
+
 /// Phase of the proposal lifecycle.
 ///
 /// ```text
@@ -72,6 +127,7 @@ pub struct ProposalAction {
 pub struct Proposal {
     pub id: u64,
     pub proposal_type: ProposalType,
+    pub category: ProposalCategory,
     pub phase: ProposalPhase,
     pub proposer: Address,
     /// Human-readable summary stored as a short on-chain string.

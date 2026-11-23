@@ -2,27 +2,39 @@
 
 This is a guided walkthrough of the repository structure and how the contract suite fits together.
 
-## Root-Level Files
+## Root-Level Files and Directories
 
 - `Cargo.toml` - Rust workspace definition and shared dependencies.
 - `Makefile` - Common build, test, and deployment commands.
 - `deny.toml` - Dependency policy rules for `cargo deny`.
 - `.coderabbit.yaml` - Code review automation configuration.
 - `.pre-commit-config.yaml` - Pre-commit hooks configuration.
+- `.github/workflows/` - GitHub Actions pipelines.
 - `setup.sh` - Automated environment setup.
+- `contracts/` - Soroban smart contract workspace crates.
+- `sdk/zk_prover/` - Off-chain ZK proof generation SDK.
+- `offchain-server/` - Standalone Rust server for audit logs and proof endpoints.
+- `website/` - Static project website and `node:test` suite.
+- `test/` and `tests/integration/` - Shared and cross-contract test suites.
+- `fuzz/` - Cargo fuzz targets.
+- `docs/` - Architecture, API, onboarding, runbooks, compliance, and the [documentation index](../README.md).
 
 ## Contracts Workspace
 
 All contract crates live in `contracts/` and are part of the workspace. Each contract is a separate Rust crate with its own `Cargo.toml`, and they share utilities from the common library.
 
-### Contract Suite (19 total)
+### Contract Suite (26 crates)
 
+- `contracts/access_control` - Role and permission management for micro-contracts.
 - `contracts/ai_integration` - AI-assisted vision analysis and anomaly handling.
 - `contracts/analytics` - Aggregated metrics and reporting for vision data.
 - `contracts/audit` - Audit trail and access logging.
-- `contracts/common` - Shared utilities, error types, and security helpers. See the shared library overview in [contracts/common/src/lib.rs](../../contracts/common/src/lib.rs).
+- `contracts/benches` - Benchmark crate; not a deployed contract.
+- `contracts/clinical_records` - Clinical record storage and access rules.
+- `contracts/common` - Shared utilities, error types, and security helpers; not a deployed contract.
 - `contracts/compliance` - Compliance checks and enforcement for policy rules.
 - `contracts/cross_chain` - Cross-chain relay and data portability helpers.
+- `contracts/delegation` - Delegated authority and scoped permissions.
 - `contracts/emr_bridge` - EMR integration and data interoperability.
 - `contracts/events` - Event streaming and contract telemetry.
 - `contracts/fhir` - FHIR-compatible data transforms.
@@ -30,9 +42,12 @@ All contract crates live in `contracts/` and are part of the workspace. Each con
 - `contracts/identity` - Identity and verification primitives.
 - `contracts/key_manager` - Key derivation and key rotation.
 - `contracts/metering` - Usage metering and quotas.
+- `contracts/orchestrator` - Cross-contract workflow orchestration.
 - `contracts/staking` - Staking and incentives.
+- `contracts/state_channel` - Off-chain state channel primitives.
 - `contracts/timelock` - Timelock execution for governance actions.
 - `contracts/treasury` - Treasury controls and funds management.
+- `contracts/vault` - Secure value and secret holding helpers.
 - `contracts/vision_records` - Core vision record management contract.
 - `contracts/zk_verifier` - ZK proof verification.
 - `contracts/zk_voting` - ZK-enabled governance voting.
@@ -43,21 +58,28 @@ The main contract lives in `contracts/vision_records`.
 
 ### Module Structure
 
-- `lib.rs` - Contract entry points, shared types, and storage keys.
+- `lib.rs` - Contract entry points, shared state, and public API.
 - `appointment.rs` - Appointment scheduling and visit tracking.
 - `audit.rs` - Access auditing and usage tracing.
 - `circuit_breaker.rs` - Emergency pause and safety controls.
+- `consent_management.rs` - Patient consent lifecycle.
 - `emergency.rs` - Emergency access and break-glass flows.
 - `errors.rs` - Contract-specific error definitions.
 - `events.rs` - Event emissions for observability.
 - `examination.rs` - Vision examination structures and logic.
+- `export.rs` - Patient data export helpers.
+- `insurance.rs` - Insurance metadata and claim support.
+- `multisig.rs` - Multi-party approval helpers.
 - `patient_profile.rs` - Patient profile storage and updates.
+- `portability.rs` - Data portability flows.
 - `prescription.rs` - Prescription creation and update logic.
+- `provenance.rs` - Record provenance tracking.
 - `rbac.rs` - Role-based access control and policy evaluation.
-- `types.rs` - Common types and enums (these are currently defined in `lib.rs` in this branch).
-- `upgrade.rs` - Upgrade and migration helpers (see shared migration helpers in `contracts/common`).
+- `transactions.rs` - Internal transaction helpers.
+- `types.rs` - Common types and enums.
+- `user.rs` - User registration and profile helpers.
 
-There are supporting modules such as `provider.rs`, `rate_limit.rs`, `validation.rs`, and internal tests that complement the main flow.
+Shared migration helpers live in `contracts/common/src/migration.rs`.
 
 ### How the Modules Interconnect
 
@@ -69,12 +91,13 @@ There are supporting modules such as `provider.rs`, `rate_limit.rs`, `validation
 
 ### Storage Key Organization
 
-Storage keys use the Soroban `symbol_short!` convention. See [docs/storage-key-conventions.md](../storage-key-conventions.md).
+Storage keys use the Soroban `symbol_short!` convention. See [storage key conventions](../storage-key-conventions.md).
 
 ## Documentation
 
 All documentation lives in `docs/`. Start with:
 
+- [Documentation index](../README.md)
 - [Architecture overview](../architecture.md)
 - [API reference](../api.md)
 - [Security model](../security/overview.md)
@@ -93,4 +116,4 @@ Fuzz testing is in `fuzz/` and uses `cargo-fuzz`. This is how we stress test con
 
 ## CI/CD
 
-GitHub Actions workflows live in `.github/workflows/` and include CI, security scans, and deployment automation.
+GitHub Actions workflows live in `.github/workflows/` and include Rust tests, formatting, contract checks, website linting, Markdown link checks, security scans, and deployment automation.

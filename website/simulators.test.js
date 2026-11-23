@@ -410,14 +410,6 @@ describe('RBAC Access Control Simulator Logic (#284)', () => {
     assert.match(preview.textContent, /role: Optometrist \(3\), expires_at: now \+ 172800 s/);
   });
 
-  test('form submission simulates access grant and updates code console', async () => {
-    let prevented = false;
-    await form.dispatchEvent({
-      type: 'submit',
-      preventDefault: () => {
-        prevented = true;
-      },
-    });
   test('get_role reads the role from the contract and shows a loading state meanwhile', async () => {
     let finish;
     const calls = [];

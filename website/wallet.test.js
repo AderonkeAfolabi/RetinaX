@@ -49,21 +49,17 @@ function fakeSdk(overrides = {}) {
   const log = [];
   const server = {
     simulateTransaction: async (tx) => (
-      log.push(['simulate', tx]),
-      { result: { retval: { native: 3 } } }
+      log.push(['simulate', tx]), { result: { retval: { native: 3 } } }
     ),
     getAccount: async (address) => (
-      log.push(['getAccount', address]),
-      { id: address, sequence: '7' }
+      log.push(['getAccount', address]), { id: address, sequence: '7' }
     ),
     prepareTransaction: async (tx) => (
-      log.push(['prepare', tx]),
-      { ...tx, toXDR: () => 'prepared-xdr' }
+      log.push(['prepare', tx]), { ...tx, toXDR: () => 'prepared-xdr' }
     ),
     sendTransaction: async (tx) => (log.push(['send', tx]), { status: 'PENDING', hash: 'abc123' }),
     pollTransaction: async (hash, opts) => (
-      log.push(['poll', hash, opts]),
-      { status: 'SUCCESS', ledger: 42 }
+      log.push(['poll', hash, opts]), { status: 'SUCCESS', ledger: 42 }
     ),
     ...overrides,
   };
@@ -243,8 +239,7 @@ describe('access_control contract calls over Soroban RPC (#284)', () => {
   test('has_permission passes the permission as a u32', async () => {
     const sdk = fakeSdk({
       simulateTransaction: async (tx) => (
-        sdk.log.push(['simulate', tx]),
-        { result: { retval: { native: true } } }
+        sdk.log.push(['simulate', tx]), { result: { retval: { native: true } } }
       ),
     });
     const app = loadApp({ StellarSdk: sdk });

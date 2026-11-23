@@ -4,6 +4,17 @@
 
 Provides privacy-preserving analytics on health metrics using homomorphic encryption and differential privacy. Enables secure aggregation of sensitive health data across multiple providers without exposing individual records.
 
+## Architecture at a Glance
+
+```mermaid
+flowchart LR
+    Provider[Provider] -->|encrypt| Ciphertext[Paillier ciphertext]
+    Ciphertext -->|add_ciphertexts| Aggregate[Aggregated ciphertext]
+    Aggregator[Authorized aggregator] -->|decrypt| Aggregate
+    Aggregate --> Noise[Differential privacy layer]
+    Noise --> Report[Privacy-preserving report]
+```
+
 ## Initialization
 
 ### `initialize(env: Env, admin: Address, aggregator: Address, pub_key: PaillierPublicKey, priv_key: Option<PaillierPrivateKey>) -> Result<(), ContractError>`
@@ -267,7 +278,7 @@ Cryptographic keys for homomorphic encryption (structure defined in `homomorphic
 
 ## Related Documentation
 
-- [Homomorphic Encryption Design](../docs/ZK_INTEGRATION.md#homomorphic)
-- [Differential Privacy](../docs/ZK_INTEGRATION.md#differential-privacy)
+- [Homomorphic Encryption Design](../security/cryptography.md)
+- [Differential Privacy](../security/cryptography.md)
 - [Storage Key Conventions](../storage-key-conventions.md)
 - [Indexer Guide](../indexer.md) — for metric query patterns

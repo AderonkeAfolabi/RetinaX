@@ -715,6 +715,35 @@ fn test_retry_invalid_index_fails() {
     }
 }
 
+#[test]
+fn test_dlq_capacity_eviction() {
+    let (env, client, admin) = setup();
+    register_schema(&env, &client, &admin, "records.vision.create", 1);
+
+    let event_id1 = publish_test_event(&env, &client, &admin, "records.vision.create", 1, "p1");
+    let event_id2 = publish_test_event(&env, &client, &admin, "records.vision.create", 1, "p2");
+    let event_id3 = publish_test_event(&env, &client, &admin, "records.vision.create", 1, "p3");
+
+    let sub1 = Address::generate(&env);
+    let sub2 = Address::generate(&env);
+    let sub3 = Address::generate(&env);
+
+    // Set DLQ capacity to 2
+    client.set_dlq_capacity(&admin, &2);
+    assert_eq!(client.get_dlq_capacity(), 2);
+
+    client.push_dead_letter(&admin, &event_id1, &sub1, &String::from_str(&env, "fail1"));
+    client.push_dead_letter(&admin, &event_id2, &sub2, &String::from_str(&env, "fail2"));
+    assert_eq!(client.get_dead_letters().len(), 2);
+
+    // Third entry triggers eviction of oldest entry (event_id1)
+    client.push_dead_letter(&admin, &event_id3, &sub3, &String::from_str(&env, "fail3"));
+    let dlq = client.get_dead_letters();
+    assert_eq!(dlq.len(), 2);
+    assert_eq!(dlq.get(0).unwrap().event_id, event_id2);
+    assert_eq!(dlq.get(1).unwrap().event_id, event_id3);
+}
+
 // ── Integration: subscription dispatch with events ───────────────────────────
 
 #[test]

@@ -837,4 +837,102 @@ impl VisionRecordsContract {
         };
         Ok(Bytes::from_slice(&env, rendered.as_bytes()))
     }
+
+    /// Cursor-based export of a patient's data (issue #446).
+    ///
+    /// The export is one linear sequence: the patient's records, then their prescriptions, then their access grants.
+    /// `cursor` is an index into that sequence, and `limit` (capped at [`portability::MAX_EXPORT_PAGE_SIZE`]) is the
+    /// number of items one page carries. Each page is a complete FHIR bundle or CSV document for the items it holds.
+    /// Start at `cursor = 0`, then follow `next_cursor` until it is `None`. Unlike `export_patient_data`, prescriptions
+    /// and grants are paged too, so no list size makes the export fail.
+    pub fn export_patient_data_page(
+        env: Env,
+        caller: Address,
+        patient: Address,
+        format: portability::PortabilityFormat,
+        cursor: u32,
+        limit: u32,
+    ) -> Result<portability::ExportPage, ContractError> {
+        caller.require_auth();
+        Self::enforce_rate_limit(&env, &caller)?;
+
+        let allowed = caller == patient
+            || Self::check_access(env.clone(), patient.clone(), caller.clone())
+                != AccessLevel::None
+            || Self::has_permission_unified(&env, &caller, &Permission::SystemAdmin);
+        if !allowed {
+            return Self::access_denied(&env, &caller, "export_patient_data_page", "ActiveGrant");
+        }
+
+        let page_size = limit.min(portability::MAX_EXPORT_PAGE_SIZE);
+        if page_size == 0 {
+            return Err(ContractError::InvalidInput);
+        }
+
+        let record_ids = Self::get_patient_records(env.clone(), patient.clone());
+        let history = prescription::get_patient_history(&env, patient.clone());
+        let grantees: Vec<Address> = env
+            .storage()
+            .persistent()
+            .get(&(symbol_short!("ACC_LST"), patient.clone()))
+            .unwrap_or(Vec::new(&env));
+
+        let records_end = record_ids.len();
+        let prescriptions_end = records_end.saturating_add(history.len());
+        let total = prescriptions_end.saturating_add(grantees.len());
+        if cursor > total {
+            return Err(ContractError::InvalidInput);
+        }
+
+        let page_end = cursor.saturating_add(page_size).min(total);
+        let mut entries = alloc::vec::Vec::new();
+        let mut prescriptions = alloc::vec::Vec::new();
+        let mut grants = alloc::vec::Vec::new();
+        for index in cursor..page_end {
+            if index < records_end {
+                let Some(record_id) = record_ids.get(index) else {
+                    continue;
+                };
+                let record = Self::get_record_raw(&env, record_id)?;
+                let exam = if matches!(record.record_type, RecordType::Examination) {
+                    examination::get_examination(&env, record_id)
+                } else {
+                    None
+                };
+                entries.push(portability::ExportEntry { record, exam });
+            } else if index < prescriptions_end {
+                let Some(rx_id) = history.get(index - records_end) else {
+                    continue;
+                };
+                if let Some(rx) = prescription::get_prescription(&env, rx_id) {
+                    prescriptions.push(rx);
+                }
+            } else {
+                let Some(grantee) = grantees.get(index - prescriptions_end) else {
+                    continue;
+                };
+                let key = (symbol_short!("ACCESS"), patient.clone(), grantee);
+                if let Some(grant) = env.storage().persistent().get::<_, AccessGrant>(&key) {
+                    grants.push(grant);
+                }
+            }
+        }
+
+        let next_cursor = if page_end < total { Some(page_end) } else { None };
+        let export = portability::PatientExport {
+            now: env.ledger().timestamp(),
+            entries,
+            prescriptions,
+            grants,
+        };
+        let rendered = match format {
+            portability::PortabilityFormat::FhirJson => portability::render_fhir_bundle(&export),
+            portability::PortabilityFormat::Csv => portability::render_csv(&export),
+        };
+        Ok(portability::ExportPage {
+            data: Bytes::from_slice(&env, rendered.as_bytes()),
+            next_cursor,
+            total,
+        })
+    }
 }
