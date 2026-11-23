@@ -5,7 +5,8 @@ use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env, Vec};
 
 use crate::{
     homomorphic::{PaillierPrivateKey, PaillierPublicKey},
-    AnalyticsContract, AnalyticsContractClient, MetricDimensions, MetricValue, TrendPoint,
+    AnalyticsContract, AnalyticsContractClient, ContractError, MetricDimensions, MetricValue,
+    TrendPoint,
 };
 
 fn setup() -> (Env, AnalyticsContractClient<'static>, Address, Address) {
@@ -105,6 +106,64 @@ fn test_aggregate_records() {
     // Since our DP noise is simple seed-based, we can check if it's within a range if needed,
     // but for the sake of this test, we check if it's at least positive.
     assert!(value.sum > 0);
+}
+
+#[test]
+fn dp_params_default_until_the_admin_sets_them() {
+    let (_env, client, _admin, _aggregator) = setup();
+
+    let defaults = client.get_dp_params();
+    assert_eq!(defaults.epsilon, 1);
+    assert_eq!(defaults.sensitivity, 10);
+
+    client.set_dp_params(&5, &200);
+    let updated = client.get_dp_params();
+    assert_eq!(updated.epsilon, 5);
+    assert_eq!(updated.sensitivity, 200);
+}
+
+#[test]
+fn dp_params_outside_the_bounds_are_rejected_and_leave_the_old_values() {
+    let (_env, client, _admin, _aggregator) = setup();
+
+    assert_eq!(client.try_set_dp_params(&0, &10), Err(Ok(ContractError::InvalidInput)));
+    assert_eq!(client.try_set_dp_params(&11, &10), Err(Ok(ContractError::InvalidInput)));
+    assert_eq!(client.try_set_dp_params(&1, &0), Err(Ok(ContractError::InvalidInput)));
+    assert_eq!(client.try_set_dp_params(&1, &1_000_001), Err(Ok(ContractError::InvalidInput)));
+
+    let unchanged = client.get_dp_params();
+    assert_eq!(unchanged.epsilon, 1);
+    assert_eq!(unchanged.sensitivity, 10);
+}
+
+#[test]
+fn aggregate_noise_follows_the_configured_parameters() {
+    let (env, client, _admin, aggregator) = setup();
+    let kind = symbol_short!("DP_CNT");
+    let dims = MetricDimensions {
+        region: None,
+        age_band: None,
+        condition: None,
+        time_bucket: 1,
+    };
+    let mut records = Vec::new(&env);
+    records.push_back(client.encrypt(&10));
+    records.push_back(client.encrypt(&5));
+
+    // Epsilon 10 with sensitivity 5 gives a noise scale of zero, so the recorded sum is exact.
+    client.set_dp_params(&10, &5);
+    client.aggregate_records(&aggregator, &kind, &dims, &records);
+    assert_eq!(client.get_metric(&kind, &dims).sum, 15);
+
+    // Defaults (epsilon 1, sensitivity 10) keep the noise within plus or minus 10 of the exact sum.
+    let other = MetricDimensions {
+        time_bucket: 2,
+        ..dims.clone()
+    };
+    client.set_dp_params(&1, &10);
+    client.aggregate_records(&aggregator, &kind, &other, &records);
+    let noisy = client.get_metric(&kind, &other).sum;
+    assert!((5..=25).contains(&noisy), "noisy sum {noisy} outside 15 +/- 10");
 }
 
 #[test]

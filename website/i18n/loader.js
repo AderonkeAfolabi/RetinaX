@@ -21,6 +21,8 @@
   var SUPPORTED_LANGUAGES = [
     { code: 'en', label: 'English', dir: 'ltr' },
     { code: 'es', label: 'Español', dir: 'ltr' },
+    { code: 'fr', label: 'Français', dir: 'ltr' },
+    { code: 'pt', label: 'Português', dir: 'ltr' },
   ];
   var RTL_LANGUAGES = ['ar', 'he', 'fa', 'ur'];
   var ATTRIBUTE_BINDINGS = {

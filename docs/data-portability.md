@@ -46,7 +46,24 @@ export_patient_data(caller, patient, format, offset, limit) -> Bytes
   and access grants are included on the first page only.
 - Prescriptions and grants are not paged yet. If the patient has more than 50
   prescriptions, or more than 50 grantees, the first-page call fails with
-  `InvalidInput`. Paging these lists is a follow-up.
+  `InvalidInput`. Use `export_patient_data_page` below for lists of any size.
+
+### Cursor-based bulk export: `export_patient_data_page` (issue #446)
+
+```text
+export_patient_data_page(caller, patient, format, cursor, limit) -> ExportPage
+ExportPage { data: Bytes, next_cursor: Option<u32>, total: u32 }
+```
+
+- The export is one sequence: the patient's records, then their prescriptions,
+  then their access grants. `cursor` is an index into that sequence.
+- `limit` is capped at 50 items per page. Start at `cursor = 0` and follow
+  `next_cursor` until it is `None`. Each page's `data` is a complete FHIR bundle
+  or CSV document for the items it holds, so concatenate pages on the client
+  side rather than parsing them as one document.
+- `total` is the number of items, so a client can show progress. A cursor past
+  `total` returns `InvalidInput`. A `limit` of 0 also returns `InvalidInput`.
+- Authorisation is the same as `export_patient_data`.
 
 ### FHIR mapping
 

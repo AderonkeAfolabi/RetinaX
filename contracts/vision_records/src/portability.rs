@@ -24,7 +24,7 @@
 #![allow(clippy::arithmetic_side_effects)]
 
 use alloc::{format, string::String as StdString, vec::Vec as StdVec};
-use soroban_sdk::{contracttype, String};
+use soroban_sdk::{contracttype, Bytes, String};
 
 use crate::examination::{
     EyeExamination, OptFundusPhotography, OptPhysicalMeasurement, OptRetinalImaging,
@@ -44,6 +44,18 @@ pub const MAX_EXPORT_PAGE_SIZE: u32 = 50;
 pub enum PortabilityFormat {
     FhirJson,
     Csv,
+}
+
+/// One page of a cursor-based export (issue #446).
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ExportPage {
+    /// The FHIR bundle or CSV document for the items on this page.
+    pub data: Bytes,
+    /// Cursor for the next page, or `None` when this page is the last one.
+    pub next_cursor: Option<u32>,
+    /// Number of exportable items across records, prescriptions and grants.
+    pub total: u32,
 }
 
 /// One stored record together with its examination payload, when it has one.

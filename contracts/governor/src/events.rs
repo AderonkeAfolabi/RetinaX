@@ -55,3 +55,8 @@ pub fn publish_proposal_executed(env: &Env, proposal_id: u64) {
     env.events()
         .publish((symbol_short!("PROP_EXE"),), proposal_id);
 }
+
+pub fn publish_proposal_vetoed(env: &Env, proposal_id: u64, guardian: &Address) {
+    env.events()
+        .publish((symbol_short!("PROP_VTO"), proposal_id), guardian.clone());
+}

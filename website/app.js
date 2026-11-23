@@ -2,17 +2,25 @@
    RetinaX — Clinical Interactive JS & GSAP + AOS Mega Animations
    ========================================================================== */
 
-window.RETINAX_CONTRACTS = Object.assign({
-  audit: '',
-  identity: '',
-  key_manager: '',
-  vision_records: ''
-}, window.RETINAX_CONTRACTS || {});
+const root =
+  typeof window !== 'undefined' ? window : typeof globalThis !== 'undefined' ? globalThis : {};
+root.RETINAX_CONTRACTS = Object.assign(
+  {
+    audit: '',
+    identity: '',
+    key_manager: '',
+    vision_records: '',
+  },
+  root.RETINAX_CONTRACTS || {}
+);
 
-window.RETINAX_DEPLOYMENTS = Object.assign({
-  testnet: { rpcUrl: 'https://soroban-testnet.stellar.org', contracts: { access_control: '' } },
-  mainnet: { rpcUrl: '', contracts: { access_control: '' } }
-}, window.RETINAX_DEPLOYMENTS || {});
+root.RETINAX_DEPLOYMENTS = Object.assign(
+  {
+    testnet: { rpcUrl: 'https://soroban-testnet.stellar.org', contracts: { access_control: '' } },
+    mainnet: { rpcUrl: '', contracts: { access_control: '' } },
+  },
+  root.RETINAX_DEPLOYMENTS || {}
+);
 
 if (typeof document !== 'undefined') {
   document.addEventListener('DOMContentLoaded', () => {
@@ -1970,21 +1978,36 @@ class ModalDialog extends ModalBase {
     if (!overlay) return;
 
     if (this.open) {
+      this.previousActiveElement =
+        typeof document !== 'undefined' && document.activeElement ? document.activeElement : null;
       overlay.classList.add('active');
       document.body.style.overflow = 'hidden';
       document.addEventListener('keydown', this.handleKeydown);
       this.dispatchEvent(new CustomEvent('modal-open', { bubbles: true, composed: true }));
+      const closeBtn = this.querySelector('.modal-dialog-close-btn');
+      if (closeBtn && typeof closeBtn.focus === 'function') closeBtn.focus();
     } else {
       overlay.classList.remove('active');
       document.body.style.overflow = '';
       document.removeEventListener('keydown', this.handleKeydown);
       this.dispatchEvent(new CustomEvent('modal-close', { bubbles: true, composed: true }));
+      if (this.previousActiveElement && typeof this.previousActiveElement.focus === 'function') {
+        try {
+          this.previousActiveElement.focus();
+        } catch (_) {}
+      }
     }
   }
 
   handleKeydown(e) {
     if (e.key === 'Escape' && this.open && this.closable) {
       this.close();
+    } else if (e.key === 'Tab' && this.open) {
+      const card = this.querySelector('.modal-dialog-card') || this;
+      const AccordionModule = typeof window !== 'undefined' ? window.Accordion : null;
+      if (AccordionModule && typeof AccordionModule.trapFocus === 'function') {
+        AccordionModule.trapFocus(card, e);
+      }
     }
   }
 
@@ -2044,13 +2067,17 @@ function initModal() {
   const customModal = document.getElementById('connect-wallet-dialog');
   const btnConnect = document.getElementById('btn-connect-wallet');
   const btnClose = document.getElementById('modal-close-btn');
+  let modalPreviousActive = null;
 
   function openModal() {
+    modalPreviousActive =
+      typeof document !== 'undefined' && document.activeElement ? document.activeElement : null;
     if (customModal && typeof customModal.openModal === 'function') {
       customModal.openModal();
     } else if (modalOverlay) {
       modalOverlay.classList.add('active');
       document.body.style.overflow = 'hidden';
+      if (btnClose && typeof btnClose.focus === 'function') btnClose.focus();
     }
   }
 
@@ -2060,6 +2087,11 @@ function initModal() {
     } else if (modalOverlay) {
       modalOverlay.classList.remove('active');
       document.body.style.overflow = '';
+      if (modalPreviousActive && typeof modalPreviousActive.focus === 'function') {
+        try {
+          modalPreviousActive.focus();
+        } catch (_) {}
+      }
     }
   }
 
@@ -2090,6 +2122,11 @@ function initModal() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && modalOverlay && modalOverlay.classList.contains('active')) {
       closeModal();
+    } else if (e.key === 'Tab' && modalOverlay && modalOverlay.classList.contains('active')) {
+      const AccordionModule = typeof window !== 'undefined' ? window.Accordion : null;
+      if (AccordionModule && typeof AccordionModule.trapFocus === 'function') {
+        AccordionModule.trapFocus(modalOverlay, e);
+      }
     }
   });
 }

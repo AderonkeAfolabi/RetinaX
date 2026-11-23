@@ -1061,3 +1061,100 @@ fn test_events_include_correct_timestamps() {
     // Just check that events are emitted, timestamps are checked in the detailed test
     // In a real test, we could check each event's timestamp > initial_time
 }
+
+// ── Tiered pricing plans (#462) ────────────────────────────────────────────────
+
+fn tier_quota(total_limit: u64) -> TenantQuota {
+    TenantQuota {
+        read_limit: 1000,
+        write_limit: 1000,
+        compute_limit: 1000,
+        storage_limit: 1000,
+        total_limit,
+        burst_allowance: 0,
+        enabled: true,
+    }
+}
+
+fn tier(total_limit: u64, price_per_cycle: u64) -> crate::plans::Plan {
+    crate::plans::Plan {
+        quota: tier_quota(total_limit),
+        price_per_cycle,
+    }
+}
+
+#[test]
+fn assigning_a_plan_sets_the_tenant_quota_and_records_the_plan() {
+    let (env, client, admin) = setup();
+    let org = register_org(&client, &admin, &env);
+    client.set_plan(&admin, &1, &tier(10, 50));
+
+    client.assign_plan(&admin, &org, &1);
+
+    assert_eq!(client.get_tenant_plan(&org), Some(1));
+    assert_eq!(client.get_quota(&org).map(|q| q.total_limit), Some(10));
+    assert_eq!(client.get_plan(&1).map(|p| p.price_per_cycle), Some(50));
+}
+
+#[test]
+fn upgrade_and_downgrade_change_the_limit_and_keep_the_cycle_usage() {
+    let (env, client, admin) = setup();
+    let org = register_org(&client, &admin, &env);
+    client.set_plan(&admin, &1, &tier(2, 0));
+    client.set_plan(&admin, &2, &tier(10, 0));
+    client.assign_plan(&admin, &org, &1);
+
+    client.record_gas(&admin, &org, &OperationType::Read);
+    client.record_gas(&admin, &org, &OperationType::Read);
+    let blocked = client.try_record_gas(&admin, &org, &OperationType::Read);
+    assert_eq!(blocked, Err(Ok(MeteringError::QuotaExceeded)));
+
+    // Upgrade: the larger limit applies at once and the two reads already recorded still count.
+    client.assign_plan(&admin, &org, &2);
+    client.record_gas(&admin, &org, &OperationType::Read);
+    assert_eq!(client.get_usage(&org).read_used, 3);
+
+    // Downgrade below the current usage: the tenant is blocked until the next cycle.
+    client.assign_plan(&admin, &org, &1);
+    let after_downgrade = client.try_record_gas(&admin, &org, &OperationType::Read);
+    assert_eq!(after_downgrade, Err(Ok(MeteringError::QuotaExceeded)));
+    assert_eq!(client.get_usage(&org).read_used, 3);
+    assert_eq!(client.get_tenant_plan(&org), Some(1));
+}
+
+#[test]
+fn plan_assignment_rejects_unknown_plans_unknown_tenants_and_a_zero_plan_id() {
+    let (env, client, admin) = setup();
+    let org = register_org(&client, &admin, &env);
+    let stranger = Address::generate(&env);
+
+    assert_eq!(
+        client.try_assign_plan(&admin, &org, &9),
+        Err(Ok(MeteringError::PlanNotFound))
+    );
+    client.set_plan(&admin, &1, &tier(10, 0));
+    assert_eq!(
+        client.try_assign_plan(&admin, &stranger, &1),
+        Err(Ok(MeteringError::TenantNotFound))
+    );
+    assert_eq!(
+        client.try_set_plan(&admin, &0, &tier(10, 0)),
+        Err(Ok(MeteringError::InvalidInput))
+    );
+}
+
+#[test]
+fn postpaid_invoice_includes_the_plan_base_price_even_without_usage() {
+    let (env, client, admin) = setup();
+    let org = register_org(&client, &admin, &env);
+    client.set_plan(&admin, &1, &tier(100, 50));
+    client.assign_plan(&admin, &org, &1);
+    client.set_billing_model(&admin, &org, &BillingModel::Postpaid);
+
+    let cycle = client.open_billing_cycle(&admin);
+    client.record_gas(&admin, &org, &OperationType::Read); // one unit of gas
+    client.close_billing_cycle(&admin);
+
+    // 1 unit of gas plus the plan's base price of 50.
+    assert_eq!(client.get_invoice(&org, &cycle).map(|i| i.amount_due), Some(51));
+}
