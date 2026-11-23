@@ -15,8 +15,7 @@ use soroban_sdk::{
     Address, Env, String, Vec,
 };
 use treasury::{
-    AllocationSummary, ContractError, ProposalStatus, TreasuryContract,
-    TreasuryContractClient,
+    AllocationSummary, ContractError, ProposalStatus, TreasuryContract, TreasuryContractClient,
 };
 
 // ── Mock DEX Router ──────────────────────────────────────────────────────────
@@ -36,11 +35,20 @@ impl MockDexRouter {
         from.require_auth();
         let asset_in = path.get(0).unwrap();
         let token_in = TokenClient::new(&env, &asset_in);
-        token_in.transfer_from(&env.current_contract_address(), &from, &env.current_contract_address(), &amount_in);
+        token_in.transfer_from(
+            &env.current_contract_address(),
+            &from,
+            &env.current_contract_address(),
+            &amount_in,
+        );
 
         let asset_out = path.get(path.len() - 1).unwrap();
         let token_out = TokenClient::new(&env, &asset_out);
-        let out_amount = if amount_in >= min_out { amount_in } else { min_out };
+        let out_amount = if amount_in >= min_out {
+            amount_in
+        } else {
+            min_out
+        };
         token_out.transfer(&env.current_contract_address(), &from, &out_amount);
         out_amount
     }
@@ -75,13 +83,19 @@ fn setup_integrated_system() -> IntegratedContext<'static> {
 
     // Deploy tokens
     let asset_a_admin = Address::generate(&env);
-    let token_a = env.register_stellar_asset_contract_v2(asset_a_admin).address();
+    let token_a = env
+        .register_stellar_asset_contract_v2(asset_a_admin)
+        .address();
 
     let asset_b_admin = Address::generate(&env);
-    let token_b = env.register_stellar_asset_contract_v2(asset_b_admin).address();
+    let token_b = env
+        .register_stellar_asset_contract_v2(asset_b_admin)
+        .address();
 
     let asset_c_admin = Address::generate(&env);
-    let token_c = env.register_stellar_asset_contract_v2(asset_c_admin).address();
+    let token_c = env
+        .register_stellar_asset_contract_v2(asset_c_admin)
+        .address();
 
     // Deploy DEX router
     let router_id = env.register(MockDexRouter, ());
@@ -144,7 +158,10 @@ fn test_governor_spending_proposal_passes_and_executes() {
     let initial_treasury_a = TokenClient::new(&ctx.env, &ctx.token_a).balance(&ctx.treasury_id);
 
     // Verify governor is properly linked
-    assert_eq!(ctx.treasury_client.get_governor(), Some(ctx.governor_id.clone()));
+    assert_eq!(
+        ctx.treasury_client.get_governor(),
+        Some(ctx.governor_id.clone())
+    );
 
     // Governor executes spend on Treasury
     let spend_res = ctx.treasury_client.try_governor_spend(
@@ -179,12 +196,9 @@ fn test_direct_treasury_withdrawal_without_governor_rejected() {
     let recipient = Address::generate(&ctx.env);
 
     // 1. Random attacker calling governor_spend is rejected
-    let res = ctx.treasury_client.try_governor_spend(
-        &attacker,
-        &ctx.token_a,
-        &recipient,
-        &10_000i128,
-    );
+    let res =
+        ctx.treasury_client
+            .try_governor_spend(&attacker, &ctx.token_a, &recipient, &10_000i128);
     assert_eq!(res, Err(Ok(ContractError::NotAuthorizedCaller)));
 
     // 2. Even a multisig signer calling governor_spend directly is rejected
@@ -197,12 +211,9 @@ fn test_direct_treasury_withdrawal_without_governor_rejected() {
     assert_eq!(signer_attempt, Err(Ok(ContractError::NotAuthorizedCaller)));
 
     // 3. Admin calling governor_spend directly is rejected (must go through governor)
-    let admin_attempt = ctx.treasury_client.try_governor_spend(
-        &ctx.admin,
-        &ctx.token_a,
-        &recipient,
-        &10_000i128,
-    );
+    let admin_attempt =
+        ctx.treasury_client
+            .try_governor_spend(&ctx.admin, &ctx.token_a, &recipient, &10_000i128);
     assert_eq!(admin_attempt, Err(Ok(ContractError::NotAuthorizedCaller)));
 }
 
@@ -214,12 +225,9 @@ fn test_spending_proposal_exceeding_balance_or_limit_rejected() {
     let recipient = Address::generate(&ctx.env);
 
     // 1. Non-positive spend amount rejected
-    let res_zero = ctx.treasury_client.try_governor_spend(
-        &ctx.governor_id,
-        &ctx.token_a,
-        &recipient,
-        &0i128,
-    );
+    let res_zero =
+        ctx.treasury_client
+            .try_governor_spend(&ctx.governor_id, &ctx.token_a, &recipient, &0i128);
     assert_eq!(res_zero, Err(Ok(ContractError::PositiveAmountRequired)));
 
     let res_neg = ctx.treasury_client.try_governor_spend(
@@ -231,7 +239,8 @@ fn test_spending_proposal_exceeding_balance_or_limit_rejected() {
     assert_eq!(res_neg, Err(Ok(ContractError::PositiveAmountRequired)));
 
     // 2. Set asset limit to 50,000
-    ctx.treasury_client.set_asset_limit(&ctx.admin, &ctx.token_a, &50_000i128);
+    ctx.treasury_client
+        .set_asset_limit(&ctx.admin, &ctx.token_a, &50_000i128);
 
     // Spend of 50,001 exceeds limit
     let res_limit = ctx.treasury_client.try_governor_spend(
@@ -271,8 +280,10 @@ fn test_multi_token_treasury_management() {
     let recipient_c = Address::generate(&ctx.env);
 
     // Set distinct limits per token
-    ctx.treasury_client.set_asset_limit(&ctx.admin, &ctx.token_a, &80_000i128);
-    ctx.treasury_client.set_asset_limit(&ctx.admin, &ctx.token_b, &40_000i128);
+    ctx.treasury_client
+        .set_asset_limit(&ctx.admin, &ctx.token_a, &80_000i128);
+    ctx.treasury_client
+        .set_asset_limit(&ctx.admin, &ctx.token_b, &40_000i128);
     // Token C has no limit (defaults to i128::MAX)
 
     assert_eq!(ctx.treasury_client.get_limit(&ctx.token_a), 80_000i128);
@@ -280,12 +291,8 @@ fn test_multi_token_treasury_management() {
     assert_eq!(ctx.treasury_client.get_limit(&ctx.token_c), i128::MAX);
 
     // 1. Governor spend for Token A
-    ctx.treasury_client.governor_spend(
-        &ctx.governor_id,
-        &ctx.token_a,
-        &recipient_a,
-        &30_000i128,
-    );
+    ctx.treasury_client
+        .governor_spend(&ctx.governor_id, &ctx.token_a, &recipient_a, &30_000i128);
 
     // 2. Multisig transfer proposal for Token B
     let prop_b = ctx.treasury_client.create_transfer_proposal(
@@ -297,8 +304,10 @@ fn test_multi_token_treasury_management() {
         &String::from_str(&ctx.env, "Token B grant"),
         &5_000u64,
     );
-    ctx.treasury_client.approve_proposal(&ctx.signers[1], &prop_b.id);
-    ctx.treasury_client.execute_proposal(&ctx.signers[0], &prop_b.id);
+    ctx.treasury_client
+        .approve_proposal(&ctx.signers[1], &prop_b.id);
+    ctx.treasury_client
+        .execute_proposal(&ctx.signers[0], &prop_b.id);
 
     // 3. Multisig transfer proposal for Token C
     let prop_c = ctx.treasury_client.create_transfer_proposal(
@@ -310,8 +319,10 @@ fn test_multi_token_treasury_management() {
         &String::from_str(&ctx.env, "Token C dev fund"),
         &5_000u64,
     );
-    ctx.treasury_client.approve_proposal(&ctx.signers[2], &prop_c.id);
-    ctx.treasury_client.execute_proposal(&ctx.signers[1], &prop_c.id);
+    ctx.treasury_client
+        .approve_proposal(&ctx.signers[2], &prop_c.id);
+    ctx.treasury_client
+        .execute_proposal(&ctx.signers[1], &prop_c.id);
 
     // Verify all recipients received their designated token amounts
     assert_eq!(
@@ -353,7 +364,8 @@ fn test_balance_invariants_and_category_allocation_tracking() {
     let rec2 = Address::generate(&ctx.env);
 
     // Operation 1: Governor Spend (20,000)
-    ctx.treasury_client.governor_spend(&ctx.governor_id, &ctx.token_a, &rec1, &20_000i128);
+    ctx.treasury_client
+        .governor_spend(&ctx.governor_id, &ctx.token_a, &rec1, &20_000i128);
 
     // Operation 2: Multisig Transfer (50,000)
     let prop = ctx.treasury_client.create_transfer_proposal(
@@ -365,8 +377,10 @@ fn test_balance_invariants_and_category_allocation_tracking() {
         &String::from_str(&ctx.env, "Medical Research"),
         &5_000u64,
     );
-    ctx.treasury_client.approve_proposal(&ctx.signers[1], &prop.id);
-    ctx.treasury_client.execute_proposal(&ctx.signers[0], &prop.id);
+    ctx.treasury_client
+        .approve_proposal(&ctx.signers[1], &prop.id);
+    ctx.treasury_client
+        .execute_proposal(&ctx.signers[0], &prop.id);
 
     let remaining_a = TokenClient::new(&ctx.env, &ctx.token_a).balance(&ctx.treasury_id);
     let bal1 = TokenClient::new(&ctx.env, &ctx.token_a).balance(&rec1);
@@ -413,8 +427,10 @@ fn test_swap_proposal_multi_token_rebalance() {
         &5_000u64,
     );
 
-    ctx.treasury_client.approve_proposal(&ctx.signers[1], &proposal.id);
-    ctx.treasury_client.execute_proposal(&ctx.signers[0], &proposal.id);
+    ctx.treasury_client
+        .approve_proposal(&ctx.signers[1], &proposal.id);
+    ctx.treasury_client
+        .execute_proposal(&ctx.signers[0], &proposal.id);
 
     let final_b = TokenClient::new(&ctx.env, &ctx.token_b).balance(&ctx.treasury_id);
     let final_a = TokenClient::new(&ctx.env, &ctx.token_a).balance(&ctx.treasury_id);
@@ -433,11 +449,16 @@ fn test_set_governor_unauthorized_rejected() {
     let stranger = Address::generate(&ctx.env);
     let fake_governor = Address::generate(&ctx.env);
 
-    let res = ctx.treasury_client.try_set_governor(&stranger, &fake_governor);
+    let res = ctx
+        .treasury_client
+        .try_set_governor(&stranger, &fake_governor);
     assert_eq!(res, Err(Ok(ContractError::UnauthorisedAdmin)));
 
     // Admin can update governor
     let new_governor = Address::generate(&ctx.env);
-    assert!(ctx.treasury_client.try_set_governor(&ctx.admin, &new_governor).is_ok());
+    assert!(ctx
+        .treasury_client
+        .try_set_governor(&ctx.admin, &new_governor)
+        .is_ok());
     assert_eq!(ctx.treasury_client.get_governor(), Some(new_governor));
 }

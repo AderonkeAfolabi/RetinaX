@@ -25,7 +25,10 @@ struct MockExternalEmrContract {
 
 impl MockExternalEmrContract {
     fn new(_env: &Env, provider_id: &String, available: bool) -> Self {
-        Self { available, provider_id: provider_id.clone() }
+        Self {
+            available,
+            provider_id: provider_id.clone(),
+        }
     }
 
     fn simulate_call(&self) -> Result<String, &str> {

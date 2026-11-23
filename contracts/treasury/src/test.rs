@@ -231,14 +231,7 @@ fn test_create_and_claim_stream() {
 
     // Create stream: start 100, stop 200, rate 10 per sec, cliff 120, deposit 1000
     let stream_id = client.create_stream(
-        &signer1,
-        &recipient,
-        &asset1,
-        &1000i128,
-        &100u64,
-        &200u64,
-        &10i128,
-        &120u64,
+        &signer1, &recipient, &asset1, &1000i128, &100u64, &200u64, &10i128, &120u64,
     );
 
     let stream = client.get_stream(&stream_id).unwrap();
@@ -288,14 +281,7 @@ fn test_stream_cancellation_and_underflow_prevention() {
 
     // Create stream: start 100, stop 300, rate 5 per sec, cliff 150, deposit 1000
     let stream_id = client.create_stream(
-        &signer1,
-        &recipient,
-        &asset1,
-        &1000i128,
-        &100u64,
-        &300u64,
-        &5i128,
-        &150u64,
+        &signer1, &recipient, &asset1, &1000i128, &100u64, &300u64, &5i128, &150u64,
     );
 
     // Cancel before cliff (time 120) - nothing vested / paid out
@@ -319,14 +305,7 @@ fn test_stream_cancellation_and_underflow_prevention() {
     // Second stream testing cancellation after cliff
     env.ledger().set_timestamp(200);
     let stream_id2 = client.create_stream(
-        &signer1,
-        &recipient,
-        &asset1,
-        &1000i128,
-        &200u64,
-        &400u64,
-        &5i128,
-        &250u64,
+        &signer1, &recipient, &asset1, &1000i128, &200u64, &400u64, &5i128, &250u64,
     );
 
     // Advance to 300 (past cliff of 250) -> 100s * 5 = 500 vested

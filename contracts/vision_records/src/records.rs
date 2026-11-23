@@ -918,7 +918,11 @@ impl VisionRecordsContract {
             }
         }
 
-        let next_cursor = if page_end < total { Some(page_end) } else { None };
+        let next_cursor = if page_end < total {
+            Some(page_end)
+        } else {
+            None
+        };
         let export = portability::PatientExport {
             now: env.ledger().timestamp(),
             entries,

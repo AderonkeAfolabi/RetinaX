@@ -345,7 +345,7 @@ pub fn encrypt_data(
 
 ### Standards and Specifications
 - [NIST Cryptographic Standards](https://csrc.nist.gov/)
-- [FIPS 140-2](https://csrc.nist.gov/publications/fips/fips140-2/final/)
+- [FIPS 140-2](https://csrc.nist.gov/pubs/fips/140-2/upd2/final)
 - [HIPAA Security Rule](https://www.hhs.gov/hipaa/for-professionals/security/)
 
 ### Research Papers
@@ -355,8 +355,8 @@ pub fn encrypt_data(
 
 ### Implementation Libraries
 - [Stellar SDK](https://github.com/stellar/js-stellar-sdk)
-- [Bellman](https://github.com/zcash/librustbellman)
-- [Paillier Rust](https://github.com/magnusmuller/paillier-rust)
+- [Bellman](https://github.com/zkcrypto/bellman)
+- Paillier Rust
 
 ---
 

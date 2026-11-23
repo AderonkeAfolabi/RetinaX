@@ -10,5 +10,7 @@ fn only_maps_an_opaque_patient_id_and_active_state() {
     let patient = client.map_minimal_patient(&id, &false);
     assert_eq!(patient.id, id);
     assert!(!patient.active);
-    assert!(client.try_map_minimal_patient(&String::from_str(&env, "name/email"), &true).is_err());
+    assert!(client
+        .try_map_minimal_patient(&String::from_str(&env, "name/email"), &true)
+        .is_err());
 }

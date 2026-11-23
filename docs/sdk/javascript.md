@@ -749,7 +749,7 @@ describe('Patient Management Integration', () => {
 ### Debug Tools
 
 - [Stellar Laboratory](https://laboratory.stellar.org/) for XDR decoding
-- [Soroban Explorer](https://soroban-explorer.stellar.org/) for transaction tracking
+- [Soroban Explorer](https://stellar.expert/) for transaction tracking
 - Network-specific RPC endpoints for debugging
 
 ## References

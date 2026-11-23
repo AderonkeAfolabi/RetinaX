@@ -231,7 +231,8 @@ fn cursor_export_pages_over_one_hundred_and_twenty_records() {
     let mut pages = 0;
     let mut rows = 0;
     while let Some(at) = cursor {
-        let page = client.export_patient_data_page(&patient, &patient, &PortabilityFormat::Csv, &at, &50);
+        let page =
+            client.export_patient_data_page(&patient, &patient, &PortabilityFormat::Csv, &at, &50);
         assert_eq!(page.total, 120);
         rows += bytes_to_text(&page.data).matches(iop_row).count();
         pages += 1;
@@ -254,12 +255,15 @@ fn cursor_export_pages_grants_past_the_old_fifty_entry_limit() {
     }
 
     // The offset-based export refuses a grantee list longer than one page.
-    let refused = client.try_export_patient_data(&patient, &patient, &PortabilityFormat::Csv, &0, &50);
+    let refused =
+        client.try_export_patient_data(&patient, &patient, &PortabilityFormat::Csv, &0, &50);
     assert_eq!(refused, Err(Ok(ContractError::InvalidInput)));
 
     // One record, then 60 grants: the first page holds the record and grants 0..=48.
-    let first = client.export_patient_data_page(&patient, &patient, &PortabilityFormat::Csv, &0, &50);
-    let second = client.export_patient_data_page(&patient, &patient, &PortabilityFormat::Csv, &50, &50);
+    let first =
+        client.export_patient_data_page(&patient, &patient, &PortabilityFormat::Csv, &0, &50);
+    let second =
+        client.export_patient_data_page(&patient, &patient, &PortabilityFormat::Csv, &50, &50);
     assert_eq!(first.total, 61);
     assert_eq!(first.next_cursor, Some(50));
     assert_eq!(second.next_cursor, None);

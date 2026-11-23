@@ -8,7 +8,10 @@ use soroban_sdk::{
 pub mod types;
 pub mod validation;
 pub use types::FhirError;
-use types::{DiagnosticReport, Gender, MedicationRequest, MinimalPatient, Observation, ObservationStatus, Patient};
+use types::{
+    DiagnosticReport, Gender, MedicationRequest, MinimalPatient, Observation, ObservationStatus,
+    Patient,
+};
 
 use common::migration::{self, FieldTransform, Migration};
 
@@ -161,7 +164,11 @@ impl FhirContract {
     }
 
     /// Projects only the pseudonymous identifier and active flag for FHIR exchange.
-    pub fn map_minimal_patient(_env: Env, id: String, active: bool) -> Result<MinimalPatient, FhirError> {
+    pub fn map_minimal_patient(
+        _env: Env,
+        id: String,
+        active: bool,
+    ) -> Result<MinimalPatient, FhirError> {
         if !validation::valid_resource_id(&id) {
             return Err(FhirError::InvalidRecordData);
         }
@@ -193,14 +200,20 @@ impl FhirContract {
     }
 
     /// Validates and returns a metadata-only FHIR R4 DiagnosticReport projection.
-    pub fn map_diagnostic_report(_env: Env, report: DiagnosticReport) -> Result<DiagnosticReport, FhirError> {
+    pub fn map_diagnostic_report(
+        _env: Env,
+        report: DiagnosticReport,
+    ) -> Result<DiagnosticReport, FhirError> {
         if !validation::valid_resource_id(&report.id)
             || !validation::valid_resource_id(&report.subject_id)
             || report.code_system.is_empty()
             || report.code_value.is_empty()
             || report.effective_datetime == 0
             || report.result_ids.len() > 100
-            || !report.result_ids.iter().all(|id| validation::valid_resource_id(&id))
+            || !report
+                .result_ids
+                .iter()
+                .all(|id| validation::valid_resource_id(&id))
         {
             return Err(FhirError::InvalidRecordData);
         }

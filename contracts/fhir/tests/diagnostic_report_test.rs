@@ -17,6 +17,9 @@ fn maps_report_coding_and_opaque_result_references() {
         result_ids: vec![&env, String::from_str(&env, "observation-1")],
     };
     assert_eq!(client.map_diagnostic_report(&report), report);
-    report.result_ids = vec![&env, String::from_str(&env, "http://example.com/observation")];
+    report.result_ids = vec![
+        &env,
+        String::from_str(&env, "http://example.com/observation"),
+    ];
     assert!(client.try_map_diagnostic_report(&report).is_err());
 }

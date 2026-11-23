@@ -4,12 +4,12 @@ use crate::{
     AccessControlContract, AccessControlContractClient, AccessControlError, CredentialType,
     Permission, PolicyConditions, Role, SensitivityLevel, TimeRestriction,
 };
+use proptest::prelude::*;
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Ledger},
     Address, Env, Vec,
 };
-use proptest::prelude::*;
 
 // ContractError variant coverage:
 // Unauthorized, InvalidInput, NotFound, DelegationExpired, Paused,

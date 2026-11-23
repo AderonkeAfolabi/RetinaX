@@ -1741,8 +1741,10 @@ impl StakingContract {
         let prov_total: i128 = store.get(&prov_key).unwrap_or(0);
         store.set(&prov_key, &prov_total.saturating_sub(amount));
 
-        env.events()
-            .publish((symbol_short!("UNDELEG"), record.provider, delegator), amount);
+        env.events().publish(
+            (symbol_short!("UNDELEG"), record.provider, delegator),
+            amount,
+        );
 
         Ok(())
     }

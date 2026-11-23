@@ -108,7 +108,7 @@ Welcome to the RetinaX documentation. This index groups every guide by the audie
 - [Emergency Contacts](emergency-contacts.md) — Escalation contacts for urgent incidents.
 - [Release Management](release-management.md) — Release planning, tagging, and rollout process.
 - [RBAC Quick Reference](rbac-quick-reference.md) — Fast reference for role and permission operations.
-- [Rate Limiting](rate-limiting.md) — Rate-limit configuration and monitoring guidance.
+- [Rate Limiting](security/rate-limiting.md) — Rate-limit configuration and monitoring guidance.
 
 ## Auditors
 

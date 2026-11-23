@@ -74,11 +74,7 @@ impl AccessControlContract {
     }
 
     /// Pauses or resumes administrative operations.
-    pub fn set_paused(
-        env: Env,
-        caller: Address,
-        paused: bool,
-    ) -> Result<(), AccessControlError> {
+    pub fn set_paused(env: Env, caller: Address, paused: bool) -> Result<(), AccessControlError> {
         admin::set_paused(&env, &caller, paused)
     }
 
@@ -185,11 +181,7 @@ impl AccessControlContract {
     /// * `limit` - The maximum number of entries to return.
     ///
     /// Returns a tuple `(Vec<Address>, u32)` containing the paginated slice and total count.
-    pub fn get_whitelisted_addresses(
-        env: Env,
-        offset: u32,
-        limit: u32,
-    ) -> (Vec<Address>, u32) {
+    pub fn get_whitelisted_addresses(env: Env, offset: u32, limit: u32) -> (Vec<Address>, u32) {
         whitelist::get_whitelisted_addresses(&env, offset, limit)
     }
 
@@ -243,11 +235,7 @@ impl AccessControlContract {
     ///
     /// # Errors
     /// * `AccessControlError::Unauthorized` - If `caller` lacks `Permission::ManageUsers` and is not admin.
-    pub fn revoke_role(
-        env: Env,
-        caller: Address,
-        user: Address,
-    ) -> Result<(), AccessControlError> {
+    pub fn revoke_role(env: Env, caller: Address, user: Address) -> Result<(), AccessControlError> {
         permissions::revoke_role(&env, &caller, &user)
     }
 

@@ -11,7 +11,10 @@ mod reputation_tests {
 
     #[test]
     fn decays_one_half_per_complete_period_and_saturates() {
-        let score = Reputation { score: MAX_BPS, updated_at: 100 };
+        let score = Reputation {
+            score: MAX_BPS,
+            updated_at: 100,
+        };
         assert_eq!(decayed_score(&score, 99), 10_000);
         assert_eq!(decayed_score(&score, 100 + HALF_LIFE - 1), 10_000);
         assert_eq!(decayed_score(&score, 100 + HALF_LIFE), 5_000);
@@ -487,10 +490,19 @@ impl AiIntegrationContract {
             let key = (REPUTATION, request.provider_id);
             let now = env.ledger().timestamp();
             let sample = if accepted { MAX_BPS } else { 0 };
-            let score = env.storage().persistent().get::<_, Reputation>(&key)
+            let score = env
+                .storage()
+                .persistent()
+                .get::<_, Reputation>(&key)
                 .map(|old| (decayed_score(&old, now) + sample) / 2)
                 .unwrap_or(sample);
-            env.storage().persistent().set(&key, &Reputation { score, updated_at: now });
+            env.storage().persistent().set(
+                &key,
+                &Reputation {
+                    score,
+                    updated_at: now,
+                },
+            );
         }
 
         result.verification_state = if accepted {
@@ -514,9 +526,15 @@ impl AiIntegrationContract {
     }
 
     /// Returns the decayed score in basis points, or None before the first review.
-    pub fn get_provider_reputation(env: Env, provider_id: u32) -> Result<Option<u32>, AiIntegrationError> {
+    pub fn get_provider_reputation(
+        env: Env,
+        provider_id: u32,
+    ) -> Result<Option<u32>, AiIntegrationError> {
         Self::get_provider(env.clone(), provider_id)?;
-        Ok(env.storage().persistent().get::<_, Reputation>(&(REPUTATION, provider_id))
+        Ok(env
+            .storage()
+            .persistent()
+            .get::<_, Reputation>(&(REPUTATION, provider_id))
             .map(|value| decayed_score(&value, env.ledger().timestamp())))
     }
 

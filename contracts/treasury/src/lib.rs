@@ -310,7 +310,8 @@ impl TreasuryContract {
             .instance()
             .set(&category_limit_key(&category), &limit);
 
-        env.events().publish((symbol_short!("cat_lim"), category), limit);
+        env.events()
+            .publish((symbol_short!("cat_lim"), category), limit);
         Ok(())
     }
 
@@ -332,8 +333,7 @@ impl TreasuryContract {
             return Err(ContractError::FutureExpiryRequired);
         }
         env.storage().instance().set(&PERIOD_DURATION, &duration);
-        env.events()
-            .publish((symbol_short!("period"),), duration);
+        env.events().publish((symbol_short!("period"),), duration);
         Ok(())
     }
 
@@ -738,10 +738,7 @@ impl TreasuryContract {
         }
     }
 
-    pub fn get_category_spent_in_period(
-        env: Env,
-        category: Symbol,
-    ) -> i128 {
+    pub fn get_category_spent_in_period(env: Env, category: Symbol) -> i128 {
         let now = env.ledger().timestamp();
         let period_start = get_period_start(&env, now);
         get_category_spent(&env, &category, period_start)

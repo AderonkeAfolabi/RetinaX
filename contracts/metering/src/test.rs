@@ -1156,5 +1156,8 @@ fn postpaid_invoice_includes_the_plan_base_price_even_without_usage() {
     client.close_billing_cycle(&admin);
 
     // 1 unit of gas plus the plan's base price of 50.
-    assert_eq!(client.get_invoice(&org, &cycle).map(|i| i.amount_due), Some(51));
+    assert_eq!(
+        client.get_invoice(&org, &cycle).map(|i| i.amount_due),
+        Some(51)
+    );
 }

@@ -363,10 +363,10 @@ mod prescription_tests;
 #[cfg(test)]
 mod test_archive;
 #[cfg(test)]
-mod test_portability;
-#[cfg(test)]
 mod test_insurance_endpoints;
 #[cfg(test)]
 mod test_multisig;
+#[cfg(test)]
+mod test_portability;
 #[cfg(test)]
 mod test_rate_limit_bypass;

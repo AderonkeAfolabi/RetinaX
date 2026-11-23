@@ -252,7 +252,7 @@ Contributors are recognized in:
 
 ## ❓ Questions?
 
-- Open a [Discussion](https://github.com/RetinaX-Org/RetinaX/discussions)
+- Open a [Discussion](https://github.com/RetinaX-Org/RetinaX/issues)
 - Join our Discord community
 - Tag maintainers in issues
 

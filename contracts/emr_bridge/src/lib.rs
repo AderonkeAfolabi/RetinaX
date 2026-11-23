@@ -22,17 +22,20 @@ mod retry_tests {
         client.initialize(&admin);
         let id = String::from_str(&env, "exchange");
         env.as_contract(&contract, || {
-            env.storage().persistent().set(&(symbol_short!("EXCHANGE"), id.clone()), &DataExchangeRecord {
-                exchange_id: id.clone(),
-                provider_id: id.clone(),
-                patient_id: id.clone(),
-                direction: ExchangeDirection::Export,
-                data_format: DataFormat::FhirR4,
-                resource_type: id.clone(),
-                record_hash: id.clone(),
-                timestamp: 0,
-                status: SyncStatus::Pending,
-            });
+            env.storage().persistent().set(
+                &(symbol_short!("EXCHANGE"), id.clone()),
+                &DataExchangeRecord {
+                    exchange_id: id.clone(),
+                    provider_id: id.clone(),
+                    patient_id: id.clone(),
+                    direction: ExchangeDirection::Export,
+                    data_format: DataFormat::FhirR4,
+                    resource_type: id.clone(),
+                    record_hash: id.clone(),
+                    timestamp: 0,
+                    status: SyncStatus::Pending,
+                },
+            );
         });
         let mut now = 0;
         for attempt in 0..MAX_ATTEMPTS {
@@ -44,7 +47,8 @@ mod retry_tests {
             assert!(client.process_retries(&admin, &1).is_empty());
         }
         client.update_exchange_status(&admin, &id, &SyncStatus::Failed);
-        env.ledger().with_mut(|ledger| ledger.timestamp = now + 3600);
+        env.ledger()
+            .with_mut(|ledger| ledger.timestamp = now + 3600);
         assert!(client.process_retries(&admin, &1).is_empty());
     }
 }
@@ -364,7 +368,10 @@ impl EmrBridgeContract {
                 if queue.len() >= MAX_QUEUE {
                     return Err(EmrBridgeError::RetryQueueFull);
                 }
-                retry.due_at = env.ledger().timestamp().saturating_add(retry_delay(retry.attempts));
+                retry.due_at = env
+                    .ledger()
+                    .timestamp()
+                    .saturating_add(retry_delay(retry.attempts));
                 queue.push_back(exchange_id.clone());
                 storage.set(&key, &retry);
                 storage.extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
@@ -382,7 +389,11 @@ impl EmrBridgeContract {
     }
 
     /// Claims due failed exchanges for an authenticated off-chain worker.
-    pub fn process_retries(env: Env, caller: Address, limit: u32) -> Result<Vec<String>, EmrBridgeError> {
+    pub fn process_retries(
+        env: Env,
+        caller: Address,
+        limit: u32,
+    ) -> Result<Vec<String>, EmrBridgeError> {
         caller.require_auth();
         Self::require_admin(&env, &caller)?;
         let storage = env.storage().persistent();
