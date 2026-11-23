@@ -1,8 +1,6 @@
 extern crate std;
 
-use analytics::{
-    AnalyticsContract, AnalyticsContractClient, ContractError, MetricDimensions, MetricValue,
-};
+use analytics::{AnalyticsContract, AnalyticsContractClient, MetricDimensions};
 use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env, Vec};
 
 fn setup_cross_query_test() -> (Env, AnalyticsContractClient<'static>, Address, Address) {
@@ -302,7 +300,7 @@ fn test_complex_cross_query_attempts() {
     client.aggregate_records(&aggregator, &kind, &base_dims, &sensitive_records);
 
     // Attempt 1: Change one dimension at a time to try to access data
-    let mut cross_attempts = vec![
+    let mut cross_attempts = [
         // Wrong region, same other dimensions
         MetricDimensions {
             region: Some(symbol_short!("WRONG_HSP")),
@@ -498,7 +496,7 @@ fn test_null_dimension_cross_queries() {
     client.aggregate_records(&aggregator, &kind, &null_condition_dims, &records);
 
     // Attempt cross-queries between null and specific dimensions
-    let cross_queries = vec![
+    let cross_queries = [
         // Try to access specific data using null region
         null_region_dims,
         // Try to access specific data using null age band
