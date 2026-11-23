@@ -118,6 +118,21 @@ The treasury contract manages a single token balance (a SAC-compatible asset) he
   - `get_allocation_for_category(category) -> AllocationSummary`:
     - Returns how much has been spent for `category` across all executed proposals.
 
+- **Recurring Grants and Streaming Payments**
+  - `create_stream(caller, recipient, asset, deposit, start_time, stop_time, rate, cliff) -> u64`:
+    - Creates a continuous payment stream or recurring grant schedule approved by governance or admin.
+    - `cliff` specifies the timestamp before which no funds may be claimed.
+    - `rate` specifies the release rate per second.
+  - `claim(recipient, stream_id) -> i128`:
+    - Claims vested stream tokens for `recipient`. Reverts if cliff is not reached or zero tokens are available.
+    - Safely guards against underflow when computing claimable amounts.
+  - `cancel_stream(caller, stream_id)`:
+    - Cancels an active stream by caller (governor, admin, or creator). Pays any vested unharvested balance to recipient up to the cancellation timestamp and closes the stream.
+  - `get_stream(stream_id) -> Option<Stream>`:
+    - Returns the `Stream` state.
+  - `get_claimable_amount(stream_id) -> i128`:
+    - Returns the currently vested, claimable token amount.
+
 ## Example Workflow
 
 1. **Configure Treasury**
