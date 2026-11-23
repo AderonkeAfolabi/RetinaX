@@ -629,13 +629,10 @@ fn test_emergency_veto_guardian() {
     let env = create_env();
     env.mock_all_auths();
     let (contract_id, client) = register_governor(&env);
-    default_init(&env, &client);
-
     let admin = Address::generate(&env);
-    // Replace admin with test admin
-    env.as_contract(&contract_id, || {
-        env.storage().instance().set(&crate::ADMIN, &admin)
-    });
+    let staking = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    client.initialize(&admin, &staking, &treasury, &500i128);
 
     let guardian = Address::generate(&env);
     let attacker = Address::generate(&env);
