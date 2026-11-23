@@ -8,7 +8,7 @@ use soroban_sdk::{
 pub mod types;
 pub mod validation;
 pub use types::FhirError;
-use types::{Gender, MedicationRequest, Observation, ObservationStatus, Patient};
+use types::{Gender, MedicationRequest, MinimalPatient, Observation, ObservationStatus, Patient};
 
 use common::migration::{self, FieldTransform, Migration};
 
@@ -158,6 +158,14 @@ impl FhirContract {
         }
         env.storage().persistent().remove(&key);
         env.storage().persistent().remove(&(VERSIONS, id));
+    }
+
+    /// Projects only the pseudonymous identifier and active flag for FHIR exchange.
+    pub fn map_minimal_patient(_env: Env, id: String, active: bool) -> Result<MinimalPatient, FhirError> {
+        if !validation::valid_resource_id(&id) {
+            return Err(FhirError::InvalidRecordData);
+        }
+        Ok(MinimalPatient { id, active })
     }
 
     /// Creates a FHIR Patient resource (metadata only).

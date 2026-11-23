@@ -10,6 +10,12 @@
 
 use crate::types::{FhirError, MedicationRequest, MedicationRequestIntent, Observation};
 
+pub(crate) fn valid_resource_id(value: &soroban_sdk::String) -> bool {
+    let bytes = value.to_bytes();
+    (1..=64).contains(&bytes.len()) &&
+        bytes.iter().all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'.')
+}
+
 // ── Canonical FHIR code-system URIs ──────────────────────────────────────────
 
 /// LOINC canonical system URI as required by FHIR R4.

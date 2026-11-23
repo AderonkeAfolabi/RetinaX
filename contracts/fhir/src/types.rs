@@ -1,5 +1,13 @@
 use soroban_sdk::{contracttype, Bytes, String};
 
+/// FHIR R4 Patient projection using an opaque identifier.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MinimalPatient {
+    pub id: String,
+    pub active: bool,
+}
+
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Gender {
