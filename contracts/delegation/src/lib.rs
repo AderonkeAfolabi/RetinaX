@@ -97,6 +97,7 @@ impl DelegationContract {
         } else {
             task.status = TaskStatus::Failed;
             executor::slash_executor(&env, executor.clone(), 10);
+            events::publish_task_result_rejected(&env, task_id, executor.clone());
         }
         task_queue::update_task(&env, task);
 

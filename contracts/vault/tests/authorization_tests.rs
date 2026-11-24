@@ -62,13 +62,13 @@ fn test_every_mutating_function_requires_a_signature() {
     let seed = BytesN::from_array(&env, &[10u8; 32]);
     let new_seed = BytesN::from_array(&env, &[11u8; 32]);
     let data_ref = String::from_str(&env, "ipfs://auth");
-    vault.configure_vault(&owner, &2, &3, &3, &3_600, &data_ref, &seed);
+    vault.configure_vault(&owner, &2, &3, &3, &3_600, &data_ref, &seed, &None);
 
     // Remove all mocked signatures: requests now arrive unsigned.
     env.set_auths(&[]);
 
     assert!(vault
-        .try_configure_vault(&owner, &2, &3, &3, &3_600, &data_ref, &seed)
+        .try_configure_vault(&owner, &2, &3, &3, &3_600, &data_ref, &seed, &None)
         .is_err());
     assert!(vault
         .try_reconstruct_key(&owner, &owner, &Vec::new(&env))
@@ -103,7 +103,7 @@ fn test_wrong_owner_cannot_mutate_vault() {
     let seed = BytesN::from_array(&env, &[12u8; 32]);
     let new_seed = BytesN::from_array(&env, &[13u8; 32]);
     let data_ref = String::from_str(&env, "ipfs://wrong-owner");
-    vault.configure_vault(&owner, &2, &3, &3, &3_600, &data_ref, &seed);
+    vault.configure_vault(&owner, &2, &3, &3, &3_600, &data_ref, &seed, &None);
 
     let attacker = Address::generate(&env);
 
@@ -117,7 +117,7 @@ fn test_wrong_owner_cannot_mutate_vault() {
         Err(Ok(VaultError::VaultNotFound))
     );
     assert_eq!(
-        vault.try_configure_vault(&attacker, &1, &1, &1, &3_600, &data_ref, &seed),
+        vault.try_configure_vault(&attacker, &1, &1, &1, &3_600, &data_ref, &seed, &None),
         Err(Ok(VaultError::InvalidConfig))
     );
 
@@ -135,13 +135,13 @@ fn test_approvals_are_guardian_and_owner_scoped() {
 
     let seed = BytesN::from_array(&env, &[14u8; 32]);
     let data_ref = String::from_str(&env, "ipfs://scoped");
-    vault.configure_vault(&owner, &2, &3, &3, &3_600, &data_ref, &seed);
+    vault.configure_vault(&owner, &2, &3, &3, &3_600, &data_ref, &seed, &None);
 
     // A second owner with completely different guardians.
     let other_owner = Address::generate(&env);
     identity.initialize(&other_owner);
     add_guardians(&env, &identity, &other_owner, 3);
-    vault.configure_vault(&other_owner, &2, &3, &3, &3_600, &data_ref, &seed);
+    vault.configure_vault(&other_owner, &2, &3, &3, &3_600, &data_ref, &seed, &None);
 
     // An owner-A guardian cannot approve owner B's vault.
     assert_eq!(
@@ -169,7 +169,7 @@ fn test_revoked_guardian_approval_no_longer_counts() {
 
     let seed = BytesN::from_array(&env, &[15u8; 32]);
     let data_ref = String::from_str(&env, "ipfs://revoke");
-    vault.configure_vault(&owner, &2, &3, &3, &3_600, &data_ref, &seed);
+    vault.configure_vault(&owner, &2, &3, &3, &3_600, &data_ref, &seed, &None);
 
     for guardian in &guardians {
         vault.submit_emergency_approval(guardian, &owner);
