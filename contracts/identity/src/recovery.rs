@@ -59,6 +59,8 @@ pub enum RecoveryError {
     AlreadyExists = 17,
     /// The requested DID document was not found.
     RecordNotFound = 18,
+    /// A per-DID limit (verification keys or services) has been reached.
+    LimitExceeded = 19,
 }
 
 // ── Types ────────────────────────────────────────────────────────────────────
