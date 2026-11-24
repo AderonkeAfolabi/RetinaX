@@ -1,6 +1,6 @@
 use crate::channel::Channel;
 use soroban_sdk::{symbol_short, Address, Env};
-use teye_common::{ChannelStatus, CommonError};
+use retinax_common::{ChannelStatus, CommonError};
 
 const CHALLENGE_PERIOD: u64 = 86400; // 1 day in seconds
 const FRAUD_PENALTY_BPS: u64 = 1000; // 10% of channel capacity
@@ -21,8 +21,15 @@ pub fn unilateral_close(env: &Env, channel_id: u64, closer: Address) -> Result<(
         return Err(CommonError::AccessDenied);
     }
 
+    let dispute_window: u64 = env
+        .storage()
+        .persistent()
+        .get(&(symbol_short!("CH_WIN"), channel_id))
+        .or_else(|| env.storage().instance().get(&symbol_short!("DISP_WIN")))
+        .unwrap_or(CHALLENGE_PERIOD);
+
     channel.status = ChannelStatus::Disputed;
-    channel.challenge_end = Some(env.ledger().timestamp() + CHALLENGE_PERIOD);
+    channel.challenge_end = Some(env.ledger().timestamp().saturating_add(dispute_window));
     env.storage().persistent().set(&key, &channel);
 
     Ok(())

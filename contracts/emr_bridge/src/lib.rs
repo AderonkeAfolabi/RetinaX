@@ -467,7 +467,7 @@ impl EmrBridgeContract {
 
     // ── Data Mapping Utilities ───────────────────────────────────────────────
 
-    /// Create a field mapping between EMR system fields and Teye internal fields
+    /// Create a field mapping between EMR system fields and RetinaX internal fields
     pub fn create_field_mapping(
         env: Env,
         caller: Address,

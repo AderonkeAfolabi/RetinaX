@@ -65,6 +65,8 @@ fn test_zero_inactivity_timeout_is_immediately_releasable() {
     let seed = BytesN::from_array(&env, &[1u8; 32]);
     let data_ref = String::from_str(&env, "ipfs://zero");
     let snapshot: VaultSnapshot = vault.configure_vault(&owner, &2, &3, &3, &0, &data_ref, &seed);
+    let snapshot: VaultSnapshot =
+        vault.configure_vault(&owner, &2, &3, &3, &0, &data_ref, &seed, &None);
 
     assert_eq!(snapshot.record.deadman_release_at, 1_000);
     assert!(vault.trigger_deadman_release(&owner));
@@ -82,7 +84,7 @@ fn test_max_timeout_saturates_without_overflow() {
     let seed = BytesN::from_array(&env, &[2u8; 32]);
     let data_ref = String::from_str(&env, "ipfs://max");
     let snapshot: VaultSnapshot =
-        vault.configure_vault(&owner, &2, &3, &3, &u64::MAX, &data_ref, &seed);
+        vault.configure_vault(&owner, &2, &3, &3, &u64::MAX, &data_ref, &seed, &None);
 
     assert_eq!(snapshot.record.deadman_release_at, u64::MAX);
     assert_eq!(
@@ -101,7 +103,7 @@ fn test_zero_seed_boundary() {
 
     let zero_seed = BytesN::from_array(&env, &[0u8; 32]);
     let data_ref = String::from_str(&env, "ipfs://zero-seed");
-    let snapshot = vault.configure_vault(&owner, &2, &3, &3, &3_600, &data_ref, &zero_seed);
+    let snapshot = vault.configure_vault(&owner, &2, &3, &3, &3_600, &data_ref, &zero_seed, &None);
 
     assert_eq!(snapshot.record.owner, owner);
     assert_eq!(vault.get_vault(&owner), snapshot.record);
@@ -118,7 +120,7 @@ fn test_repeated_approval_does_not_increase_quorum() {
     let seed = BytesN::from_array(&env, &[3u8; 32]);
     let data_ref = String::from_str(&env, "ipfs://repeat");
     // 2-of-3 for normal reconstruction, 3-of-3 for emergency reconstruction.
-    vault.configure_vault(&owner, &2, &3, &3, &3_600, &data_ref, &seed);
+    vault.configure_vault(&owner, &2, &3, &3, &3_600, &data_ref, &seed, &None);
 
     vault.submit_emergency_approval(&guardians[0], &owner);
     vault.submit_emergency_approval(&guardians[0], &owner);
@@ -146,7 +148,7 @@ fn test_over_withdraw_equivalent_is_rejected() {
 
     let seed = BytesN::from_array(&env, &[4u8; 32]);
     let data_ref = String::from_str(&env, "ipfs://over-withdraw");
-    vault.configure_vault(&owner, &2, &3, &3, &3_600, &data_ref, &seed);
+    vault.configure_vault(&owner, &2, &3, &3, &3_600, &data_ref, &seed, &None);
 
     let no_shares = Vec::new(&env);
     assert_eq!(

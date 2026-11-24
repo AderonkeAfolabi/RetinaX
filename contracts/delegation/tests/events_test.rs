@@ -3,7 +3,7 @@ use soroban_sdk::{
     testutils::{Address as _, Events as _},
     vec, Address, Env, IntoVal,
 };
-use teye_delegation::{DelegationContract, DelegationContractClient};
+use retinax_delegation::{DelegationContract, DelegationContractClient};
 
 #[test]
 fn initialize_publishes_admin_event() {

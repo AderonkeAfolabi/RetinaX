@@ -1,4 +1,4 @@
-//! Shared utilities and error types for the Teye contract suite.
+//! Shared utilities and error types for the RetinaX contract suite.
 //!
 //! This crate provides:
 //! - [`CommonError`] — standardised error codes for all contracts.
@@ -45,6 +45,8 @@ pub mod keys;
 #[cfg(feature = "provenance")]
 pub mod lineage;
 pub mod meta_tx;
+#[cfg(test)]
+mod meta_tx_test;
 pub mod metering;
 /// Contract upgrade migration framework with data versioning and rollback.
 /// Feature-gated: only compiled when the `migration` feature is enabled.
@@ -124,7 +126,7 @@ pub use whitelist::*;
 
 // ── Shared error enum ────────────────────────────────────────────────────────
 
-/// Standardised error codes shared by every Teye contract.
+/// Standardised error codes shared by every RetinaX contract.
 ///
 /// # Code ranges
 /// | Range   | Purpose                       |

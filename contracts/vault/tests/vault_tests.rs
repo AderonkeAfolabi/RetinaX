@@ -90,7 +90,7 @@ fn test_uninitialized_calls_rejected() {
     let data_ref = String::from_str(&env, "ipfs://meta");
 
     // configure_vault rejected when uninitialized
-    let res_conf = vault.try_configure_vault(&owner, &2, &3, &2, &3600, &data_ref, &seed);
+    let res_conf = vault.try_configure_vault(&owner, &2, &3, &2, &3600, &data_ref, &seed, &None);
     assert_eq!(res_conf, Err(Ok(VaultError::NotInitialized)));
 
     // reconstruct_key rejected when uninitialized
@@ -122,31 +122,31 @@ fn test_configure_vault_validation_matrix() {
 
     // Zero threshold
     assert_eq!(
-        vault.try_configure_vault(&owner, &0, &5, &3, &3600, &data_ref, &seed),
+        vault.try_configure_vault(&owner, &0, &5, &3, &3600, &data_ref, &seed, &None),
         Err(Ok(VaultError::InvalidConfig))
     );
 
     // Zero shard count
     assert_eq!(
-        vault.try_configure_vault(&owner, &3, &0, &3, &3600, &data_ref, &seed),
+        vault.try_configure_vault(&owner, &3, &0, &3, &3600, &data_ref, &seed, &None),
         Err(Ok(VaultError::InvalidConfig))
     );
 
     // Threshold greater than shard count
     assert_eq!(
-        vault.try_configure_vault(&owner, &6, &5, &6, &3600, &data_ref, &seed),
+        vault.try_configure_vault(&owner, &6, &5, &6, &3600, &data_ref, &seed, &None),
         Err(Ok(VaultError::InvalidConfig))
     );
 
     // Emergency threshold below normal threshold
     assert_eq!(
-        vault.try_configure_vault(&owner, &3, &5, &2, &3600, &data_ref, &seed),
+        vault.try_configure_vault(&owner, &3, &5, &2, &3600, &data_ref, &seed, &None),
         Err(Ok(VaultError::InvalidConfig))
     );
 
     // Emergency threshold greater than shard count
     assert_eq!(
-        vault.try_configure_vault(&owner, &3, &5, &6, &3600, &data_ref, &seed),
+        vault.try_configure_vault(&owner, &3, &5, &6, &3600, &data_ref, &seed, &None),
         Err(Ok(VaultError::InvalidConfig))
     );
 
@@ -155,7 +155,7 @@ fn test_configure_vault_validation_matrix() {
     identity.initialize(&other_owner);
     add_guardians(&env, &identity, &other_owner, 2);
     assert_eq!(
-        vault.try_configure_vault(&other_owner, &2, &4, &3, &3600, &data_ref, &seed),
+        vault.try_configure_vault(&other_owner, &2, &4, &3, &3600, &data_ref, &seed, &None),
         Err(Ok(VaultError::InvalidConfig))
     );
 }
@@ -171,7 +171,7 @@ fn test_configure_and_get_vault_invariants() {
     let data_ref = String::from_str(&env, "ipfs://vault-config");
 
     let snapshot: VaultSnapshot =
-        vault.configure_vault(&owner, &2, &4, &3, &7200, &data_ref, &seed);
+        vault.configure_vault(&owner, &2, &4, &3, &7200, &data_ref, &seed, &None);
 
     assert_eq!(snapshot.record.owner, owner);
     assert_eq!(snapshot.record.epoch, 1);
@@ -205,7 +205,7 @@ fn test_reconstruct_key_and_insufficient_shares() {
     let data_ref = String::from_str(&env, "vault-ref");
 
     // 2-of-4 threshold
-    vault.configure_vault(&owner, &2, &4, &3, &3600, &data_ref, &seed);
+    vault.configure_vault(&owner, &2, &4, &3, &3600, &data_ref, &seed, &None);
 
     let split_shares = sss::split(
         seed_bytes,
@@ -267,7 +267,7 @@ fn test_emergency_approval_and_reconstruction_flow() {
     let data_ref = String::from_str(&env, "vault-emergency");
 
     // Threshold: 3, Emergency Threshold: 4, Shard Count: 5
-    vault.configure_vault(&owner, &3, &5, &4, &3600, &data_ref, &seed);
+    vault.configure_vault(&owner, &3, &5, &4, &3600, &data_ref, &seed, &None);
 
     // Non-guardian cannot submit emergency approval
     let random_user = Address::generate(&env);
@@ -307,7 +307,7 @@ fn test_key_rotation_and_epoch_increment() {
     let new_seed = BytesN::from_array(&env, &[22u8; 32]);
     let data_ref = String::from_str(&env, "doc");
 
-    vault.configure_vault(&owner, &2, &3, &2, &3600, &data_ref, &old_seed);
+    vault.configure_vault(&owner, &2, &3, &2, &3600, &data_ref, &old_seed, &None);
 
     let rotation = vault.rotate_key(&owner, &new_seed);
     assert_eq!(rotation.owner, owner);
@@ -328,7 +328,7 @@ fn test_touch_activity_and_deadman_switch() {
 
     let seed = BytesN::from_array(&env, &[33u8; 32]);
     let data_ref = String::from_str(&env, "doc");
-    vault.configure_vault(&owner, &2, &3, &2, &1000, &data_ref, &seed);
+    vault.configure_vault(&owner, &2, &3, &2, &1000, &data_ref, &seed, &None);
 
     // Deadman release fails before timeout
     env.ledger().set_timestamp(5_500);

@@ -25,6 +25,8 @@ soroban-sdk = { workspace = true, features = ["alloc"] }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 teye-common = { path = "../common", package = "common", features = ["std", "full"] }
+soroban-sdk = { workspace = true }
+retinax-common = { path = "../common", package = "common", features = ["std", "full"] }
 audit = { path = "../audit" }
 clinical_records = { path = "../clinical_records" }
 key_manager = { path = "../key_manager" }
