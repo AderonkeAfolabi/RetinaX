@@ -11,6 +11,20 @@ Implements privacy-preserving voting using zero-knowledge proofs. Enables anonym
 - **Merkle Root:** Defines the set of authorized voters (root of merkle tree)
 - **ZK Proof:** Proves membership in the merkle tree without revealing voter address
 
+## Architecture at a Glance
+
+```mermaid
+flowchart TD
+    Admin[Admin] -->|set_merkle_root| Roll[Authorized voter roll]
+    Admin -->|set_verification_key| Key[Verification key]
+    Voter[Voter] -->|cast_vote with proof and nullifier| Ballot[Ballot]
+    Roll --> Verify[Verify membership and nullifier]
+    Key --> Verify
+    Ballot --> Verify
+    Verify -->|valid| Tally[Anonymous tally]
+    Verify -->|invalid| Reject[Reject vote]
+```
+
 ---
 
 ## Initialization
@@ -334,6 +348,6 @@ ZK Voting may integrate with:
 
 ## Related Documentation
 
-- [ZK Integration Guide](../docs/zk-integration-guide.md)
-- [Governance](../docs/governance.md)
-- [Post-Quantum Research](../docs/post-quantum-zk-research.md)
+- [ZK Integration Guide](../zk-integration-guide.md)
+- [Governance](../governance.md)
+- [Post-Quantum Research](../post-quantum-zk-research.md)

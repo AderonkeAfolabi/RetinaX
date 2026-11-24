@@ -2,6 +2,10 @@
 
 This document serves as the definitive guide for all testing practices, quality gates, and coverage requirements across the RetinaX contract suite.
 
+## Test Layout
+
+The workspace test suite is rooted at [`test/`](../test). Files outside contract crates and outside `test/` are not workspace test targets and must not be added as test locations. Contract integration tests belong in that contract's `tests/` directory.
+
 ## Testing Taxonomy
 
 | Test Type | Location | Purpose | Tool | Command |
@@ -12,8 +16,8 @@ This document serves as the definitive guide for all testing practices, quality 
 | **Benchmarks** | `contracts/benches/` | Gas usage, performance regression | Criterion | `cargo bench` |
 | **Fuzz Tests** | `fuzz/` | Random input exploration | cargo-fuzz/libFuzzer | `cargo fuzz run` |
 | **Property Tests** | `contracts/*/tests/property/` | Invariant verification | proptest | `cargo test --features property-testing` |
-| **Negative Tests** | `tests/negative/` | Error path validation | cargo test | `cargo test --test negative` |
-| **Upgrade Tests** | `tests/upgrade/` | State migration correctness | cargo test | `cargo test --test upgrade` |
+| **Negative Tests** | `test/negative/` | Error path validation | cargo test | `cargo test --workspace --all-targets` |
+| **Upgrade Tests** | `test/upgrade/` | State migration correctness | cargo test | `cargo test --workspace --all-targets` |
 
 ## Test Writing Conventions
 
@@ -450,7 +454,7 @@ RUSTFLAGS="-Z sanitizer=undefined" cargo fuzz run vision_records
 ### Pipeline Stages
 
 ```yaml
-# .github/workflows/ci.yml
+# .github/workflows/cargo-test.yml
 name: CI Pipeline
 
 on: [push, pull_request]

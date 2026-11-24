@@ -1387,7 +1387,7 @@ fn propose_and_execute_rate_change(
 
 ## Related Documentation
 
-- [Governance](../governance.md) — Uses admin_tiers, multisig
-- [Security](../security.md) — Uses reentrancy_guard, rate_limit, pausable
-- [Storage Conventions](../storage-key-conventions.md) — TTL, key naming
-- [Architecture](../architecture.md) — Module dependencies overview
+- [Governance](governance.md) — Uses admin_tiers, multisig
+- [Security](security.md) — Uses reentrancy_guard, rate_limit, pausable
+- [Storage Conventions](storage-key-conventions.md) — TTL, key naming
+- [Architecture](architecture.md) — Module dependencies overview

@@ -610,6 +610,6 @@ pub enum ContractError {
 ## References
 
 - [Soroban SDK Documentation](https://soroban.stellar.org/docs/)
-- [Rust Example Code](../../../example/rust/)
+- [Rust Example Code](../../example/rust/)
 - [ZK Prover SDK](../../sdk/zk_prover/)
-- [Contract API Documentation](../../api/)
+- [Contract API Documentation](../api.md)

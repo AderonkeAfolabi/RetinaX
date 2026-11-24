@@ -137,6 +137,74 @@ impl AuditContract {
         Ok(segment_info.entries)
     }
 
+    /// Retrieve audit entries within a sequence range (from <= seq <= to).
+    /// Returns up to `limit` entries to bound resource consumption.
+    pub fn get_entries_range(
+        env: Env,
+        segment_id: Symbol,
+        from_seq: u64,
+        to_seq: u64,
+        limit: u32,
+    ) -> Result<Vec<AuditLogEntry>, Error> {
+        let segment_info: SegmentInfo = env
+            .storage()
+            .persistent()
+            .get(&(SEGMENTS, segment_id))
+            .ok_or(Error::from_contract_error(
+                AuditContractError::SegmentNotFound as u32,
+            ))?;
+
+        let mut result = Vec::new(&env);
+        let capped_limit = limit.saturating_add(1).saturating_div(1).min(1000);
+        let mut count = 0u32;
+
+        for entry in segment_info.entries.iter() {
+            if entry.sequence >= from_seq && entry.sequence <= to_seq {
+                result.push_back(entry);
+                count += 1;
+                if count >= capped_limit {
+                    break;
+                }
+            }
+        }
+
+        Ok(result)
+    }
+
+    /// Retrieve audit entries within a timestamp range (from_ts <= timestamp <= to_ts).
+    /// Returns up to `limit` entries to bound resource consumption.
+    pub fn get_entries_by_time(
+        env: Env,
+        segment_id: Symbol,
+        from_ts: u64,
+        to_ts: u64,
+        limit: u32,
+    ) -> Result<Vec<AuditLogEntry>, Error> {
+        let segment_info: SegmentInfo = env
+            .storage()
+            .persistent()
+            .get(&(SEGMENTS, segment_id))
+            .ok_or(Error::from_contract_error(
+                AuditContractError::SegmentNotFound as u32,
+            ))?;
+
+        let mut result = Vec::new(&env);
+        let capped_limit = limit.saturating_add(1).saturating_div(1).min(1000);
+        let mut count = 0u32;
+
+        for entry in segment_info.entries.iter() {
+            if entry.timestamp >= from_ts && entry.timestamp <= to_ts {
+                result.push_back(entry);
+                count += 1;
+                if count >= capped_limit {
+                    break;
+                }
+            }
+        }
+
+        Ok(result)
+    }
+
     pub fn get_entry_count(env: Env, segment_id: Symbol) -> Result<u64, Error> {
         let segment_info: SegmentInfo = env
             .storage()

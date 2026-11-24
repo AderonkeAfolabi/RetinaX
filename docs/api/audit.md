@@ -4,6 +4,21 @@ Domain types for the `audit` crate (`contracts/audit`). These types back the tam
 
 On-chain storage for the Soroban `AuditContract` uses a smaller set of contract types, listed at the end of this page. Access-log types on `vision_records` (`AuditEntry`, `AccessAction`, `AccessResult`) are documented in [Access Audit Logging](../audit-logging.md).
 
+## Architecture at a Glance
+
+```mermaid
+flowchart LR
+    Caller[Contract or client] -->|create_segment| Audit[AuditContract]
+    Audit --> Segment[LogSegmentId]
+    Caller -->|append_entry| Audit
+    Caller -->|append_entry_with_checks| Checks[Identity / Vault / Compliance checks]
+    Checks --> Audit
+    Audit --> Chain[Hash chain: prev_hash to entry_hash]
+    Chain --> Merkle[MerkleRoot and witness signatures]
+    Merkle --> Indexer[Off-chain indexer]
+    Indexer --> API[offchain-server audit-log API]
+```
+
 ## Digest
 
 ```rust

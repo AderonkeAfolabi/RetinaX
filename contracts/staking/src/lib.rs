@@ -74,6 +74,18 @@ const APPEAL: Symbol = symbol_short!("APPEAL");
 const EVIDENCE_CTR: Symbol = symbol_short!("EVD_CTR");
 const EVIDENCE: Symbol = symbol_short!("EVIDENCE");
 
+// Delegated staking. A delegator's stake sits in their own balance; DEL_REC
+// records which provider it is delegated through. Provider slashes are applied
+// lazily through a per-provider index scaled by DELEG_INDEX_SCALE.
+const DEL_REC: Symbol = symbol_short!("DEL_REC");
+const PROV_CFG: Symbol = symbol_short!("PROV_CFG");
+const PROV_TOT: Symbol = symbol_short!("PROV_TOT");
+const PROV_IDX: Symbol = symbol_short!("PROV_IDX");
+/// Starting value of a provider's slash index.
+const DELEG_INDEX_SCALE: i128 = 1_000_000_000;
+/// Basis-point denominator (10 000 = 100 %).
+const MAX_BPS: u32 = 10_000;
+
 // ── Contract errors ──────────────────────────────────────────────────────────
 
 #[soroban_sdk::contracterror]
@@ -184,6 +196,16 @@ pub struct SlashEvidence {
 }
 
 // ── Contract ─────────────────────────────────────────────────────────────────
+
+/// A delegator's stake delegated through a provider.
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct Delegation {
+    pub provider: Address,
+    pub amount: i128,
+    /// Provider slash index at the delegator's last sync.
+    pub index_snapshot: i128,
+}
 
 #[contract]
 pub struct StakingContract;
@@ -456,10 +478,13 @@ impl StakingContract {
         // 1. Flush rewards before reducing stake.
         Self::update_reward(&env, &staker);
 
-        // 2. Verify the user has enough staked.
+        Self::sync_delegation(&env, &staker);
+
+        // 2. Verify the user has enough free (non-delegated) stake.
         let user_stake_key = (USER_STAKE, staker.clone());
         let prev_stake: i128 = env.storage().persistent().get(&user_stake_key).unwrap_or(0);
-        if prev_stake < amount {
+        let locked = Self::delegated_amount(&env, &staker);
+        if prev_stake.saturating_sub(locked) < amount {
             return Err(ContractError::InsufficientBalance);
         }
 
@@ -571,8 +596,9 @@ impl StakingContract {
         Self::require_initialized(&env)?;
         staker.require_auth();
 
-        // 1. Sync the accumulator.
+        // 1. Sync the accumulator and any slash on the staker's provider.
         Self::update_reward(&env, &staker);
+        Self::sync_delegation(&env, &staker);
 
         // 2. Read and reset the user's earned balance.
         let earned_key = (USER_EARNED, staker.clone());
@@ -583,6 +609,10 @@ impl StakingContract {
             return Ok(0);
         }
 
+        // A delegator's provider takes its commission out of this claim.
+        let commission = Self::take_delegation_commission(&env, &staker, earned);
+        let net = earned.saturating_sub(commission);
+
         env.storage().persistent().set(&earned_key, &0i128);
 
         // 3. Transfer reward tokens to the staker.
@@ -591,23 +621,25 @@ impl StakingContract {
             .instance()
             .get(&REWARD_TOKEN)
             .ok_or(ContractError::NotInitialized)?;
-        token::Client::new(&env, &reward_token).transfer(
-            &env.current_contract_address(),
-            &staker,
-            &earned,
-        );
+        if net > 0 {
+            token::Client::new(&env, &reward_token).transfer(
+                &env.current_contract_address(),
+                &staker,
+                &net,
+            );
+        }
 
-        events::publish_reward_claimed(&env, staker.clone(), earned);
+        events::publish_reward_claimed(&env, staker.clone(), net);
 
         audit::AuditManager::log_event(
             &env,
             staker,
             "staking.claim",
-            soroban_sdk::String::from_str(&env, &earned.to_string()),
+            soroban_sdk::String::from_str(&env, &net.to_string()),
             "ok",
         );
 
-        Ok(earned)
+        Ok(net)
     }
 
     // ── View functions ───────────────────────────────────────────────────────
@@ -1139,17 +1171,25 @@ impl StakingContract {
 
         let user_stake_key = (USER_STAKE, validator.clone());
         let current_stake: i128 = env.storage().persistent().get(&user_stake_key).unwrap_or(0);
+        let delegated = Self::delegated_total(&env, &validator);
+        let effective = current_stake.saturating_add(delegated);
 
-        if current_stake <= 0 {
+        if effective <= 0 {
             return Err(ContractError::InsufficientBalance);
         }
 
-        // Cap the slash at the validator's entire balance.
-        let slash_amount = amount.min(current_stake);
-        let new_validator_stake = current_stake.saturating_sub(slash_amount);
+        // Cap the slash at the validator's own stake plus the stake delegated to it.
+        let slash_amount = amount.min(effective);
+        // Delegated stake takes its pro rata share; the rest comes from the validator's own stake.
+        let delegated_loss = slash_amount.saturating_mul(delegated) / effective;
+        let own_loss = slash_amount.saturating_sub(delegated_loss);
+        let new_validator_stake = current_stake.saturating_sub(own_loss);
         env.storage()
             .persistent()
             .set(&user_stake_key, &new_validator_stake);
+        if delegated > 0 {
+            Self::apply_delegation_slash(&env, &validator, delegated, delegated_loss);
+        }
 
         let prev_total: i128 = env.storage().instance().get(&TOTAL_STAKED).unwrap_or(0);
         let new_total = prev_total.saturating_sub(slash_amount);
@@ -1587,6 +1627,106 @@ impl StakingContract {
     /// Flush the global reward-per-token accumulator without touching any
     /// user-specific state.  Called at the start of every admin mutation that
     /// changes the emission rate.
+    fn delegated_total(env: &Env, provider: &Address) -> i128 {
+        let key = (PROV_TOT, provider.clone());
+        env.storage().persistent().get(&key).unwrap_or(0)
+    }
+
+    fn delegated_amount(env: &Env, delegator: &Address) -> i128 {
+        let key = (DEL_REC, delegator.clone());
+        match env.storage().persistent().get::<_, Delegation>(&key) {
+            Some(record) => record.amount,
+            None => 0,
+        }
+    }
+
+    fn provider_index(env: &Env, provider: &Address) -> i128 {
+        let key = (PROV_IDX, provider.clone());
+        env.storage()
+            .persistent()
+            .get(&key)
+            .unwrap_or(DELEG_INDEX_SCALE)
+    }
+
+    /// Scale a provider's index after `loss` of its `delegated` stake was slashed.
+    fn apply_delegation_slash(env: &Env, provider: &Address, delegated: i128, loss: i128) {
+        let remaining = delegated.saturating_sub(loss);
+        let index = Self::provider_index(env, provider);
+        let new_index = index.saturating_mul(remaining) / delegated;
+        let store = env.storage().persistent();
+        store.set(&(PROV_IDX, provider.clone()), &new_index);
+        store.set(&(PROV_TOT, provider.clone()), &remaining);
+    }
+
+    /// Bring a delegator's record up to date with slashes applied to their provider.
+    ///
+    /// Slashes are applied lazily: each slash lowers the provider's index, and the
+    /// delegator's amount is scaled by the ratio of the current index to the index
+    /// at their last sync. The lost stake is removed from their own balance.
+    fn sync_delegation(env: &Env, delegator: &Address) {
+        let store = env.storage().persistent();
+        let record_key = (DEL_REC, delegator.clone());
+        let mut record: Delegation = match store.get(&record_key) {
+            Some(record) => record,
+            None => return,
+        };
+
+        let index = Self::provider_index(env, &record.provider);
+        if index == record.index_snapshot {
+            return;
+        }
+
+        // Flush rewards up to now at the stake they were earned on, then reduce it.
+        Self::update_reward(env, delegator);
+
+        let remaining = if record.index_snapshot > 0 {
+            record.amount.saturating_mul(index) / record.index_snapshot
+        } else {
+            0
+        };
+        let lost = record.amount.saturating_sub(remaining);
+
+        let stake_key = (USER_STAKE, delegator.clone());
+        let stake: i128 = store.get(&stake_key).unwrap_or(0);
+        store.set(&stake_key, &stake.saturating_sub(lost));
+
+        record.amount = remaining;
+        record.index_snapshot = index;
+        store.set(&record_key, &record);
+    }
+
+    /// Split a delegator's gross reward claim and credit the provider's commission.
+    ///
+    /// Only the delegated share of the delegator's stake pays commission. Returns
+    /// the commission taken, or 0 when there is no active delegation.
+    fn take_delegation_commission(env: &Env, delegator: &Address, gross: i128) -> i128 {
+        let store = env.storage().persistent();
+        let record: Delegation = match store.get(&(DEL_REC, delegator.clone())) {
+            Some(record) => record,
+            None => return 0,
+        };
+        let staked: i128 = store.get(&(USER_STAKE, delegator.clone())).unwrap_or(0);
+        if record.amount <= 0 || staked <= 0 {
+            return 0;
+        }
+
+        let commission_key = (PROV_CFG, record.provider.clone());
+        let bps: u32 = store.get(&commission_key).unwrap_or(0);
+        let delegated_share = gross.saturating_mul(record.amount) / staked;
+        let commission = delegated_share.saturating_mul(i128::from(bps)) / i128::from(MAX_BPS);
+        if commission <= 0 {
+            return 0;
+        }
+
+        // Credit the commission to the provider's earned balance.
+        Self::update_reward(env, &record.provider);
+        let earned_key = (USER_EARNED, record.provider.clone());
+        let provider_earned: i128 = store.get(&earned_key).unwrap_or(0);
+        store.set(&earned_key, &provider_earned.saturating_add(commission));
+
+        commission
+    }
+
     fn update_global_reward(env: &Env) -> i128 {
         let total_staked: i128 = env.storage().instance().get(&TOTAL_STAKED).unwrap_or(0);
         let reward_rate: i128 = env.storage().instance().get(&REWARD_RATE).unwrap_or(0);
@@ -1636,6 +1776,176 @@ impl StakingContract {
         env.storage()
             .persistent()
             .set(&(USER_RPT_PAID, user.clone()), &current_rpt);
+    }
+
+    // ===== Delegated staking =====
+
+    /// Register as a provider, or update the commission of an existing provider.
+    ///
+    /// `commission_bps` is the provider's share of each delegator's reward claim,
+    /// in basis points (10 000 = 100 %).
+    pub fn register_provider(
+        env: Env,
+        provider: Address,
+        commission_bps: u32,
+    ) -> Result<(), ContractError> {
+        Self::require_not_paused(&env)?;
+        Self::require_initialized(&env)?;
+        provider.require_auth();
+
+        if commission_bps > MAX_BPS {
+            return Err(ContractError::InvalidInput);
+        }
+
+        let store = env.storage().persistent();
+        store.set(&(PROV_CFG, provider.clone()), &commission_bps);
+        env.events()
+            .publish((symbol_short!("PROV_REG"), provider), commission_bps);
+
+        Ok(())
+    }
+
+    /// Delegate `amount` stake tokens to a registered provider.
+    ///
+    /// The tokens are staked under the delegator's own balance, so they earn
+    /// rewards pro rata like any other stake. The provider's commission is taken
+    /// from those rewards when the delegator claims. A delegator can delegate
+    /// through one provider at a time; top-ups to the same provider are allowed.
+    pub fn delegate(
+        env: Env,
+        delegator: Address,
+        provider: Address,
+        amount: i128,
+    ) -> Result<(), ContractError> {
+        let _guard = common::ReentrancyGuard::new(&env);
+        Self::require_not_paused(&env)?;
+        Self::require_initialized(&env)?;
+        delegator.require_auth();
+
+        if amount <= 0 || delegator == provider {
+            return Err(ContractError::InvalidInput);
+        }
+
+        let store = env.storage().persistent();
+        if !store.has(&(PROV_CFG, provider.clone())) {
+            return Err(ContractError::NotProvider);
+        }
+        let record_key = (DEL_REC, delegator.clone());
+        if let Some(record) = store.get::<_, Delegation>(&record_key) {
+            if record.provider != provider {
+                return Err(ContractError::DelegationExists);
+            }
+        }
+
+        // A provider whose index reached zero was fully slashed and takes no new stake.
+        let index = Self::provider_index(&env, &provider);
+        if index <= 0 {
+            return Err(ContractError::InvalidInput);
+        }
+
+        // Flush rewards and any pending slash before the delegator's stake changes.
+        Self::update_reward(&env, &delegator);
+        Self::sync_delegation(&env, &delegator);
+
+        let stake_token: Address = env
+            .storage()
+            .instance()
+            .get(&STAKE_TOKEN)
+            .ok_or(ContractError::NotInitialized)?;
+        token::Client::new(&env, &stake_token).transfer(
+            &delegator,
+            env.current_contract_address(),
+            &amount,
+        );
+
+        let stake_key = (USER_STAKE, delegator.clone());
+        let prev_stake: i128 = store.get(&stake_key).unwrap_or(0);
+        store.set(&stake_key, &prev_stake.saturating_add(amount));
+
+        let instance = env.storage().instance();
+        let prev_total: i128 = instance.get(&TOTAL_STAKED).unwrap_or(0);
+        instance.set(&TOTAL_STAKED, &prev_total.saturating_add(amount));
+
+        // sync_delegation has already normalised any existing record to the current index.
+        let prev_delegated = Self::delegated_amount(&env, &delegator);
+        let record = Delegation {
+            provider: provider.clone(),
+            amount: prev_delegated.saturating_add(amount),
+            index_snapshot: index,
+        };
+        store.set(&record_key, &record);
+
+        let prov_key = (PROV_TOT, provider.clone());
+        let prov_total: i128 = store.get(&prov_key).unwrap_or(0);
+        store.set(&prov_key, &prov_total.saturating_add(amount));
+
+        let since_key = (USER_SINCE, delegator.clone());
+        if !store.has(&since_key) {
+            store.set(&since_key, &env.ledger().timestamp());
+        }
+
+        env.events()
+            .publish((symbol_short!("DELEG"), provider, delegator), amount);
+
+        Ok(())
+    }
+
+    /// Remove `amount` of delegated stake. The tokens stay in the delegator's
+    /// staked balance and can then be unstaked through the normal path.
+    pub fn undelegate(env: Env, delegator: Address, amount: i128) -> Result<(), ContractError> {
+        Self::require_not_paused(&env)?;
+        Self::require_initialized(&env)?;
+        delegator.require_auth();
+
+        if amount <= 0 {
+            return Err(ContractError::InvalidInput);
+        }
+
+        Self::sync_delegation(&env, &delegator);
+
+        let store = env.storage().persistent();
+        let record_key = (DEL_REC, delegator.clone());
+        let mut record: Delegation = match store.get(&record_key) {
+            Some(record) => record,
+            None => return Err(ContractError::DelegationNotFound),
+        };
+        if amount > record.amount {
+            return Err(ContractError::InsufficientBalance);
+        }
+
+        record.amount = record.amount.saturating_sub(amount);
+        if record.amount == 0 {
+            store.remove(&record_key);
+        } else {
+            store.set(&record_key, &record);
+        }
+
+        let prov_key = (PROV_TOT, record.provider.clone());
+        let prov_total: i128 = store.get(&prov_key).unwrap_or(0);
+        store.set(&prov_key, &prov_total.saturating_sub(amount));
+
+        env.events()
+            .publish((symbol_short!("UNDELEG"), record.provider, delegator), amount);
+
+        Ok(())
+    }
+
+    /// Return a delegator's delegation record, if any.
+    ///
+    /// The amount reflects slashes applied up to the delegator's most recent
+    /// action on the contract (any stake, unstake, claim, delegate or undelegate).
+    pub fn get_delegation(env: Env, delegator: Address) -> Option<Delegation> {
+        env.storage().persistent().get(&(DEL_REC, delegator))
+    }
+
+    /// Return the commission (basis points) a provider has registered.
+    pub fn get_provider_commission(env: Env, provider: Address) -> Option<u32> {
+        env.storage().persistent().get(&(PROV_CFG, provider))
+    }
+
+    /// Return the total stake currently delegated to a provider.
+    pub fn get_delegated_total(env: Env, provider: Address) -> i128 {
+        Self::delegated_total(&env, &provider)
     }
 
     // ===== Two-Phase Commit Hooks =====
