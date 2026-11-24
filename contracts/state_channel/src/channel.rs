@@ -44,6 +44,23 @@ pub fn open(
     Ok(id)
 }
 
+pub fn open_with_timeout(
+    env: &Env,
+    patient: Address,
+    provider: Address,
+    capacity: u64,
+    dispute_window: u64,
+) -> Result<u64, CommonError> {
+    if dispute_window == 0 {
+        return Err(CommonError::InvalidInput);
+    }
+    let id = open(env, patient, provider, capacity)?;
+    env.storage()
+        .persistent()
+        .set(&(symbol_short!("CH_WIN"), id), &dispute_window);
+    Ok(id)
+}
+
 pub fn cooperative_close(
     env: &Env,
     channel_id: u64,
