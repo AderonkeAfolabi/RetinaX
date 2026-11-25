@@ -2,6 +2,8 @@
 
 ### Features
 
+* **staking:** add reward rounding property tests, document downward truncation direction, and verify conservation of funds ([#438](https://github.com/RetinaX-Org/RetinaX/issues/438))
+* **vision_records:** implement data class retention policy with automatic expiry, TTL purging, and HIPAA/GDPR compliance sign-off ([#447](https://github.com/RetinaX-Org/RetinaX/issues/447))
 * **sdk/zk_prover:** add `wasm32-unknown-unknown` WASM build target and browser JS usage guide ([#471](https://github.com/RetinaX-Org/RetinaX/issues/471))
 * **offchain-server:** add cursor pagination and Stellar Ed25519 signature header authentication for `/api/audit-logs` ([#472](https://github.com/RetinaX-Org/RetinaX/issues/472))
 * **offchain-server:** add OpenAPI 3.0 specification, Swagger UI documentation at `/docs`, and database migration tooling ([#473](https://github.com/RetinaX-Org/RetinaX/issues/473))

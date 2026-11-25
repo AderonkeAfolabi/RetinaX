@@ -22,6 +22,7 @@ pub mod prescription;
 pub mod provider;
 pub mod rate_limit;
 pub mod rbac;
+pub mod retention;
 pub mod validation;
 
 mod types;
@@ -370,3 +371,5 @@ mod test_insurance_endpoints;
 mod test_multisig;
 #[cfg(test)]
 mod test_rate_limit_bypass;
+#[cfg(test)]
+mod test_retention;
