@@ -2,8 +2,10 @@
 
 ### Features
 
-* **staking:** add reward rounding property tests, document downward truncation direction, and verify conservation of funds ([#438](https://github.com/RetinaX-Org/RetinaX/issues/438))
-* **vision_records:** implement data class retention policy with automatic expiry, TTL purging, and HIPAA/GDPR compliance sign-off ([#447](https://github.com/RetinaX-Org/RetinaX/issues/447))
+* **audit:** implement Merkle checkpoint anchoring, RFC 6962 inclusion proofs, and on-chain verification ([#452](https://github.com/RetinaX-Org/RetinaX/issues/452))
+* **key_manager:** implement multi-signature key recovery cancellation and request query ([#451](https://github.com/RetinaX-Org/RetinaX/issues/451))
+* **fuzz:** add fuzz target for key_manager contract covering HD derivation, key rotation, and social recovery ([#442](https://github.com/RetinaX-Org/RetinaX/issues/442))
+* **fuzz:** add fuzz target for identity contract covering DID lifecycle, guardian modifications, and social recovery ([#441](https://github.com/RetinaX-Org/RetinaX/issues/441))
 * **sdk/zk_prover:** add `wasm32-unknown-unknown` WASM build target and browser JS usage guide ([#471](https://github.com/RetinaX-Org/RetinaX/issues/471))
 * **offchain-server:** add cursor pagination and Stellar Ed25519 signature header authentication for `/api/audit-logs` ([#472](https://github.com/RetinaX-Org/RetinaX/issues/472))
 * **offchain-server:** add OpenAPI 3.0 specification, Swagger UI documentation at `/docs`, and database migration tooling ([#473](https://github.com/RetinaX-Org/RetinaX/issues/473))
