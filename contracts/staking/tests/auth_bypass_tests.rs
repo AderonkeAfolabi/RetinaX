@@ -68,8 +68,7 @@ mod auth_bypass_tests {
         // Mock unauthorized operation
         let result: Result<(), &str> = Err("auth_error");
 
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "auth_error");
+        assert_eq!(result, Err("auth_error"));
     }
 
     #[test]

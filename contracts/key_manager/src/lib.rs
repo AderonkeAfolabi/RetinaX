@@ -86,8 +86,8 @@ mod hierarchy;
 mod rotation;
 
 use soroban_sdk::{
-    contract, contractclient, contracterror, contractimpl, contracttype, symbol_short, Address,
-    Bytes, BytesN, Env, Symbol, Vec,
+    contractclient, contracterror, contracttype, symbol_short, Address, Bytes, BytesN, Env, Symbol,
+    Vec,
 };
 
 #[contractclient(name = "IdentityContractClient")]
@@ -304,10 +304,16 @@ pub enum ContractError {
 }
 
 /// Main contract implementation for hierarchical key management.
-#[contract]
+#[cfg_attr(
+    not(all(target_family = "wasm", feature = "library")),
+    soroban_sdk::contract
+)]
 pub struct KeyManagerContract;
 
-#[contractimpl]
+#[cfg_attr(
+    not(all(target_family = "wasm", feature = "library")),
+    soroban_sdk::contractimpl
+)]
 #[allow(clippy::too_many_arguments)]
 impl KeyManagerContract {
     /// Initialize the contract with admin and identity contract.
@@ -1246,4 +1252,21 @@ impl KeyManagerContract {
         data.extend_from_array(&request.approvals.len().to_be_bytes());
         env.crypto().sha256(&data).into()
     }
+}
+
+#[cfg(all(target_family = "wasm", feature = "library"))]
+#[contractclient(name = "KeyManagerContractClient")]
+#[allow(dead_code)]
+pub trait KeyManagerInterface {
+    fn derive_record_key(
+        env: Env,
+        key_id: BytesN<32>,
+        record_id: u64,
+    ) -> Result<DerivedKey, ContractError>;
+    fn derive_record_key_with_version(
+        env: Env,
+        key_id: BytesN<32>,
+        record_id: u64,
+        version: u32,
+    ) -> Result<DerivedKey, ContractError>;
 }

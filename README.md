@@ -64,7 +64,7 @@ RetinaX transforms vision care record management by leveraging Stellar's blockch
 Before you begin, ensure you have the following installed:
 
 - **Rust 1.78.0+** - [Install Rust](https://www.rust-lang.org/tools/install)
-- **Soroban CLI** - [Install Soroban](https://soroban.stellar.org/docs/getting-started/installation) (contracts target `soroban-sdk` 25.0.0)
+- **Soroban CLI** - [Install Soroban](https://developers.stellar.org/docs/tools/cli/install-cli) (contracts target `soroban-sdk` 25.0.0)
 - **Git** - For version control
 - **Make** - For using the provided Makefile (optional but recommended)
 
@@ -456,7 +456,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Support
 
 - **Issues**: [GitHub Issues](https://github.com/RetinaX-Org/RetinaX/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/RetinaX-Org/RetinaX/discussions)
+- **Discussions**: [GitHub Discussions](https://github.com/RetinaX-Org/RetinaX/issues)
 - **Discord**: [Join our Discord](https://discord.gg/stellar-retinax)
 
 ---

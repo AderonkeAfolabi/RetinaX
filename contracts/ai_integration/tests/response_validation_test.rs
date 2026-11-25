@@ -231,7 +231,7 @@ fn test_anomaly_at_threshold_boundary_flags_request() {
     assert_eq!(request.status, RequestStatus::Flagged);
 
     let flagged = client.get_flagged_requests();
-    assert!(flagged.contains(&request_id));
+    assert!(flagged.contains(request_id));
 }
 
 #[test]
@@ -243,7 +243,7 @@ fn test_anomaly_one_below_threshold_completes_request() {
     assert_eq!(request.status, RequestStatus::Completed);
 
     let flagged = client.get_flagged_requests();
-    assert!(!flagged.contains(&request_id));
+    assert!(!flagged.contains(request_id));
 }
 
 // ── Invalid provider signatures ───────────────────────────────────────────────

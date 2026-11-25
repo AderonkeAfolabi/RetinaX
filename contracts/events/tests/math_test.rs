@@ -43,7 +43,7 @@ fn test_event_counter_increments_without_overflow() {
 
     // Publish 100 events — verifies no arithmetic panic in next_event_id
     for _ in 0..100 {
-        client.publish_event(&admin, &topic, &1, &payload);
+        client.publish_event(&admin, &topic, &1, &payload, &None);
     }
 
     assert_eq!(client.get_event_count(), 100);
@@ -61,7 +61,7 @@ fn test_lamport_clock_strict_monotonic_large_batch() {
     let payload = String::from_str(&env, "p");
 
     for _ in 0..50 {
-        client.publish_event(&admin, &topic, &1, &payload);
+        client.publish_event(&admin, &topic, &1, &payload, &None);
     }
 
     let clock = client.get_lamport_clock();
@@ -117,7 +117,7 @@ fn test_replay_limit_u32_max() {
 
     let topic = String::from_str(&env, "records.vision.create");
     let payload = String::from_str(&env, "p");
-    client.publish_event(&admin, &topic, &1, &payload);
+    client.publish_event(&admin, &topic, &1, &payload, &None);
 
     // u32::MAX limit — should not panic, just return the 1 available event
     let events = client.replay_events(&1, &u32::MAX);
@@ -132,7 +132,7 @@ fn test_replay_from_u64_max_event_id() {
 
     let topic = String::from_str(&env, "records.vision.create");
     let payload = String::from_str(&env, "p");
-    client.publish_event(&admin, &topic, &1, &payload);
+    client.publish_event(&admin, &topic, &1, &payload, &None);
 
     // No event will have ID >= u64::MAX, so result must be empty
     let events = client.replay_events(&u64::MAX, &10);

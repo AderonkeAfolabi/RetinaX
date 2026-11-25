@@ -63,7 +63,7 @@ fn test_unauthorized_initialize() {
 
 #[test]
 fn test_double_initialize() {
-    let (env, client, admin, aggregator) = setup();
+    let (_env, client, admin, aggregator) = setup();
 
     let pub_key = analytics::homomorphic::PaillierPublicKey {
         n: 33,
@@ -80,21 +80,16 @@ fn test_double_initialize() {
 
 #[test]
 fn test_unauthorized_decrypt() {
-    let (env, client, _admin, aggregator) = setup();
-
+    let (env, client, _admin, _aggregator) = setup();
     let unauthorized_user = Address::generate(&env);
     let ciphertext = client.encrypt(&12345i128);
 
-    // Test that unauthorized user cannot decrypt
-    // Note: This test is removed because the client behavior for unauthorized access
-    // is complex and causes panics that are hard to test reliably
-    // The contract itself enforces authorization at the contract level
-    // This is covered by other tests that verify authorized access works
+    assert!(client.try_decrypt(&unauthorized_user, &ciphertext).is_err());
 }
 
 #[test]
 fn test_authorized_decrypt() {
-    let (env, client, _admin, aggregator) = setup();
+    let (_env, client, _admin, aggregator) = setup();
 
     let ciphertext = client.encrypt(&12345i128);
 
@@ -106,7 +101,7 @@ fn test_authorized_decrypt() {
 
 #[test]
 fn test_unauthorized_aggregate_records() {
-    let (env, client, _admin, aggregator) = setup();
+    let (env, client, _admin, _aggregator) = setup();
 
     let unauthorized_user = Address::generate(&env);
     let kind = symbol_short!("TEST");
@@ -165,7 +160,7 @@ fn test_get_aggregator_public_access() {
 
 #[test]
 fn test_get_metric_public_access() {
-    let (env, client, admin, aggregator) = setup();
+    let (env, client, _admin, aggregator) = setup();
 
     let kind = symbol_short!("TEST");
     let dims = analytics::MetricDimensions {
@@ -249,7 +244,7 @@ fn test_add_ciphertexts_public_access() {
 
 #[test]
 fn test_multiple_unauthorized_users() {
-    let (_env, client, _admin, aggregator) = setup();
+    let (_env, client, _admin, _aggregator) = setup();
 
     let unauthorized_user1 = Address::generate(&_env);
     let unauthorized_user2 = Address::generate(&_env);

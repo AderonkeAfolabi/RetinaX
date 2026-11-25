@@ -292,11 +292,10 @@ fn test_rejects_offchain_signature_with_replay_attack() {
 
     // First attempt - will fail because proof is not cryptographically valid,
     // but nonce will NOT increment on failure
-    let _ = client.try_verify_access(&request);
+    assert_eq!(client.try_verify_access(&request), Ok(Ok(false)));
 
-    // Try to replay the same request - should still fail with nonce 0
-    let replay_result = client.try_verify_access(&request);
-    assert!(replay_result.is_err());
+    // Submitting the same invalid proof again must still deny access.
+    assert_eq!(client.try_verify_access(&request), Ok(Ok(false)));
 
     // Nonce should still be 0 (unchanged because previous attempt failed)
     let current_nonce = client.get_nonce(&user);

@@ -116,9 +116,11 @@ mod tests {
 
     #[test]
     fn test_unstake_request_stored_and_retrieved() {
-        with_contract(|env| {
-            let staker = Address::generate(env);
-            let id = next_request_id(env);
+        let env = Env::default();
+        let contract_id = env.register(crate::StakingContract, ());
+        env.as_contract(&contract_id, || {
+            let staker = Address::generate(&env);
+            let id = next_request_id(&env);
             let req = UnstakeRequest {
                 id,
                 staker: staker.clone(),
@@ -126,8 +128,8 @@ mod tests {
                 unlock_at: 9999,
                 withdrawn: false,
             };
-            store_request(env, &req);
-            let loaded = get_request(env, id).expect("request not found");
+            store_request(&env, &req);
+            let loaded = get_request(&env, id).expect("request not found");
             assert_eq!(loaded.amount, 5_000);
             assert_eq!(loaded.unlock_at, 9999);
             assert!(!loaded.withdrawn);
@@ -136,79 +138,89 @@ mod tests {
 
     #[test]
     fn test_withdrawal_blocked_before_lock_expires() {
-        with_contract(|env| {
+        let env = Env::default();
+        let contract_id = env.register(crate::StakingContract, ());
+        env.as_contract(&contract_id, || {
             env.ledger().set_timestamp(1000);
             let lock_period = 86_400u64; // 1 day
             let unlock_at = 1000 + lock_period;
-            let id = next_request_id(env);
+            let id = next_request_id(&env);
             let req = UnstakeRequest {
                 id,
-                staker: Address::generate(env),
+                staker: Address::generate(&env),
                 amount: 1_000,
                 unlock_at,
                 withdrawn: false,
             };
-            store_request(env, &req);
+            store_request(&env, &req);
             // One second before unlock
             env.ledger().set_timestamp(unlock_at - 1);
-            let loaded = get_request(env, id).unwrap();
+            let loaded = get_request(&env, id).unwrap();
             assert!(env.ledger().timestamp() < loaded.unlock_at);
         });
     }
 
     #[test]
     fn test_withdrawal_allowed_after_lock_expires() {
-        with_contract(|env| {
+        let env = Env::default();
+        let contract_id = env.register(crate::StakingContract, ());
+        env.as_contract(&contract_id, || {
             env.ledger().set_timestamp(1000);
             let unlock_at = 1000 + 86_400u64;
-            let id = next_request_id(env);
+            let id = next_request_id(&env);
             let req = UnstakeRequest {
                 id,
-                staker: Address::generate(env),
+                staker: Address::generate(&env),
                 amount: 1_000,
                 unlock_at,
                 withdrawn: false,
             };
-            store_request(env, &req);
+            store_request(&env, &req);
             env.ledger().set_timestamp(unlock_at);
-            let loaded = get_request(env, id).unwrap();
+            let loaded = get_request(&env, id).unwrap();
             assert!(env.ledger().timestamp() >= loaded.unlock_at);
         });
     }
 
     #[test]
     fn test_double_withdrawal_prevented_by_withdrawn_flag() {
-        with_contract(|env| {
-            let id = next_request_id(env);
+        let env = Env::default();
+        let contract_id = env.register(crate::StakingContract, ());
+        env.as_contract(&contract_id, || {
+            let id = next_request_id(&env);
             let mut req = UnstakeRequest {
                 id,
-                staker: Address::generate(env),
+                staker: Address::generate(&env),
                 amount: 1_000,
                 unlock_at: 0,
                 withdrawn: false,
             };
-            store_request(env, &req);
+            store_request(&env, &req);
             // Mark as withdrawn
             req.withdrawn = true;
-            store_request(env, &req);
-            let loaded = get_request(env, id).unwrap();
+            store_request(&env, &req);
+            let loaded = get_request(&env, id).unwrap();
             assert!(loaded.withdrawn);
         });
     }
 
     #[test]
     fn test_nonexistent_request_returns_none() {
-        with_contract(|env| {
-            assert!(get_request(env, 9999).is_none());
+        let env = Env::default();
+        let contract_id = env.register(crate::StakingContract, ());
+        env.as_contract(&contract_id, || {
+            assert!(get_request(&env, 9999).is_none());
         });
     }
 
     #[test]
     fn test_request_ids_are_monotonically_increasing() {
-        with_contract(|env| {
-            let id1 = next_request_id(env);
-            let id2 = next_request_id(env);
-            let id3 = next_request_id(env);
+        let env = Env::default();
+        let contract_id = env.register(crate::StakingContract, ());
+        env.as_contract(&contract_id, || {
+            let id1 = next_request_id(&env);
+            let id2 = next_request_id(&env);
+            let id3 = next_request_id(&env);
             assert!(id1 < id2);
             assert!(id2 < id3);
         });
@@ -257,13 +269,15 @@ mod tests {
 
     #[test]
     fn test_rate_change_proposal_stored_and_retrieved() {
-        with_contract(|env| {
+        let env = Env::default();
+        let contract_id = env.register(crate::StakingContract, ());
+        env.as_contract(&contract_id, || {
             let proposal = RateChangeProposal {
                 new_rate: 20,
                 effective_at: 5000,
             };
-            store_rate_proposal(env, &proposal);
-            let loaded = get_rate_proposal(env).expect("proposal not found");
+            store_rate_proposal(&env, &proposal);
+            let loaded = get_rate_proposal(&env).expect("proposal not found");
             assert_eq!(loaded.new_rate, 20);
             assert_eq!(loaded.effective_at, 5000);
         });
@@ -271,43 +285,49 @@ mod tests {
 
     #[test]
     fn test_rate_change_blocked_before_effective_at() {
-        with_contract(|env| {
+        let env = Env::default();
+        let contract_id = env.register(crate::StakingContract, ());
+        env.as_contract(&contract_id, || {
             env.ledger().set_timestamp(1000);
             let proposal = RateChangeProposal {
                 new_rate: 20,
                 effective_at: 5000,
             };
-            store_rate_proposal(env, &proposal);
-            let loaded = get_rate_proposal(env).unwrap();
+            store_rate_proposal(&env, &proposal);
+            let loaded = get_rate_proposal(&env).unwrap();
             assert!(env.ledger().timestamp() < loaded.effective_at);
         });
     }
 
     #[test]
     fn test_rate_change_allowed_after_effective_at() {
-        with_contract(|env| {
+        let env = Env::default();
+        let contract_id = env.register(crate::StakingContract, ());
+        env.as_contract(&contract_id, || {
             env.ledger().set_timestamp(5000);
             let proposal = RateChangeProposal {
                 new_rate: 20,
                 effective_at: 5000,
             };
-            store_rate_proposal(env, &proposal);
-            let loaded = get_rate_proposal(env).unwrap();
+            store_rate_proposal(&env, &proposal);
+            let loaded = get_rate_proposal(&env).unwrap();
             assert!(env.ledger().timestamp() >= loaded.effective_at);
         });
     }
 
     #[test]
     fn test_rate_proposal_cleared_after_apply() {
-        with_contract(|env| {
+        let env = Env::default();
+        let contract_id = env.register(crate::StakingContract, ());
+        env.as_contract(&contract_id, || {
             let proposal = RateChangeProposal {
                 new_rate: 20,
                 effective_at: 0,
             };
-            store_rate_proposal(env, &proposal);
-            assert!(get_rate_proposal(env).is_some());
-            clear_rate_proposal(env);
-            assert!(get_rate_proposal(env).is_none());
+            store_rate_proposal(&env, &proposal);
+            assert!(get_rate_proposal(&env).is_some());
+            clear_rate_proposal(&env);
+            assert!(get_rate_proposal(&env).is_none());
         });
     }
 }

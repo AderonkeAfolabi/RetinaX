@@ -30,7 +30,7 @@ fn publish_test_event(
 ) -> u64 {
     let topic_str = String::from_str(env, topic);
     let payload_str = String::from_str(env, payload);
-    client.publish_event(admin, &topic_str, &schema_version, &payload_str)
+    client.publish_event(admin, &topic_str, &schema_version, &payload_str, &None)
 }
 
 fn register_schema(
@@ -180,7 +180,7 @@ fn test_publish_without_schema_fails() {
     let topic = String::from_str(&env, "records.vision.create");
     let payload = String::from_str(&env, "payload");
 
-    let result = client.try_publish_event(&admin, &topic, &1, &payload);
+    let result = client.try_publish_event(&admin, &topic, &1, &payload, &None);
     match result {
         Err(Ok(e)) => assert_eq!(e, EventError::SchemaNotFound),
         _ => panic!("Expected SchemaNotFound error"),
@@ -196,7 +196,7 @@ fn test_publish_unauthorized_fails() {
     let topic = String::from_str(&env, "records.vision.create");
     let payload = String::from_str(&env, "payload");
 
-    let result = client.try_publish_event(&outsider, &topic, &1, &payload);
+    let result = client.try_publish_event(&outsider, &topic, &1, &payload, &None);
     match result {
         Err(Ok(e)) => assert_eq!(e, EventError::Unauthorized),
         _ => panic!("Expected Unauthorized error"),
@@ -573,7 +573,7 @@ fn test_replay_with_limit() {
     for _i in 0..5 {
         let payload = String::from_str(&env, "p");
         let topic = String::from_str(&env, "records.vision.create");
-        client.publish_event(&admin, &topic, &1, &payload);
+        client.publish_event(&admin, &topic, &1, &payload, &None);
     }
 
     let events = client.replay_events(&1, &3);
@@ -924,7 +924,7 @@ fn test_consumer_group_offset_consistency_under_rapid_publishes() {
     for i in 0..25u32 {
         let payload = String::from_str(&env, "p");
         let topic = String::from_str(&env, "records.vision.create");
-        let _ = client.publish_event(&admin, &topic, &1, &payload);
+        let _ = client.publish_event(&admin, &topic, &1, &payload, &None);
         // Each publish should advance group offset by 1 via dispatch.
         let group = client.get_consumer_group(&gid);
         assert_eq!(group.offset, (i as u64) + 1);

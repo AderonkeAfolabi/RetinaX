@@ -48,11 +48,7 @@ pub fn require_admin(env: &Env, caller: &Address) -> Result<(), AccessControlErr
 }
 
 /// Pauses or resumes administrative operations on the contract.
-pub fn set_paused(
-    env: &Env,
-    caller: &Address,
-    paused: bool,
-) -> Result<(), AccessControlError> {
+pub fn set_paused(env: &Env, caller: &Address, paused: bool) -> Result<(), AccessControlError> {
     caller.require_auth();
     let admin: Address = env
         .storage()

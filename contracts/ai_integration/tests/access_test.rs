@@ -183,7 +183,7 @@ fn test_unauthorized_get_admin() {
     let (_env, client, _admin) = setup();
 
     let admin_result = client.try_get_admin();
-    assert_eq!(admin_result.is_ok(), true);
+    assert!(admin_result.is_ok());
 }
 
 #[test]

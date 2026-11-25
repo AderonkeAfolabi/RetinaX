@@ -2,10 +2,10 @@
 
 ### Features
 
-* **audit:** implement Merkle checkpoint anchoring, RFC 6962 inclusion proofs, and on-chain verification ([#452](https://github.com/RetinaX-Org/RetinaX/issues/452))
-* **key_manager:** implement multi-signature key recovery cancellation and request query ([#451](https://github.com/RetinaX-Org/RetinaX/issues/451))
-* **fuzz:** add fuzz target for key_manager contract covering HD derivation, key rotation, and social recovery ([#442](https://github.com/RetinaX-Org/RetinaX/issues/442))
-* **fuzz:** add fuzz target for identity contract covering DID lifecycle, guardian modifications, and social recovery ([#441](https://github.com/RetinaX-Org/RetinaX/issues/441))
+* **ai_integration:** add time-decayed provider reputation (#464).
+* **fhir:** map a minimal pseudonymous Patient projection (#467).
+* **fhir:** validate and map DiagnosticReport metadata and result references (#466).
+* **emr_bridge:** queue failed syncs for bounded exponential retries (#468).
 * **sdk/zk_prover:** add `wasm32-unknown-unknown` WASM build target and browser JS usage guide ([#471](https://github.com/RetinaX-Org/RetinaX/issues/471))
 * **offchain-server:** add cursor pagination and Stellar Ed25519 signature header authentication for `/api/audit-logs` ([#472](https://github.com/RetinaX-Org/RetinaX/issues/472))
 * **offchain-server:** add OpenAPI 3.0 specification, Swagger UI documentation at `/docs`, and database migration tooling ([#473](https://github.com/RetinaX-Org/RetinaX/issues/473))
@@ -15,6 +15,12 @@
 
 ### Features
 
+* add automated release management workflow (6856459)
+* implement event monitoring system (d6f6c25)
+* implement record versioning and history tracking (5b6a6ea)
+* implement role based access control (ef86cbf)
+* initial project scaffolding for RetinaX-Org vision care platform (aca3c01)
+## 1.2.2 (2026-02-22)
 * add automated release management workflow ([6856459](https://github.com/RetinaX-Org/RetinaX/commit/6856459e18c1000b2121171b11112bb64f5aaa8e))
 * implement event monitoring system ([d6f6c25](https://github.com/RetinaX-Org/RetinaX/commit/d6f6c2546805cfb0b92f42fd455f08f7793b98b8))
 * implement record versioning and history tracking ([5b6a6ea](https://github.com/RetinaX-Org/RetinaX/commit/5b6a6ea5d2089510641b23e9b9ec8fa1347f0175))
@@ -27,6 +33,17 @@
 * **rbac:** correctly persist user roles to storage on initialization and registration ([fbfae85](https://github.com/RetinaX-Org/RetinaX/commit/fbfae859eb167d0f9be98412160a4c7bc3b7945e))
 * **test:** remove corrupted inline unit test module from lib.rs ([2fa262b](https://github.com/RetinaX-Org/RetinaX/commit/2fa262b8d5df8ce3ec0035643dcd894f245915e8))
 
+## 1.1.0 (2026-02-22)
+
+### Features
+
+* implement mutation testing and tests coverage for #27 (ced0105)
+* **zk:** implement Issue #43 ZK Verifier integration (eefb197)
+
+### Bug Fixes
+
+* **ci:** Resolve clippy warning and missing toolchain input in mutation.yml (d477d70)
+* **test:** remove corrupted master test block in lib.rs (f800c4b)
 ## [1.1.0](https://github.com/RetinaX-Org/RetinaX/compare/v1.0.0...v1.1.0) (2026-02-22)
 
 ### Features
@@ -39,13 +56,13 @@
 * **ci:** Resolve clippy warning and missing toolchain input in mutation.yml ([d477d70](https://github.com/RetinaX-Org/RetinaX/commit/d477d70c15e682e874f0cfb1951e1c4969e150ff))
 * **test:** remove corrupted master test block in lib.rs ([f800c4b](https://github.com/RetinaX-Org/RetinaX/commit/f800c4b3c979c3b30765f911d5ee6cd809c77b77))
 
-## [1.2.1](https://github.com/RetinaX-Org/RetinaX/compare/v1.2.0...v1.2.1) (2026-02-22)
+## 1.2.1 (2026-02-22)
 
 ### Bug Fixes
 
 * **test:** remove corrupted master test block in lib.rs ([f800c4b](https://github.com/RetinaX-Org/RetinaX/commit/f800c4b3c979c3b30765f911d5ee6cd809c77b77))
 
-## [1.2.0](https://github.com/RetinaX-Org/RetinaX/compare/v1.1.0...v1.2.0) (2026-02-22)
+## 1.2.0 (2026-02-22)
 
 ### Features
 
@@ -56,7 +73,7 @@
 
 * **ci:** Resolve clippy warning and missing toolchain input in mutation.yml ([d477d70](https://github.com/RetinaX-Org/RetinaX/commit/d477d70c15e682e874f0cfb1951e1c4969e150ff))
 
-## [1.1.0](https://github.com/RetinaX-Org/RetinaX/compare/v1.0.0...v1.1.0) (2026-02-21)
+## 1.1.0 (2026-02-21)
 
 ### Features
 
@@ -66,6 +83,10 @@
 
 ### Features
 
+* **ai_integration:** add time-decayed provider reputation (#464).
+* **fhir:** map a minimal pseudonymous Patient projection (#467).
+* **fhir:** validate and map DiagnosticReport metadata and result references (#466).
+* **emr_bridge:** queue failed syncs for bounded exponential retries (#468).
 * **sdk/zk_prover:** add `wasm32-unknown-unknown` WASM build target and browser JS usage guide ([#471](https://github.com/RetinaX-Org/RetinaX/issues/471))
 * **offchain-server:** add cursor pagination and Stellar Ed25519 signature header authentication for `/api/audit-logs` ([#472](https://github.com/RetinaX-Org/RetinaX/issues/472))
 * **offchain-server:** add OpenAPI 3.0 specification, Swagger UI documentation at `/docs`, and database migration tooling ([#473](https://github.com/RetinaX-Org/RetinaX/issues/473))

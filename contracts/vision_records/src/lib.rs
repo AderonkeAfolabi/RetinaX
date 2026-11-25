@@ -57,7 +57,11 @@ use retinax_common::state_machine::{
 use retinax_common::{
     admin_tiers, concurrency::ConflictEntry, concurrency::FieldChange,
     concurrency::ResolutionStrategy, progressive_auth, risk_engine, session, whitelist, AdminTier,
-    KeyManager, MeteringOpType, UpdateOutcome, VersionStamp,
+    MeteringOpType, UpdateOutcome, VersionStamp,
+};
+use teye_common::{
+    keys::memory::{hex_to_bytes, KeyManager},
+    soroban_str_to_std,
 };
 
 /// Re-export the contract-specific error type at the crate root.
@@ -148,8 +152,8 @@ fn rate_limit_action_hash(
 fn encryption_key_action_hash(env: &Env, version: &String, key: &String) -> BytesN<32> {
     let mut payload = Bytes::new(env);
     payload.append(&Bytes::from_slice(env, b"SET_ENC"));
-    let version_std = version.to_string();
-    let key_std = key.to_string();
+    let version_std = soroban_str_to_std(version);
+    let key_std = soroban_str_to_std(key);
     payload.append(&Bytes::from_slice(env, version_std.as_bytes()));
     payload.append(&Bytes::from_slice(env, key_std.as_bytes()));
     env.crypto().sha256(&payload).into()
@@ -290,7 +294,7 @@ impl VisionRecordsContract {
 
     #[allow(dead_code)]
     fn parse_key_version_u32(version: &String) -> Option<u32> {
-        version.to_string().parse::<u32>().ok()
+        soroban_str_to_std(version).parse::<u32>().ok()
     }
 
     fn enforce_rate_limit(env: &Env, caller: &Address) -> Result<(), ContractError> {
@@ -364,11 +368,11 @@ mod prescription_tests;
 #[cfg(test)]
 mod test_archive;
 #[cfg(test)]
-mod test_portability;
-#[cfg(test)]
 mod test_insurance_endpoints;
 #[cfg(test)]
 mod test_multisig;
+#[cfg(test)]
+mod test_portability;
 #[cfg(test)]
 mod test_rate_limit_bypass;
 #[cfg(test)]

@@ -11,7 +11,7 @@
 //! off-chain tooling can verify the exact call being made before the timelock
 //! expires.
 
-use soroban_sdk::{symbol_short, Address, BytesN, Env, IntoVal, Symbol};
+use soroban_sdk::{symbol_short, Address, BytesN, Env, Symbol};
 
 // ── Timelock durations (seconds) ──────────────────────────────────────────────
 

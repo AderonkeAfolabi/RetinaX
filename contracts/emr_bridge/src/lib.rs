@@ -7,15 +7,69 @@ pub mod types;
 #[cfg(test)]
 mod test;
 
+#[cfg(test)]
+mod retry_tests {
+    use super::*;
+    use soroban_sdk::testutils::{Address as _, Ledger};
+
+    #[test]
+    fn claims_only_due_exchanges_and_caps_attempts() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let contract = env.register(EmrBridgeContract, ());
+        let client = EmrBridgeContractClient::new(&env, &contract);
+        client.initialize(&admin);
+        let id = String::from_str(&env, "exchange");
+        env.as_contract(&contract, || {
+            env.storage().persistent().set(
+                &(symbol_short!("EXCHANGE"), id.clone()),
+                &DataExchangeRecord {
+                    exchange_id: id.clone(),
+                    provider_id: id.clone(),
+                    patient_id: id.clone(),
+                    direction: ExchangeDirection::Export,
+                    data_format: DataFormat::FhirR4,
+                    resource_type: id.clone(),
+                    record_hash: id.clone(),
+                    timestamp: 0,
+                    status: SyncStatus::Pending,
+                },
+            );
+        });
+        let mut now = 0;
+        for attempt in 0..MAX_ATTEMPTS {
+            client.update_exchange_status(&admin, &id, &SyncStatus::Failed);
+            assert!(client.process_retries(&admin, &1).is_empty());
+            now += retry_delay(attempt);
+            env.ledger().with_mut(|ledger| ledger.timestamp = now);
+            assert_eq!(client.process_retries(&admin, &1).get(0), Some(id.clone()));
+            assert!(client.process_retries(&admin, &1).is_empty());
+        }
+        client.update_exchange_status(&admin, &id, &SyncStatus::Failed);
+        env.ledger()
+            .with_mut(|ledger| ledger.timestamp = now + 3600);
+        assert!(client.process_retries(&admin, &1).is_empty());
+    }
+}
+
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String, Symbol, Vec};
 use types::{
     DataExchangeRecord, DataFormat, EmrProvider, EmrSystem, ExchangeDirection, FieldMapping,
-    ProviderStatus, SyncStatus, SyncVerification,
+    ProviderStatus, RetryRecord, SyncStatus, SyncVerification,
 };
 
 /// Storage keys
 const ADMIN: Symbol = symbol_short!("ADMIN");
 const INITIALIZED: Symbol = symbol_short!("INIT");
+const RETRIES: Symbol = symbol_short!("RETRIES");
+const RETRY: Symbol = symbol_short!("RETRY");
+const MAX_QUEUE: u32 = 64;
+const MAX_ATTEMPTS: u32 = 5;
+
+fn retry_delay(attempts: u32) -> u64 {
+    60 * (1u64 << attempts.min(MAX_ATTEMPTS - 1))
+}
 
 /// TTL constants for persistent storage (in ledgers)
 const TTL_THRESHOLD: u32 = 17_280; // ~1 day
@@ -40,6 +94,7 @@ pub enum EmrBridgeError {
     VerificationNotFound = 13,
     VerificationAlreadyExists = 14,
     InvalidSyncState = 15,
+    RetryQueueFull = 16,
 }
 
 #[contract]
@@ -294,13 +349,36 @@ impl EmrBridgeContract {
         caller.require_auth();
         Self::require_admin(&env, &caller)?;
 
-        let exchange_key = (symbol_short!("EXCHANGE"), exchange_id);
+        let exchange_key = (symbol_short!("EXCHANGE"), exchange_id.clone());
         let mut record: DataExchangeRecord = env
             .storage()
             .persistent()
             .get(&exchange_key)
             .ok_or(EmrBridgeError::ExchangeNotFound)?;
 
+        if new_status == SyncStatus::Failed {
+            let storage = env.storage().persistent();
+            let key = (RETRY, exchange_id.clone());
+            let mut retry: RetryRecord = storage.get(&key).unwrap_or(RetryRecord {
+                attempts: 0,
+                due_at: 0,
+            });
+            let mut queue: Vec<String> = storage.get(&RETRIES).unwrap_or(Vec::new(&env));
+            if retry.attempts < MAX_ATTEMPTS && !queue.contains(&exchange_id) {
+                if queue.len() >= MAX_QUEUE {
+                    return Err(EmrBridgeError::RetryQueueFull);
+                }
+                retry.due_at = env
+                    .ledger()
+                    .timestamp()
+                    .saturating_add(retry_delay(retry.attempts));
+                queue.push_back(exchange_id.clone());
+                storage.set(&key, &retry);
+                storage.extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+                storage.set(&RETRIES, &queue);
+                storage.extend_ttl(&RETRIES, TTL_THRESHOLD, TTL_EXTEND_TO);
+            }
+        }
         record.status = new_status;
         env.storage().persistent().set(&exchange_key, &record);
         env.storage()
@@ -310,12 +388,56 @@ impl EmrBridgeContract {
         Ok(())
     }
 
+    /// Claims due failed exchanges for an authenticated off-chain worker.
+    pub fn process_retries(
+        env: Env,
+        caller: Address,
+        limit: u32,
+    ) -> Result<Vec<String>, EmrBridgeError> {
+        caller.require_auth();
+        Self::require_admin(&env, &caller)?;
+        let storage = env.storage().persistent();
+        let queue: Vec<String> = storage.get(&RETRIES).unwrap_or(Vec::new(&env));
+        let now = env.ledger().timestamp();
+        let mut remaining = Vec::new(&env);
+        let mut claimed = Vec::new(&env);
+        for id in queue.iter() {
+            let retry_key = (RETRY, id.clone());
+            let mut retry: RetryRecord = match storage.get(&retry_key) {
+                Some(record) => record,
+                None => continue,
+            };
+            let exchange_key = (symbol_short!("EXCHANGE"), id.clone());
+            let mut exchange: DataExchangeRecord = match storage.get(&exchange_key) {
+                Some(record) => record,
+                None => continue,
+            };
+            if exchange.status != SyncStatus::Failed || retry.attempts >= MAX_ATTEMPTS {
+                continue;
+            }
+            if retry.due_at > now || claimed.len() >= limit.min(MAX_QUEUE) {
+                remaining.push_back(id);
+                continue;
+            }
+            retry.attempts += 1;
+            storage.set(&retry_key, &retry);
+            storage.extend_ttl(&retry_key, TTL_THRESHOLD, TTL_EXTEND_TO);
+            exchange.status = SyncStatus::InProgress;
+            storage.set(&exchange_key, &exchange);
+            storage.extend_ttl(&exchange_key, TTL_THRESHOLD, TTL_EXTEND_TO);
+            claimed.push_back(id);
+        }
+        storage.set(&RETRIES, &remaining);
+        storage.extend_ttl(&RETRIES, TTL_THRESHOLD, TTL_EXTEND_TO);
+        Ok(claimed)
+    }
+
     /// Get a data exchange record by ID
     pub fn get_exchange(
         env: Env,
         exchange_id: String,
     ) -> Result<DataExchangeRecord, EmrBridgeError> {
-        let exchange_key = (symbol_short!("EXCHANGE"), exchange_id);
+        let exchange_key = (symbol_short!("EXCHANGE"), exchange_id.clone());
         let record: DataExchangeRecord = env
             .storage()
             .persistent()

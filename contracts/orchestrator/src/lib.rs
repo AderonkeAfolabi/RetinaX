@@ -369,10 +369,7 @@ impl OrchestratorContract {
         workflow::get(&env, &id, version).ok_or(TransactionError::TransactionNotFound)
     }
 
-    pub fn get_deployed_workflow_version(
-        env: Env,
-        id: String,
-    ) -> Result<u32, TransactionError> {
+    pub fn get_deployed_workflow_version(env: Env, id: String) -> Result<u32, TransactionError> {
         Self::require_initialized(&env)?;
         workflow::deployed(&env, &id).ok_or(TransactionError::TransactionNotFound)
     }

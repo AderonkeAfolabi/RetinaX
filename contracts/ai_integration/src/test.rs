@@ -6,8 +6,7 @@ use soroban_sdk::{testutils::Address as _, Address, Env, String};
 
 use crate::{
     AiIntegrationContract, AiIntegrationContractClient, AiIntegrationError, ProviderStatus,
-    RequestStatus,
-    VerificationState,
+    RequestStatus, VerificationState,
 };
 
 fn setup() -> (Env, AiIntegrationContractClient<'static>, Address, Address) {
@@ -363,7 +362,10 @@ fn test_provider_score_calculation_via_confidence() {
     assert_eq!(status2, RequestStatus::Flagged);
 
     let flagged = client.get_flagged_requests();
-    assert!(flagged.contains(&r2), "high-anomaly request must appear in flagged list");
+    assert!(
+        flagged.contains(&r2),
+        "high-anomaly request must appear in flagged list"
+    );
 }
 
 #[test]
@@ -386,27 +388,37 @@ fn test_anomaly_threshold_boundary() {
 
     // Exactly at threshold → Flagged
     let r_at = client.submit_analysis_request(
-        &requester, &30, &patient, &20,
+        &requester,
+        &30,
+        &patient,
+        &20,
         &String::from_str(&env, "sha256:at"),
         &String::from_str(&env, "task"),
     );
     let status_at = client.store_analysis_result(
-        &operator, &r_at,
+        &operator,
+        &r_at,
         &String::from_str(&env, "sha256:out-at"),
-        &5_000, &7_000, // anomaly == threshold
+        &5_000,
+        &7_000, // anomaly == threshold
     );
     assert_eq!(status_at, RequestStatus::Flagged);
 
     // One below threshold → Completed
     let r_below = client.submit_analysis_request(
-        &requester, &30, &patient, &21,
+        &requester,
+        &30,
+        &patient,
+        &21,
         &String::from_str(&env, "sha256:below"),
         &String::from_str(&env, "task"),
     );
     let status_below = client.store_analysis_result(
-        &operator, &r_below,
+        &operator,
+        &r_below,
         &String::from_str(&env, "sha256:out-below"),
-        &5_000, &6_999, // one below threshold
+        &5_000,
+        &6_999, // one below threshold
     );
     assert_eq!(status_below, RequestStatus::Completed);
 }
@@ -429,21 +441,28 @@ fn test_verified_result_cannot_be_overwritten() {
     );
 
     let r = client.submit_analysis_request(
-        &requester, &40, &patient, &30,
+        &requester,
+        &40,
+        &patient,
+        &30,
         &String::from_str(&env, "sha256:once"),
         &String::from_str(&env, "task"),
     );
     client.store_analysis_result(
-        &operator, &r,
+        &operator,
+        &r,
         &String::from_str(&env, "sha256:first"),
-        &8_000, &1_000,
+        &8_000,
+        &1_000,
     );
 
     // Second attempt must fail
     let result = client.try_store_analysis_result(
-        &operator, &r,
+        &operator,
+        &r,
         &String::from_str(&env, "sha256:second"),
-        &8_000, &1_000,
+        &8_000,
+        &1_000,
     );
     assert!(result.is_err(), "duplicate result store must be rejected");
 }
@@ -465,18 +484,25 @@ fn test_non_admin_cannot_verify_result() {
     );
 
     let r = client.submit_analysis_request(
-        &requester, &50, &patient, &40,
+        &requester,
+        &50,
+        &patient,
+        &40,
         &String::from_str(&env, "sha256:img-auth"),
         &String::from_str(&env, "task"),
     );
     client.store_analysis_result(
-        &operator, &r,
+        &operator,
+        &r,
         &String::from_str(&env, "sha256:out-auth"),
-        &8_000, &1_000,
+        &8_000,
+        &1_000,
     );
 
     let result = client.try_verify_analysis_result(
-        &non_admin, &r, &true,
+        &non_admin,
+        &r,
+        &true,
         &String::from_str(&env, "sha256:qa-nonauth"),
     );
     assert!(result.is_err(), "non-admin must not verify a result");
@@ -488,7 +514,10 @@ fn test_set_anomaly_threshold_requires_admin() {
     let non_admin = Address::generate(&env);
 
     let result = client.try_set_anomaly_threshold(&non_admin, &5_000);
-    assert!(result.is_err(), "non-admin must not change anomaly threshold");
+    assert!(
+        result.is_err(),
+        "non-admin must not change anomaly threshold"
+    );
 }
 
 #[test]
@@ -502,7 +531,12 @@ fn test_anomaly_threshold_above_max_bps_rejected() {
 
 // ── Model version pinning (#465) ───────────────────────────────────────────────
 
-fn register_retina_provider(env: &Env, client: &AiIntegrationContractClient, admin: &Address, operator: &Address) {
+fn register_retina_provider(
+    env: &Env,
+    client: &AiIntegrationContractClient,
+    admin: &Address,
+    operator: &Address,
+) {
     client.register_provider(
         admin,
         &1,
@@ -554,12 +588,14 @@ fn pinned_request_for_another_version_is_refused_until_the_provider_moves_to_it(
     let input = String::from_str(&env, "sha256:input");
     let task = String::from_str(&env, "fundus");
 
-    let stale = client.try_submit_pinned_analysis_request(&requester, &1, &patient, &7, &input, &task, &2);
+    let stale =
+        client.try_submit_pinned_analysis_request(&requester, &1, &patient, &7, &input, &task, &2);
     assert_eq!(stale, Err(Ok(AiIntegrationError::ModelVersionMismatch)));
 
     client.set_model_version(&admin, &1, &2);
     assert_eq!(client.get_provider(&1).model_version, 2);
-    let request_id = client.submit_pinned_analysis_request(&requester, &1, &patient, &7, &input, &task, &2);
+    let request_id =
+        client.submit_pinned_analysis_request(&requester, &1, &patient, &7, &input, &task, &2);
     assert_eq!(client.get_analysis_request(&request_id).model_version, 2);
 
     // The version a request was made against stays on it after the provider moves on.
