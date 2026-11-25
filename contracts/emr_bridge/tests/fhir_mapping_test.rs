@@ -138,7 +138,7 @@ fn test_fhir_export_direction_stored_correctly() {
 }
 
 /// FHIR field mappings describe how source fields in the EMR system map to
-/// Teye's internal schema. Creating a mapping for a FHIR provider stores
+/// RetinaX's internal schema. Creating a mapping for a FHIR provider stores
 /// source_field, target_field, and transform_rule intact.
 #[test]
 fn test_fhir_field_mapping_source_and_target_stored_correctly() {
@@ -148,7 +148,7 @@ fn test_fhir_field_mapping_source_and_target_stored_correctly() {
         &String::from_str(&s.env, "map-patient-name"),
         &s.provider_id,
         &String::from_str(&s.env, "Patient.name[0].family"),
-        &String::from_str(&s.env, "teye.patient.surname"),
+        &String::from_str(&s.env, "retinax.patient.surname"),
         &String::from_str(&s.env, "normalize_unicode"),
     );
 
@@ -158,7 +158,7 @@ fn test_fhir_field_mapping_source_and_target_stored_correctly() {
     );
     assert_eq!(
         mapping.target_field,
-        String::from_str(&s.env, "teye.patient.surname")
+        String::from_str(&s.env, "retinax.patient.surname")
     );
     assert_eq!(
         mapping.transform_rule,
@@ -175,17 +175,17 @@ fn test_fhir_field_mappings_indexed_under_provider() {
         (
             "map-obs-value",
             "Observation.valueQuantity.value",
-            "teye.metric.value",
+            "retinax.metric.value",
         ),
         (
             "map-obs-unit",
             "Observation.valueQuantity.unit",
-            "teye.metric.unit",
+            "retinax.metric.unit",
         ),
         (
             "map-cond-code",
             "Condition.code.coding[0].code",
-            "teye.condition.icd10",
+            "retinax.condition.icd10",
         ),
     ];
 
@@ -272,7 +272,7 @@ fn test_multiple_fhir_resources_grouped_under_same_pseudonym() {
 
     // Verify each exchange ID is present in the patient's index.
     for (ex_id, _) in resources {
-        assert!(exchanges.contains(&String::from_str(&s.env, ex_id)));
+        assert!(exchanges.contains(String::from_str(&s.env, ex_id)));
     }
 }
 
@@ -310,11 +310,11 @@ fn test_patient_index_isolation_between_pseudonyms() {
 
     assert_eq!(a_list.len(), 1);
     assert_eq!(b_list.len(), 1);
-    assert!(a_list.contains(&String::from_str(&s.env, "ex-iso-a")));
-    assert!(b_list.contains(&String::from_str(&s.env, "ex-iso-b")));
+    assert!(a_list.contains(String::from_str(&s.env, "ex-iso-a")));
+    assert!(b_list.contains(String::from_str(&s.env, "ex-iso-b")));
     // No cross-contamination.
-    assert!(!a_list.contains(&String::from_str(&s.env, "ex-iso-b")));
-    assert!(!b_list.contains(&String::from_str(&s.env, "ex-iso-a")));
+    assert!(!a_list.contains(String::from_str(&s.env, "ex-iso-b")));
+    assert!(!b_list.contains(String::from_str(&s.env, "ex-iso-a")));
 }
 
 /// A suspended provider must not accept new FHIR data exchanges, preventing
@@ -459,7 +459,7 @@ fn test_field_mapping_fully_reconstructed_from_ledger() {
     let s = setup();
 
     let source = String::from_str(&s.env, "Observation.component[0].valueQuantity.value");
-    let target = String::from_str(&s.env, "teye.vitals.systolic_bp");
+    let target = String::from_str(&s.env, "retinax.vitals.systolic_bp");
     let rule = String::from_str(&s.env, "convert_mmhg");
 
     s.client.create_field_mapping(
@@ -526,7 +526,7 @@ fn test_sync_verification_reconstructed_from_ledger() {
     assert_eq!(retrieved.exchange_id, exchange_id);
     assert!(!retrieved.is_consistent);
     assert_eq!(retrieved.discrepancies.len(), 2);
-    assert!(retrieved.discrepancies.contains(&String::from_str(
+    assert!(retrieved.discrepancies.contains(String::from_str(
         &s.env,
         "DiagnosticReport.result count differs"
     )));

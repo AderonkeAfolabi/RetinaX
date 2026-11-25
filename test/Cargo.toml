@@ -28,5 +28,9 @@ name = "cross_contract_integration"
 path = "tests/integration/cross_contract.rs"
 
 [[test]]
+name = "storage_collision_tests"
+path = "tests/storage_collision_tests.rs"
+
+[[test]]
 name = "access_control_integration"
 path = "tests/access_control_integration.rs"

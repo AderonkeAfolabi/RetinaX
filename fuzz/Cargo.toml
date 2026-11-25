@@ -1,5 +1,5 @@
 [package]
-name = "teye-fuzz"
+name = "retinax-fuzz"
 version = "0.0.0"
 publish = false
 edition = "2021"
@@ -13,6 +13,9 @@ arbitrary = { version = "1.3", features = ["derive"] }
 soroban-sdk = { version = "25.1.1", features = ["testutils"] }
 vision_records = { path = "../contracts/vision_records", features = ["testutils"] }
 staking = { path = "../contracts/staking", features = ["testutils"] }
+identity = { path = "../contracts/identity" }
+key_manager = { path = "../contracts/key_manager", features = ["testutils"] }
+audit = { path = "../contracts/audit" }
 
 # Prevent this from interfering with workspaces
 [workspace]
@@ -33,5 +36,17 @@ doc = false
 [[bin]]
 name = "audit_fuzz"
 path = "fuzz_targets/audit.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "identity_fuzz"
+path = "fuzz_targets/identity.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "key_manager_fuzz"
+path = "fuzz_targets/key_manager.rs"
 test = false
 doc = false

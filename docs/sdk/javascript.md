@@ -26,7 +26,7 @@ RPC_URL=https://soroban-testnet.stellar.org
 NETWORK_PASSPHRASE=Test SDF Network ; September 2015
 
 # Contract Configuration
-TEYE_CONTRACT_ID=YOUR_CONTRACT_ID_HERE
+RETINAX_CONTRACT_ID=YOUR_CONTRACT_ID_HERE
 VISION_RECORDS_CONTRACT_ID=YOUR_VISION_RECORDS_CONTRACT_ID
 GOVERNOR_CONTRACT_ID=YOUR_GOVERNOR_CONTRACT_ID
 
@@ -75,7 +75,7 @@ class RetinaXSDK {
   constructor(network = "testnet") {
     this.rpc = new SorobanRpc.Server(process.env.RPC_URL);
     this.networkPassphrase = network === "testnet" ? Networks.TESTNET : Networks.PUBLIC;
-    this.contractId = process.env.TEYE_CONTRACT_ID;
+    this.contractId = process.env.RETINAX_CONTRACT_ID;
     this.keypair = Keypair.fromSecret(process.env.SERVER_SECRET_KEY);
   }
 
@@ -505,7 +505,7 @@ class EventListener extends RetinaXSDK {
 
 // Example usage
 const eventListener = new EventListener("testnet");
-eventListener.subscribeToContractEvents(process.env.TEYE_CONTRACT_ID, [
+eventListener.subscribeToContractEvents(process.env.RETINAX_CONTRACT_ID, [
   "patient_registered",
   "record_added",
   "access_granted",
@@ -749,12 +749,66 @@ describe('Patient Management Integration', () => {
 ### Debug Tools
 
 - [Stellar Laboratory](https://laboratory.stellar.org/) for XDR decoding
-- [Soroban Explorer](https://soroban-explorer.stellar.org/) for transaction tracking
+- [Soroban Explorer](https://stellar.expert/) for transaction tracking
 - Network-specific RPC endpoints for debugging
 
 ## References
 
 - [Stellar SDK Documentation](https://stellar.github.io/js-stellar-sdk/)
 - [Soroban Documentation](https://soroban.stellar.org/docs/)
-- [Example JavaScript Code](../../../example/js/)
-- [Contract API Documentation](../../api/)
+- [Example JavaScript Code](../../example/js/)
+- [Contract API Documentation](../api.md)
+
+## Record-Sharing Consent (Issue #488)
+
+The `grantConsent` and `revokeConsent` helpers in
+[`example/js/invoke.js`](../../example/js/invoke.js) extend the basic
+invocation example with a full consent lifecycle.
+
+### Grant consent
+
+```javascript
+import { grantConsent } from "./example/js/invoke.js";
+
+// Grant read + write access to a provider for 30 days
+await grantConsent(
+  process.env.PATIENT_SECRET_KEY,
+  "GPROVIDER_PUBLIC_KEY_HERE",
+  ["read", "write"],
+  30 * 24 * 60 * 60 * 1000, // 30 days in ms; pass null for indefinite
+);
+```
+
+### Revoke consent
+
+```javascript
+import { revokeConsent } from "./example/js/invoke.js";
+
+await revokeConsent(
+  process.env.PATIENT_SECRET_KEY,
+  "GPROVIDER_PUBLIC_KEY_HERE",
+);
+```
+
+### Error handling
+
+Both functions throw descriptive errors on simulation failure, network
+rejection, or polling timeout — the same pattern as `invokeTeyeContract`.
+Wrap calls in `try/catch` and surface the message to the user:
+
+```javascript
+try {
+  await grantConsent(secret, provider, ["read"]);
+} catch (err) {
+  console.error("Consent grant failed:", err.message);
+}
+```
+
+### Notes
+
+- Never commit `PATIENT_SECRET_KEY` to version control; use a `.env` file.
+- `permissions` is an array: `["read"]`, `["read", "write"]`, etc.
+- After `revokeConsent` the provider's access is removed in the next ledger.
+  Existing in-flight transactions signed before revocation may still settle.
+- [Example JavaScript Code](../../example/js/)
+- [Contract API Documentation](../api.md)

@@ -435,11 +435,27 @@ fuzz_target!(|operations: Vec<DosOperation>| {
 
 - [Rate Limiting Best Practices](https://stripe.com/blog/rate-limiters)
 - [Circuit Breaker Pattern](https://martinfowler.com/bliki/CircuitBreaker.html)
-- [DoS Attack Mitigation](https://owasp.org/www-project-ddos-protection/)
-- [Reentrancy Attacks](https://consensys.github.io/smart-contract-best-practices/attacks/reentrancy/)
+- DoS Attack Mitigation
+- Reentrancy Attacks
 
 ---
 
 **Last Updated**: 2025-02-25  
 **Next Review**: 2025-03-25  
 **Version**: 1.0
+
+## Vision Records contract API
+
+The Vision Records contract uses per-address, per-operation windows. Configure
+them with `set_rate_limit_config(caller, operation, max_requests,
+window_seconds)`. When no configuration exists, the operation is not limited.
+
+The contract also exposes `get_rate_limit_config`, `get_rate_limit_status`,
+`get_all_rate_limit_configs`, and `has_rate_limit_bypass`. Verified providers
+may bypass limits; administrators can manage that state with
+`set_rate_limit_bypass`.
+
+Rate-limit checks run after authentication and before the protected operation.
+`RateLimitExceeded` events include the address, operation, current count,
+configured limit, reset time, and timestamp. Treat those events as the source
+for alerts and capacity tuning.

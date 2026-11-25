@@ -14,7 +14,7 @@ use soroban_sdk::{
 };
 
 use crate::aggregation::Aggregator;
-use crate::differential_privacy::DifferentialPrivacy;
+use crate::differential_privacy::{DifferentialPrivacy, DEFAULT_EPSILON, DEFAULT_SENSITIVITY};
 use crate::homomorphic::{HomomorphicEngine, PaillierPrivateKey, PaillierPublicKey};
 
 // ── Storage keys ────────────────────────────────────────────────────────────────
@@ -25,6 +25,7 @@ const METRIC: Symbol = symbol_short!("METRIC");
 const PUB_KEY: Symbol = symbol_short!("PUB_KEY");
 const PRIV_KEY: Symbol = symbol_short!("PRIV_KEY");
 const DEP_VER: Symbol = symbol_short!("DEP_VER");
+const DP_PARAMS: Symbol = symbol_short!("DP_PRM");
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -43,6 +44,14 @@ pub struct MetricValue {
     pub count: i128,
     pub sum: i128,
     pub version: u32,
+}
+
+/// Differential-privacy noise parameters (#463). See `set_dp_params` for the bounds.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DpParams {
+    pub epsilon: u32,
+    pub sensitivity: i128,
 }
 
 #[contracttype]
@@ -191,6 +200,43 @@ impl AnalyticsContract {
         Ok(())
     }
 
+    /// The differential-privacy parameters applied to aggregates (#463). Defaults until an admin sets them.
+    pub fn get_dp_params(env: Env) -> DpParams {
+        env.storage()
+            .instance()
+            .get(&DP_PARAMS)
+            .unwrap_or(DpParams {
+                epsilon: DEFAULT_EPSILON,
+                sensitivity: DEFAULT_SENSITIVITY,
+            })
+    }
+
+    /// Admin-only: sets the noise parameters used for every later aggregate. Epsilon must be from 1 to 10 and
+    /// sensitivity from 1 to 1,000,000; anything else is `InvalidInput`.
+    /// Aggregates already stored keep the noise they were recorded with.
+    pub fn set_dp_params(env: Env, epsilon: u32, sensitivity: i128) -> Result<(), ContractError> {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&ADMIN)
+            .ok_or(ContractError::NotInitialized)?;
+        admin.require_auth();
+
+        if !DifferentialPrivacy::validate(epsilon, sensitivity) {
+            return Err(ContractError::InvalidInput);
+        }
+        env.storage().instance().set(
+            &DP_PARAMS,
+            &DpParams {
+                epsilon,
+                sensitivity,
+            },
+        );
+        env.events()
+            .publish((symbol_short!("DP_SET"), admin), (epsilon, sensitivity));
+        Ok(())
+    }
+
     pub fn get_admin(env: Env) -> Address {
         env.storage().instance().get(&ADMIN).unwrap()
     }
@@ -288,7 +334,9 @@ impl AnalyticsContract {
         let priv_key: PaillierPrivateKey = env.storage().instance().get(&PRIV_KEY).unwrap();
         let plaintext_sum = HomomorphicEngine::decrypt(&pub_key, &priv_key, agg_ciphertext);
 
-        let noisy_sum = DifferentialPrivacy::add_laplace_noise(&env, plaintext_sum, 1, 10);
+        let dp = Self::get_dp_params(env.clone());
+        let noisy_sum =
+            DifferentialPrivacy::add_laplace_noise(&env, plaintext_sum, dp.epsilon, dp.sensitivity);
         let count = ciphertexts.len() as i128;
 
         let key = (METRIC, kind.clone(), dims.clone());

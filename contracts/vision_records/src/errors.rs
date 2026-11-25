@@ -132,6 +132,8 @@ pub enum ContractError {
     RecordArchived = 47,
     /// The record is not archived, so it cannot be restored.
     RecordNotArchived = 48,
+    /// The record has expired according to its data class retention policy.
+    RecordExpired = 49,
 }
 
 impl ContractError {
@@ -174,7 +176,8 @@ impl ContractError {
             | ContractError::AppointmentNotFound
             | ContractError::LineageNodeNotFound
             | ContractError::LineageAncestorMissing
-            | ContractError::RecordArchived => ErrorCategory::NotFound,
+            | ContractError::RecordArchived
+            | ContractError::RecordExpired => ErrorCategory::NotFound,
             ContractError::ProviderAlreadyRegistered
             | ContractError::UserAlreadyExists
             | ContractError::DuplicateRecord
@@ -217,6 +220,7 @@ impl ContractError {
             | ContractError::UserAlreadyExists
             | ContractError::RecordArchived
             | ContractError::RecordNotArchived
+            | ContractError::RecordExpired
             | ContractError::MetaTxExpired => ErrorSeverity::Low,
             ContractError::Unauthorized
             | ContractError::AccessDenied
@@ -272,6 +276,7 @@ impl ContractError {
             ContractError::InvalidPhase => "Invalid phase for operation",
             ContractError::RecordArchived => "Record is archived",
             ContractError::RecordNotArchived => "Record is not archived",
+            ContractError::RecordExpired => "Record has expired per retention policy",
             ContractError::ProviderNotFound => "Provider not found in the system",
             ContractError::ProviderAlreadyRegistered => "Provider is already registered",
             ContractError::InvalidVerificationStatus => "Invalid verification status provided",

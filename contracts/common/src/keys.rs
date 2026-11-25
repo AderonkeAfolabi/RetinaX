@@ -136,10 +136,9 @@ mod soroban_impl {
     }
 }
 
-// ── Std/test implementation ─────────────────────────────────────────────────
+/// Allocation-backed keys used by the native utilities and WASM record storage.
 
-#[cfg(any(test, feature = "std"))]
-mod std_impl {
+pub mod memory {
     extern crate alloc;
     use self::alloc::collections::BTreeMap;
     use super::{hex_decode_and_xor, xor_and_hex_encode, StdString, StdVec};
@@ -285,4 +284,4 @@ mod std_impl {
 pub use soroban_impl::{hex_to_bytes, KeyManager};
 
 #[cfg(any(test, feature = "std"))]
-pub use std_impl::{bytes_to_hex, hex_to_bytes, AuditEntry, AuditLog, DataKey, KeyManager};
+pub use memory::{bytes_to_hex, hex_to_bytes, AuditEntry, AuditLog, DataKey, KeyManager};

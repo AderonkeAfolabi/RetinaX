@@ -55,6 +55,7 @@ pub struct EventEnvelope {
     pub payload_hash: String,
     pub lamport_ts: u64,
     pub ledger_ts: u64,
+    pub patient: Option<Address>,
 }
 
 /// Severity levels for events, allowing consumers to filter by importance.
@@ -128,6 +129,7 @@ impl EventStreamContract {
         topic: String,
         schema_version: u32,
         payload_hash: String,
+        patient: Option<Address>,
     ) -> Result<u64, EventError> {
         caller.require_auth();
         Self::require_initialized(&env)?;
@@ -150,6 +152,7 @@ impl EventStreamContract {
             payload_hash,
             lamport_ts,
             ledger_ts: env.ledger().timestamp(),
+            patient,
         };
 
         // Persist the event in the sequential log
@@ -243,7 +246,7 @@ impl EventStreamContract {
     ) -> Result<u64, EventError> {
         subscriber.require_auth();
         Self::require_initialized(&env)?;
-        subscription::create_subscription(&env, &subscriber, &topic_pattern)
+        subscription::create_subscription(&env, &subscriber, &topic_pattern, None)
     }
 
     /// Remove an existing subscription.
@@ -403,6 +406,20 @@ impl EventStreamContract {
         Self::require_initialized(&env)?;
         Self::require_admin(&env, &caller)?;
         replay::retry_dead_letter(&env, dead_letter_index)
+    }
+
+    /// Set maximum capacity for the dead letter queue.
+    pub fn set_dlq_capacity(env: Env, caller: Address, capacity: u32) -> Result<(), EventError> {
+        caller.require_auth();
+        Self::require_initialized(&env)?;
+        Self::require_admin(&env, &caller)?;
+        replay::set_dlq_capacity(&env, capacity)
+    }
+
+    /// Return current dead letter queue maximum capacity.
+    pub fn get_dlq_capacity(env: Env) -> Result<u32, EventError> {
+        Self::require_initialized(&env)?;
+        Ok(replay::get_dlq_capacity(&env))
     }
 
     // ── Source contract registration ─────────────────────────────────────────

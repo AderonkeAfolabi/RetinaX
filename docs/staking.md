@@ -234,6 +234,45 @@ All state changes emit typed on-chain events for indexers and front-ends.
 
 ---
 
+## Delegated Staking
+
+A holder can delegate their stake to a registered **provider**. Delegated stake is
+still staked under the delegator's own balance, so it earns rewards pro rata like
+any other stake. The provider takes a commission from the delegated share of each
+reward claim.
+
+| Function | Who | Effect |
+|---|---|---|
+| `register_provider(provider, commission_bps)` | provider | Registers the provider, or updates its commission (0–10 000 bps). |
+| `delegate(delegator, provider, amount)` | delegator | Transfers `amount` in and records the delegation. Top-ups to the same provider accumulate. |
+| `undelegate(delegator, amount)` | delegator | Reduces the delegation. The tokens stay staked and can then be unstaked normally. |
+| `get_delegation(delegator)` | view | The delegation record: `provider`, `amount`, `index_snapshot`. |
+| `get_provider_commission(provider)` | view | The provider's commission in basis points. |
+| `get_delegated_total(provider)` | view | Total stake currently delegated to the provider. |
+
+### Rules
+
+- A delegator can delegate through one provider at a time. Delegating through a second provider returns `DelegationExists`.
+- Self-delegation is rejected.
+- Delegated stake is locked. `request_unstake` only accepts amounts above the delegated portion. Call `undelegate` first.
+- Commission is taken only from the delegated share of a claim. For a claim of `gross` by a delegator with `delegated` out of `staked`, the provider receives `gross * delegated / staked * commission_bps / 10000`. The rest goes to the delegator. The provider's commission is credited to its own earned balance and is claimed with `claim_rewards`.
+
+### Slashing propagation
+
+`slash(provider, amount)` splits the loss between the provider's own stake and its delegated stake in proportion to each. The delegated share is applied lazily. Each slash scales a per-provider index, and a delegator's record is brought up to date on their next action (`stake`, `request_unstake`, `claim_rewards`, `delegate` or `undelegate`). Until then, `get_delegation` returns the pre-slash amount.
+
+Known approximation: rewards accrued between a slash and the delegator's next action are computed on the pre-slash stake. The same applies to a provider's own stake, which is existing behaviour of `slash`.
+
+### Error codes
+
+| Code | Name | Meaning |
+|---|---|---|
+| 23 | `NotProvider` | The provider has not called `register_provider`. |
+| 24 | `DelegationNotFound` | `undelegate` called with no active delegation. |
+| 25 | `DelegationExists` | The delegator is already delegated through a different provider. |
+
+---
+
 ## Testing
 
 ```bash

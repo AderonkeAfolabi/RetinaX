@@ -5,6 +5,24 @@
 #[cfg(test)]
 mod test;
 
+#[cfg(test)]
+mod reputation_tests {
+    use super::*;
+
+    #[test]
+    fn decays_one_half_per_complete_period_and_saturates() {
+        let score = Reputation {
+            score: MAX_BPS,
+            updated_at: 100,
+        };
+        assert_eq!(decayed_score(&score, 99), 10_000);
+        assert_eq!(decayed_score(&score, 100 + HALF_LIFE - 1), 10_000);
+        assert_eq!(decayed_score(&score, 100 + HALF_LIFE), 5_000);
+        assert_eq!(decayed_score(&score, 100 + 2 * HALF_LIFE), 2_500);
+        assert_eq!(decayed_score(&score, u64::MAX), 0);
+    }
+}
+
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, symbol_short, Address, Env, String,
     Symbol, Vec,
@@ -25,8 +43,23 @@ const EVT_PROVIDER_STATUS: Symbol = symbol_short!("PRV_STS");
 const EVT_REQUEST_SUBMITTED: Symbol = symbol_short!("REQ_SUB");
 const EVT_RESULT_STORED: Symbol = symbol_short!("RES_STO");
 const EVT_RESULT_VERIFIED: Symbol = symbol_short!("RES_VFY");
+const EVT_MODEL_VERSION: Symbol = symbol_short!("MDL_VER");
 
 const MAX_BPS: u32 = 10_000;
+const REPUTATION: Symbol = symbol_short!("REPUTE");
+const HALF_LIFE: u64 = 30 * 24 * 60 * 60;
+
+#[contracttype]
+#[derive(Clone)]
+struct Reputation {
+    score: u32,
+    updated_at: u64,
+}
+
+fn decayed_score(reputation: &Reputation, now: u64) -> u32 {
+    let periods = now.saturating_sub(reputation.updated_at) / HALF_LIFE;
+    reputation.score >> periods.min(31) as u32
+}
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -43,6 +76,7 @@ pub enum AiIntegrationError {
     InvalidState = 9,
     ResultAlreadyExists = 10,
     ResultNotFound = 11,
+    ModelVersionMismatch = 12,
 }
 
 #[contracttype]
@@ -60,6 +94,8 @@ pub struct AiProvider {
     pub operator: Address,
     pub name: String,
     pub model: String,
+    /// The model version the provider currently runs (#465). Starts at 1; changed by the admin.
+    pub model_version: u32,
     pub endpoint_hash: String,
     pub status: ProviderStatus,
     pub registered_at: u64,
@@ -84,6 +120,10 @@ pub struct AnalysisRequest {
     pub record_id: u64,
     pub input_hash: String,
     pub task_type: String,
+    /// The provider's model version when the request was made (#465).
+    pub model_version: u32,
+    /// The version the caller pinned the request to, if it pinned one.
+    pub pinned_model_version: Option<u32>,
     pub requested_at: u64,
     pub status: RequestStatus,
 }
@@ -101,6 +141,8 @@ pub enum VerificationState {
 pub struct AnalysisResult {
     pub request_id: u64,
     pub provider_id: u32,
+    /// The model version the request was made against, copied from the request (#465).
+    pub model_version: u32,
     pub output_hash: String,
     pub confidence_bps: u32,
     pub anomaly_score_bps: u32,
@@ -210,6 +252,7 @@ impl AiIntegrationContract {
             operator,
             name,
             model,
+            model_version: 1,
             endpoint_hash,
             status: ProviderStatus::Active,
             registered_at: env.ledger().timestamp(),
@@ -254,7 +297,6 @@ impl AiIntegrationContract {
             .ok_or(AiIntegrationError::ProviderNotFound)
     }
 
-    #[allow(clippy::arithmetic_side_effects)]
     pub fn submit_analysis_request(
         env: Env,
         caller: Address,
@@ -264,40 +306,69 @@ impl AiIntegrationContract {
         input_hash: String,
         task_type: String,
     ) -> Result<u64, AiIntegrationError> {
-        Self::require_initialized(&env)?;
-        caller.require_auth();
-        Self::ensure_provider_active(&env, provider_id)?;
-        Self::validate_non_empty(&input_hash)?;
-        Self::validate_non_empty(&task_type)?;
-
-        let mut counter: u64 = env
-            .storage()
-            .instance()
-            .get(&REQUEST_COUNTER)
-            .unwrap_or(0u64);
-        counter = counter.saturating_add(1);
-        env.storage().instance().set(&REQUEST_COUNTER, &counter);
-
-        let request = AnalysisRequest {
-            request_id: counter,
+        Self::submit_request_inner(
+            env,
+            caller,
             provider_id,
-            requester: caller,
             patient,
             record_id,
             input_hash,
             task_type,
-            requested_at: env.ledger().timestamp(),
-            status: RequestStatus::Pending,
-        };
+            None,
+        )
+    }
 
-        let key = (REQUEST_KEY, counter);
-        env.storage().persistent().set(&key, &request);
-        env.events().publish(
-            (EVT_REQUEST_SUBMITTED, counter, provider_id),
-            request.clone(),
-        );
+    /// Submits a request pinned to `pinned_model_version` (#465). The request is refused with
+    /// `ModelVersionMismatch` unless the provider is currently running exactly that version. The request keeps the
+    /// pin, and every result stored for it records the version, so the output can be attributed for audit.
+    pub fn submit_pinned_analysis_request(
+        env: Env,
+        caller: Address,
+        provider_id: u32,
+        patient: Address,
+        record_id: u64,
+        input_hash: String,
+        task_type: String,
+        pinned_model_version: u32,
+    ) -> Result<u64, AiIntegrationError> {
+        Self::submit_request_inner(
+            env,
+            caller,
+            provider_id,
+            patient,
+            record_id,
+            input_hash,
+            task_type,
+            Some(pinned_model_version),
+        )
+    }
 
-        Ok(counter)
+    /// Admin-only: records that a provider now runs `model_version` (#465). Requests pinned to any other version are
+    /// refused from this point on. Results already stored keep the version they were made against.
+    pub fn set_model_version(
+        env: Env,
+        caller: Address,
+        provider_id: u32,
+        model_version: u32,
+    ) -> Result<(), AiIntegrationError> {
+        Self::require_initialized(&env)?;
+        Self::require_admin(&env, &caller)?;
+        if model_version == 0 {
+            return Err(AiIntegrationError::InvalidInput);
+        }
+
+        let key = (PROVIDER_KEY, provider_id);
+        let mut provider: AiProvider = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .ok_or(AiIntegrationError::ProviderNotFound)?;
+
+        provider.model_version = model_version;
+        env.storage().persistent().set(&key, &provider);
+        env.events()
+            .publish((EVT_MODEL_VERSION, provider_id), model_version);
+        Ok(())
     }
 
     pub fn store_analysis_result(
@@ -356,6 +427,7 @@ impl AiIntegrationContract {
         let result = AnalysisResult {
             request_id,
             provider_id: request.provider_id,
+            model_version: request.model_version,
             output_hash,
             confidence_bps,
             anomaly_score_bps,
@@ -414,6 +486,25 @@ impl AiIntegrationContract {
             .get(&result_key)
             .ok_or(AiIntegrationError::ResultNotFound)?;
 
+        if result.verification_state == VerificationState::Unverified {
+            let key = (REPUTATION, request.provider_id);
+            let now = env.ledger().timestamp();
+            let sample = if accepted { MAX_BPS } else { 0 };
+            let score = env
+                .storage()
+                .persistent()
+                .get::<_, Reputation>(&key)
+                .map(|old| (decayed_score(&old, now) + sample) / 2)
+                .unwrap_or(sample);
+            env.storage().persistent().set(
+                &key,
+                &Reputation {
+                    score,
+                    updated_at: now,
+                },
+            );
+        }
+
         result.verification_state = if accepted {
             VerificationState::Verified
         } else {
@@ -432,6 +523,19 @@ impl AiIntegrationContract {
         env.events()
             .publish((EVT_RESULT_VERIFIED, request_id, accepted), result.clone());
         Ok(())
+    }
+
+    /// Returns the decayed score in basis points, or None before the first review.
+    pub fn get_provider_reputation(
+        env: Env,
+        provider_id: u32,
+    ) -> Result<Option<u32>, AiIntegrationError> {
+        Self::get_provider(env.clone(), provider_id)?;
+        Ok(env
+            .storage()
+            .persistent()
+            .get::<_, Reputation>(&(REPUTATION, provider_id))
+            .map(|value| decayed_score(&value, env.ledger().timestamp())))
     }
 
     pub fn get_analysis_request(
@@ -467,6 +571,66 @@ impl AiIntegrationContract {
             .persistent()
             .get(&FLAGGED_KEY)
             .unwrap_or(Vec::new(&env)))
+    }
+
+    /// Shared body of the two submit entry points. `pinned_model_version` is `None` for an unpinned request.
+    #[allow(clippy::arithmetic_side_effects, clippy::too_many_arguments)]
+    fn submit_request_inner(
+        env: Env,
+        caller: Address,
+        provider_id: u32,
+        patient: Address,
+        record_id: u64,
+        input_hash: String,
+        task_type: String,
+        pinned_model_version: Option<u32>,
+    ) -> Result<u64, AiIntegrationError> {
+        Self::require_initialized(&env)?;
+        caller.require_auth();
+        Self::ensure_provider_active(&env, provider_id)?;
+        let provider: AiProvider = env
+            .storage()
+            .persistent()
+            .get(&(PROVIDER_KEY, provider_id))
+            .ok_or(AiIntegrationError::ProviderNotFound)?;
+        if let Some(pinned) = pinned_model_version {
+            if pinned != provider.model_version {
+                return Err(AiIntegrationError::ModelVersionMismatch);
+            }
+        }
+        Self::validate_non_empty(&input_hash)?;
+        Self::validate_non_empty(&task_type)?;
+
+        let mut counter: u64 = env
+            .storage()
+            .instance()
+            .get(&REQUEST_COUNTER)
+            .unwrap_or(0u64);
+        counter = counter.saturating_add(1);
+        env.storage().instance().set(&REQUEST_COUNTER, &counter);
+
+        let request = AnalysisRequest {
+            request_id: counter,
+            provider_id,
+            requester: caller,
+            patient,
+            record_id,
+            input_hash,
+            task_type,
+            model_version: provider.model_version,
+            pinned_model_version,
+            requested_at: env.ledger().timestamp(),
+            status: RequestStatus::Pending,
+        };
+
+        let key = (REQUEST_KEY, counter);
+        env.storage().persistent().set(&key, &request);
+        env.events().publish(
+            (EVT_REQUEST_SUBMITTED, counter, provider_id),
+            request.clone(),
+        );
+
+        Ok(counter)
     }
 
     fn require_initialized(env: &Env) -> Result<(), AiIntegrationError> {

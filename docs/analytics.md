@@ -135,3 +135,17 @@ These tests verify:
 - Metric accumulation for a given `MetricDimensions`
 - Trend generation across time buckets
 - Population metrics for the anonymous bucket
+
+## Differential-Privacy Parameters (#463)
+
+The noise applied to aggregates is configured by the admin with `set_dp_params(epsilon, sensitivity)`, and read with
+`get_dp_params() -> DpParams`. The defaults are `epsilon = 1` and `sensitivity = 10`, which are the values used before
+the parameters were configurable.
+
+- `epsilon` must be from 1 to 10. Zero would switch the noise off, so it is refused.
+- `sensitivity` must be from 1 to 1,000,000.
+- Anything outside these bounds fails with `InvalidInput`, and the previous values stay in force.
+- The noise is drawn uniformly from `[-b, b]`, where `b = sensitivity / epsilon` rounded down. A larger epsilon therefore
+  gives less noise. The draw is a bounded uniform sample rather than a true Laplace sample, because the on-chain
+  arithmetic cannot compute logarithms.
+- Each aggregate keeps the noise it was recorded with. Changing the parameters affects only later aggregates.

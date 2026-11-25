@@ -13,6 +13,21 @@ FHIR is the modern standard for healthcare data exchange. This contract facilita
 - FHIR profile compliance checking
 - Interoperability with other FHIR-compliant systems
 
+## Architecture at a Glance
+
+```mermaid
+flowchart TD
+    Admin[Admin] -->|register_resource| Registry[Resource registry]
+    Client[Client] -->|get_resource| Registry
+    Registry --> Check{Stored in current layout?}
+    Check -- No --> Migrate[Lazy migration to current schema]
+    Migrate --> Resource[FHIR resource]
+    Check -- Yes --> Resource
+    Client -->|create_patient / create_observation| Builder[Resource builder]
+    Builder --> Validators[validate_patient / validate_observation_r4]
+    Validators --> Resource
+```
+
 ---
 
 ## Public Functions
@@ -282,9 +297,9 @@ The FHIR contract integrates with the EMR Bridge for system interoperability:
 
 ## Related Documentation
 
-- [FHIR Standard](../docs/fhir.md)
+- [FHIR Standard](../fhir.md)
 - [EMR Integration](./emr_bridge.md)
-- [Data Portability](../docs/data-portability.md)
+- [Data Portability](../data-portability.md)
 - [FHIR Official Specification](https://www.hl7.org/fhir/R4/)
 
 ---

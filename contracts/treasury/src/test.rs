@@ -5,7 +5,7 @@ use soroban_sdk::{
     contract, contractimpl,
     testutils::{Address as _, Events, Ledger as _},
     token::{Client as TokenClient, StellarAssetClient},
-    vec, Address, Env, IntoVal, String, Symbol, Vec,
+    vec, Address, Env, String, Symbol, Vec,
 };
 
 use crate::{ProposalStatus, TreasuryConfig, TreasuryContract, TreasuryContractClient};
@@ -25,10 +25,8 @@ impl MockDexRouter {
     ) -> i128 {
         from.require_auth();
 
-        let asset_in = path.get(0).unwrap();
         let asset_out = path.get(path.len() - 1).unwrap();
 
-        let token_in = TokenClient::new(&env, &asset_in);
         let token_out = TokenClient::new(&env, &asset_out);
 
         // Router theoretically pulls amount_in from `from` here via allowance.
@@ -220,4 +218,105 @@ fn test_dex_path_automatic_conversion() {
 
     let final_asset2_bal = TokenClient::new(&env, &asset2).balance(&client.address);
     assert_eq!(final_asset2_bal - initial_asset2_bal, 1500i128);
+}
+
+#[test]
+fn test_create_and_claim_stream() {
+    let (env, client, signer1, _, asset1, _, _) = setup();
+    let recipient = Address::generate(&env);
+
+    env.ledger().set_timestamp(100);
+
+    // Create stream: start 100, stop 200, rate 10 per sec, cliff 120, deposit 1000
+    let stream_id = client.create_stream(
+        &signer1, &recipient, &asset1, &1000i128, &100u64, &200u64, &10i128, &120u64,
+    );
+
+    let stream = client.get_stream(&stream_id).unwrap();
+    assert_eq!(stream.deposit, 1000i128);
+    assert_eq!(stream.rate, 10i128);
+    assert_eq!(stream.cliff, 120u64);
+    assert_eq!(stream.claimed_amount, 0i128);
+    assert!(!stream.canceled);
+
+    // Before cliff (time 110) - claim fails
+    env.ledger().set_timestamp(110);
+    assert_eq!(
+        client.try_claim(&recipient, &stream_id),
+        Err(Ok(crate::ContractError::CliffNotReached))
+    );
+
+    // At cliff (time 120) - 20 seconds elapsed * 10 = 200 claimable
+    env.ledger().set_timestamp(120);
+    let claimable = client.get_claimable_amount(&stream_id);
+    assert_eq!(claimable, 200i128);
+
+    let claimed = client.claim(&recipient, &stream_id);
+    assert_eq!(claimed, 200i128);
+
+    let token_client = TokenClient::new(&env, &asset1);
+    assert_eq!(token_client.balance(&recipient), 200i128);
+
+    // Claim again without time advance - no tokens to claim
+    assert_eq!(
+        client.try_claim(&recipient, &stream_id),
+        Err(Ok(crate::ContractError::NoClaimableTokens))
+    );
+
+    // Advance past stop_time (time 250) - remaining 800 claimable
+    env.ledger().set_timestamp(250);
+    let claimed_final = client.claim(&recipient, &stream_id);
+    assert_eq!(claimed_final, 800i128);
+    assert_eq!(token_client.balance(&recipient), 1000i128);
+}
+
+#[test]
+fn test_stream_cancellation_and_underflow_prevention() {
+    let (env, client, signer1, _, asset1, _, _) = setup();
+    let recipient = Address::generate(&env);
+
+    env.ledger().set_timestamp(100);
+
+    // Create stream: start 100, stop 300, rate 5 per sec, cliff 150, deposit 1000
+    let stream_id = client.create_stream(
+        &signer1, &recipient, &asset1, &1000i128, &100u64, &300u64, &5i128, &150u64,
+    );
+
+    // Cancel before cliff (time 120) - nothing vested / paid out
+    env.ledger().set_timestamp(120);
+    client.cancel_stream(&signer1, &stream_id);
+
+    let stream = client.get_stream(&stream_id).unwrap();
+    assert!(stream.canceled);
+    assert_eq!(stream.claimed_amount, 0i128);
+
+    // Attempting to claim or cancel again returns error
+    assert_eq!(
+        client.try_claim(&recipient, &stream_id),
+        Err(Ok(crate::ContractError::StreamAlreadyCanceled))
+    );
+    assert_eq!(
+        client.try_cancel_stream(&signer1, &stream_id),
+        Err(Ok(crate::ContractError::StreamAlreadyCanceled))
+    );
+
+    // Second stream testing cancellation after cliff
+    env.ledger().set_timestamp(200);
+    let stream_id2 = client.create_stream(
+        &signer1, &recipient, &asset1, &1000i128, &200u64, &400u64, &5i128, &250u64,
+    );
+
+    // Advance to 300 (past cliff of 250) -> 100s * 5 = 500 vested
+    env.ledger().set_timestamp(300);
+    client.cancel_stream(&signer1, &stream_id2);
+
+    let stream2 = client.get_stream(&stream_id2).unwrap();
+    assert!(stream2.canceled);
+    assert_eq!(stream2.claimed_amount, 500i128);
+
+    let token_client = TokenClient::new(&env, &asset1);
+    assert_eq!(token_client.balance(&recipient), 500i128);
+
+    // Underflow test: claimable amount calculation returns 0 without panicking
+    assert_eq!(client.get_claimable_amount(&stream_id2), 0i128);
 }

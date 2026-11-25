@@ -15,6 +15,7 @@ use soroban_sdk::{contracttype, symbol_short, Address, Env, String, Vec};
 
 const CHKPT_CTR: soroban_sdk::Symbol = symbol_short!("CHKP_CTR");
 const DLQ_KEY: soroban_sdk::Symbol = symbol_short!("DLQ");
+const DLQ_CAP_KEY: soroban_sdk::Symbol = symbol_short!("DLQ_CAP");
 const MAX_DLQ_SIZE: u32 = 100;
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -249,6 +250,21 @@ pub fn compact_topic(env: &Env, topic: &String) -> Result<u32, EventError> {
 
 // ── Dead letter queue ────────────────────────────────────────────────────────
 
+pub fn get_dlq_capacity(env: &Env) -> u32 {
+    env.storage()
+        .instance()
+        .get(&DLQ_CAP_KEY)
+        .unwrap_or(MAX_DLQ_SIZE)
+}
+
+pub fn set_dlq_capacity(env: &Env, capacity: u32) -> Result<(), EventError> {
+    if capacity == 0 {
+        return Err(EventError::InvalidInput);
+    }
+    env.storage().instance().set(&DLQ_CAP_KEY, &capacity);
+    Ok(())
+}
+
 /// Push a failed delivery into the dead letter queue.
 pub fn push_dead_letter(
     env: &Env,
@@ -262,8 +278,17 @@ pub fn push_dead_letter(
         .get(&DLQ_KEY)
         .unwrap_or(Vec::new(env));
 
-    if dlq.len() >= MAX_DLQ_SIZE {
-        return Err(EventError::DeadLetterFull);
+    let capacity = get_dlq_capacity(env);
+    if dlq.len() >= capacity {
+        // Capacity eviction: drop oldest dead letter (FIFO)
+        let mut new_dlq = Vec::new(env);
+        for i in 1..dlq.len() {
+            if let Some(entry) = dlq.get(i) {
+                new_dlq.push_back(entry);
+            }
+        }
+        dlq = new_dlq;
+        env.events().publish((symbol_short!("DLQ_EVCT"),), ());
     }
 
     let entry = DeadLetterEntry {

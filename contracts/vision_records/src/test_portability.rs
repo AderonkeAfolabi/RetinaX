@@ -218,6 +218,92 @@ fn expired_grant_is_reported_as_inactive_consent() {
 }
 
 #[test]
+fn cursor_export_pages_over_one_hundred_and_twenty_records() {
+    let (env, client, admin) = setup();
+    let patient = register_user(&env, &client, &admin, Role::Patient, "Patient");
+    let provider = register_user(&env, &client, &admin, Role::Optometrist, "Provider");
+    for _ in 0..120 {
+        add_examination(&env, &client, &provider, &patient);
+    }
+
+    let iop_row = "Intraocular pressure left eye";
+    let mut cursor = Some(0u32);
+    let mut pages = 0;
+    let mut rows = 0;
+    while let Some(at) = cursor {
+        let page =
+            client.export_patient_data_page(&patient, &patient, &PortabilityFormat::Csv, &at, &50);
+        assert_eq!(page.total, 120);
+        rows += bytes_to_text(&page.data).matches(iop_row).count();
+        pages += 1;
+        cursor = page.next_cursor;
+    }
+
+    assert_eq!(pages, 3);
+    assert_eq!(rows, 120);
+}
+
+#[test]
+fn cursor_export_pages_grants_past_the_old_fifty_entry_limit() {
+    let (env, client, admin) = setup();
+    let patient = register_user(&env, &client, &admin, Role::Patient, "Patient");
+    let provider = register_user(&env, &client, &admin, Role::Optometrist, "Provider");
+    add_examination(&env, &client, &provider, &patient);
+    let grantees: alloc::vec::Vec<Address> = (0..60).map(|_| Address::generate(&env)).collect();
+    for grantee in &grantees {
+        client.grant_access(&patient, &patient, grantee, &AccessLevel::Read, &3600);
+    }
+
+    // The offset-based export refuses a grantee list longer than one page.
+    let refused =
+        client.try_export_patient_data(&patient, &patient, &PortabilityFormat::Csv, &0, &50);
+    assert_eq!(refused, Err(Ok(ContractError::InvalidInput)));
+
+    // One record, then 60 grants: the first page holds the record and grants 0..=48.
+    let first =
+        client.export_patient_data_page(&patient, &patient, &PortabilityFormat::Csv, &0, &50);
+    let second =
+        client.export_patient_data_page(&patient, &patient, &PortabilityFormat::Csv, &50, &50);
+    assert_eq!(first.total, 61);
+    assert_eq!(first.next_cursor, Some(50));
+    assert_eq!(second.next_cursor, None);
+
+    let first_text = bytes_to_text(&first.data);
+    let second_text = bytes_to_text(&second.data);
+    for (index, grantee) in grantees.iter().enumerate() {
+        let address = soroban_to_text(&grantee.to_string());
+        if index < 49 {
+            assert!(first_text.contains(&address));
+            assert!(!second_text.contains(&address));
+        } else {
+            assert!(second_text.contains(&address));
+            assert!(!first_text.contains(&address));
+        }
+    }
+}
+
+#[test]
+fn cursor_past_the_end_is_rejected_and_zero_limit_is_refused() {
+    let (env, client, admin) = setup();
+    let patient = register_user(&env, &client, &admin, Role::Patient, "Patient");
+    let provider = register_user(&env, &client, &admin, Role::Optometrist, "Provider");
+    add_examination(&env, &client, &provider, &patient);
+
+    let past_end =
+        client.try_export_patient_data_page(&patient, &patient, &PortabilityFormat::Csv, &2, &50);
+    assert_eq!(past_end, Err(Ok(ContractError::InvalidInput)));
+
+    let zero_limit =
+        client.try_export_patient_data_page(&patient, &patient, &PortabilityFormat::Csv, &0, &0);
+    assert_eq!(zero_limit, Err(Ok(ContractError::InvalidInput)));
+
+    let at_end =
+        client.export_patient_data_page(&patient, &patient, &PortabilityFormat::Csv, &1, &50);
+    assert_eq!(at_end.next_cursor, None);
+    assert_eq!(at_end.total, 1);
+}
+
+#[test]
 fn iso8601_formats_known_timestamps() {
     assert_eq!(iso8601(0), "1970-01-01T00:00:00Z");
     assert_eq!(iso8601(951_782_400), "2000-02-29T00:00:00Z");

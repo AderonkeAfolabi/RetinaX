@@ -245,11 +245,7 @@ pub fn batch_remove_from_whitelist(
 /// * `limit` - The maximum number of entries to return.
 ///
 /// Returns a tuple `(Vec<Address>, u32)` containing the paginated slice and total count.
-pub fn get_whitelisted_addresses(
-    env: &Env,
-    offset: u32,
-    limit: u32,
-) -> (Vec<Address>, u32) {
+pub fn get_whitelisted_addresses(env: &Env, offset: u32, limit: u32) -> (Vec<Address>, u32) {
     let list: Vec<Address> = env
         .storage()
         .persistent()

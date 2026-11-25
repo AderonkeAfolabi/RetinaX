@@ -10,6 +10,7 @@ rust-version.workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [features]
+library = []
 testutils = ["soroban-sdk/testutils"]
 
 [dependencies]
@@ -18,3 +19,5 @@ soroban-sdk = { workspace = true }
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
 identity = { path = "../identity" }
+
+proptest = { workspace = true }

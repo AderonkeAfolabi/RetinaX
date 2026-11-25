@@ -49,7 +49,7 @@ fn register_and_activate_provider(
 
     client.activate_provider(admin, &provider_id_str);
 
-    provider_id_str.to_string()
+    provider_id_str
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -74,7 +74,7 @@ fn test_max_timestamp_in_exchange_record() {
     let record = client.record_data_exchange(
         &admin,
         &exchange_id,
-        &String::from_str(&env, &provider_id),
+        &provider_id,
         &patient_id,
         &ExchangeDirection::Import,
         &DataFormat::FhirR4,
@@ -106,7 +106,7 @@ fn test_zero_timestamp_in_exchange_record() {
     let record = client.record_data_exchange(
         &admin,
         &exchange_id,
-        &String::from_str(&env, &provider_id),
+        &provider_id,
         &patient_id,
         &ExchangeDirection::Export,
         &DataFormat::Hl7V2,
@@ -137,7 +137,7 @@ fn test_timestamp_near_max_boundary() {
     let record = client.record_data_exchange(
         &admin,
         &exchange_id,
-        &String::from_str(&env, &provider_id),
+        &provider_id,
         &patient_id,
         &ExchangeDirection::Import,
         &DataFormat::FhirR4,
@@ -160,7 +160,7 @@ fn test_sequential_timestamp_overflow_handling() {
     let patient_id = String::from_str(&env, "sequential-pat");
 
     // Create exchanges at different timestamps including boundaries
-    let test_timestamps = vec![0u64, 1, u64::MAX / 2, u64::MAX - 1, u64::MAX];
+    let test_timestamps = [0u64, 1, u64::MAX / 2, u64::MAX - 1, u64::MAX];
 
     for (idx, ts) in test_timestamps.iter().enumerate() {
         env.ledger().set_timestamp(*ts);
@@ -170,7 +170,7 @@ fn test_sequential_timestamp_overflow_handling() {
         let record = client.record_data_exchange(
             &admin,
             &exchange_id,
-            &String::from_str(&env, &provider_id),
+            &provider_id,
             &patient_id,
             &ExchangeDirection::Import,
             &DataFormat::FhirR4,
@@ -234,7 +234,7 @@ fn test_large_patient_exchange_count() {
         client.record_data_exchange(
             &admin,
             &exchange_id,
-            &String::from_str(&env, &provider_id),
+            &provider_id,
             &patient_id,
             &ExchangeDirection::Import,
             &DataFormat::FhirR4,
@@ -250,7 +250,7 @@ fn test_large_patient_exchange_count() {
     // Verify each exchange is independently retrievable
     for i in 0..50 {
         let exchange_id = String::from_str(&env, &format!("many-ex-{}", i));
-        let record = client.get_exchange(&exchange_id).expect("Exchange exists");
+        let record = client.get_exchange(&exchange_id);
         assert_eq!(record.patient_id, patient_id);
     }
 }
@@ -273,7 +273,7 @@ fn test_empty_field_in_mapping_underflow() {
     client.create_field_mapping(
         &admin,
         &mapping_id,
-        &String::from_str(&env, &provider_id),
+        &provider_id,
         &source_field,
         &target_field,
         &transform_rule,
@@ -299,7 +299,7 @@ fn test_hash_consistency_at_numeric_boundaries() {
     let record = client.record_data_exchange(
         &admin,
         &exchange_id,
-        &String::from_str(&env, &provider_id),
+        &provider_id,
         &patient_id,
         &ExchangeDirection::Import,
         &DataFormat::FhirR4,
@@ -313,6 +313,7 @@ fn test_hash_consistency_at_numeric_boundaries() {
     let verification_id = String::from_str(&env, "verify-boundary");
     let discrepancies = Vec::new(&env);
 
+    client.update_exchange_status(&admin, &exchange_id, &SyncStatus::InProgress);
     let verification = client.verify_sync(
         &admin,
         &verification_id,
@@ -329,7 +330,7 @@ fn test_hash_consistency_at_numeric_boundaries() {
     let record_2 = client.record_data_exchange(
         &admin,
         &exchange_id_2,
-        &String::from_str(&env, &provider_id),
+        &provider_id,
         &patient_id,
         &ExchangeDirection::Export,
         &DataFormat::Hl7V2,
@@ -369,7 +370,7 @@ fn test_many_providers_list_no_overflow() {
     // Verify each provider is still accessible
     for i in 0..30 {
         let provider_id = String::from_str(&env, &format!("provider-{}", i));
-        let provider = client.get_provider(&provider_id).expect("Provider exists");
+        let provider = client.get_provider(&provider_id);
         assert!(!provider.name.is_empty());
     }
 }
@@ -393,7 +394,7 @@ fn test_exchange_status_transitions_at_boundaries() {
     let record = client.record_data_exchange(
         &admin,
         &exchange_id,
-        &String::from_str(&env, &provider_id),
+        &provider_id,
         &patient_id,
         &ExchangeDirection::Import,
         &DataFormat::FhirR4,
@@ -407,7 +408,7 @@ fn test_exchange_status_transitions_at_boundaries() {
     // Transition through states at boundary
     client.update_exchange_status(&admin, &exchange_id, &SyncStatus::Completed);
 
-    let updated = client.get_exchange(&exchange_id).expect("Exchange exists");
+    let updated = client.get_exchange(&exchange_id);
     assert_eq!(updated.status, SyncStatus::Completed);
     assert_eq!(updated.timestamp, u64::MAX); // Timestamp preserved through transitions
 }
@@ -427,7 +428,7 @@ fn test_verification_with_many_discrepancies() {
     client.record_data_exchange(
         &admin,
         &exchange_id,
-        &String::from_str(&env, &provider_id),
+        &provider_id,
         &patient_id,
         &ExchangeDirection::Import,
         &DataFormat::FhirR4,
@@ -446,6 +447,7 @@ fn test_verification_with_many_discrepancies() {
         ));
     }
 
+    client.update_exchange_status(&admin, &exchange_id, &SyncStatus::InProgress);
     let verification = client.verify_sync(
         &admin,
         &verification_id,
@@ -479,7 +481,7 @@ fn test_timestamp_consistency_across_operations() {
     let record1 = client.record_data_exchange(
         &admin,
         &ex1,
-        &String::from_str(&env, &provider_id),
+        &provider_id,
         &String::from_str(&env, "pat-mono"),
         &ExchangeDirection::Import,
         &DataFormat::FhirR4,
@@ -494,7 +496,7 @@ fn test_timestamp_consistency_across_operations() {
     let record2 = client.record_data_exchange(
         &admin,
         &ex2,
-        &String::from_str(&env, &provider_id),
+        &provider_id,
         &String::from_str(&env, "pat-mono"),
         &ExchangeDirection::Import,
         &DataFormat::FhirR4,
@@ -509,7 +511,7 @@ fn test_timestamp_consistency_across_operations() {
     let record3 = client.record_data_exchange(
         &admin,
         &ex3,
-        &String::from_str(&env, &provider_id),
+        &provider_id,
         &String::from_str(&env, "pat-mono"),
         &ExchangeDirection::Import,
         &DataFormat::FhirR4,
