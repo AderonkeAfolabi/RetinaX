@@ -114,6 +114,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **vision_records:** preserve amended eye examinations as hash-linked versions and expose `get_record_history`
 * **docs:** ADR-0013 — research spike on Ethereum header/receipt verification on Soroban (light client vs optimistic vs ZK) (#469)
+* **zk_verifier:** add `verify_batch` with a configurable max batch size, using a loop-based verification strategy (trade-off documented in `docs/`); benchmarks compare batch vs single verification
 * **ai_integration:** model version pinning per request. Providers record `model_version`, `submit_pinned_analysis_request` refuses a version other than the one pinned, and results carry the version they were made against (#465).
 * **vision_records:** cursor-based bulk patient export through `export_patient_data_page`. Records, prescriptions and grants are paged together, so long lists no longer fail the export (#446).
 * **analytics:** admin-configurable differential-privacy parameters through `set_dp_params` and `get_dp_params`, bounded to epsilon 1 to 10 and sensitivity 1 to 1,000,000 (#463).
