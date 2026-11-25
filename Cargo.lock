@@ -7,6 +7,7 @@ name = "access_control"
 version = "1.2.2"
 dependencies = [
  "common",
+ "proptest",
  "soroban-sdk",
 ]
 
@@ -621,6 +622,7 @@ checksum = "0c9ea0ac24bc397ab3c98583a3c9ba74fa56b09a4449bbe172b9b1ddb016027a"
 name = "common"
 version = "1.2.2"
 dependencies = [
+ "ed25519-dalek",
  "soroban-sdk",
 ]
 
@@ -1481,6 +1483,7 @@ name = "key_manager"
 version = "1.2.2"
 dependencies = [
  "identity",
+ "proptest",
  "soroban-sdk",
 ]
 

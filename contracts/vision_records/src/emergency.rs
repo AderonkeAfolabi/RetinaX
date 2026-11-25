@@ -22,7 +22,7 @@ fn extend_ttl_emergency_key(env: &Env, key: &(Symbol, u64)) {
 }
 
 /// Extends the time-to-live (TTL) for emergency access by patient keys.
-fn extend_ttl_emergency_patient_key(env: &Env, key: &(Symbol, Address, u64)) {
+fn extend_ttl_emergency_patient_key(env: &Env, key: &(Symbol, Address)) {
     env.storage()
         .persistent()
         .extend_ttl(key, TTL_THRESHOLD, TTL_EXTEND_TO);
@@ -75,6 +75,14 @@ pub struct EmergencyAuditEntry {
     pub timestamp: u64,
 }
 
+/// One emergency access to a patient's data, with everything audited under it
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct EmergencyAccessReport {
+    pub access: EmergencyAccess,
+    pub audit_trail: Vec<EmergencyAuditEntry>,
+}
+
 // ── Storage Functions ────────────────────────────────────────
 
 /// Increments and returns the next emergency access ID
@@ -92,9 +100,19 @@ pub fn set_emergency_access(env: &Env, access: &EmergencyAccess) {
     extend_ttl_emergency_key(env, &key);
 
     // Also index by patient for quick lookup
-    let patient_key = (EMRG_PATIENT, access.patient.clone(), access.id);
-    env.storage().persistent().set(&patient_key, &true);
+    let patient_key = (EMRG_PATIENT, access.patient.clone());
+    let mut access_ids = get_patient_access_ids(env, &access.patient);
+    access_ids.push_back(access.id);
+    env.storage().persistent().set(&patient_key, &access_ids);
     extend_ttl_emergency_patient_key(env, &patient_key);
+}
+
+/// IDs of every emergency access ever granted to a patient's data, oldest first
+fn get_patient_access_ids(env: &Env, patient: &Address) -> Vec<u64> {
+    env.storage()
+        .persistent()
+        .get(&(EMRG_PATIENT, patient.clone()))
+        .unwrap_or(Vec::new(env))
 }
 
 /// Retrieves an emergency access grant by ID
@@ -177,6 +195,21 @@ pub fn get_patient_emergency_accesses(env: &Env, patient: &Address) -> Vec<Emerg
         }
     }
     accesses
+}
+
+/// Builds a patient's break-glass report: every emergency access to their data, whatever its status
+/// and whoever requested it, oldest first, each with its audit trail.
+pub fn get_emergency_access_report(env: &Env, patient: &Address) -> Vec<EmergencyAccessReport> {
+    let mut report = Vec::new(env);
+    for access_id in get_patient_access_ids(env, patient).iter() {
+        if let Some(access) = get_emergency_access(env, access_id) {
+            report.push_back(EmergencyAccessReport {
+                access,
+                audit_trail: get_audit_entries(env, access_id),
+            });
+        }
+    }
+    report
 }
 
 // ── Business Logic & Event Emission Functions ─────────────────

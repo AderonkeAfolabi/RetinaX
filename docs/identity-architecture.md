@@ -22,7 +22,7 @@ The identity contract is structured into four primary Rust modules:
 
 ### Credential Lifecycle Management (`credential.rs`)
 - Issuance: Authorized entities issue cryptographic credentials bound to a target DID.
-- Revocation List: On-chain tracking of revoked credential IDs with cryptographic verification support.
+- Revocation Registry (`revocation.rs`): Each issuer owns a bitmap with one bit per credential, addressed by the `revocation_index` in the credential. Only the issuer can set a bit. Neither holders nor credential IDs are stored, because credential IDs are publicly bound to holders.
 - Expiration & Validation: Expiration timestamps and status checks are evaluated on-chain prior to grant execution.
 
 ### Identity Recovery Protocol (`recovery.rs`)

@@ -399,6 +399,34 @@ let verified = client.verify_zk_credential(
 
 ---
 
+### Credential Revocation
+
+Each issuer has its own registry: one bit per credential, addressed by the credential's `revocation_index`. Assign indexes at random and never derive them from the holder, so that a public index does not point to a person.
+
+#### `revoke(env: Env, issuer: Address, index: u64)`
+
+Permanently revoke a credential.
+
+**Parameters:**
+
+- `issuer` - The credential's issuer (must authenticate)
+- `index` - The credential's `revocation_index`
+
+---
+
+#### `is_revoked(env: Env, issuer: Address, index: u64) -> bool`
+
+Check if a credential has been revoked. Anyone can call this.
+
+**Parameters:**
+
+- `issuer` - The credential's issuer
+- `index` - The credential's `revocation_index`
+
+**Returns:** `bool` — true if `issuer` has revoked the credential at `index`
+
+---
+
 ## Data Types
 
 ### Structs
@@ -606,6 +634,7 @@ The contract utilizes Soroban's tiered storage model (`Instance`, `Persistent`, 
 | `(Symbol("REC_THR"), Address)` | Persistent | `u32` | Extended on write | M-of-N threshold required to execute identity recovery. |
 | `(Symbol("REC_REQ"), Address)` | Persistent | `RecoveryRequest` | Extended on write | Active in-flight recovery request for an identity owner. |
 | `(Symbol("HLD_BIND"), Address)` | Persistent | `Vec<BytesN<32>>` | Persistent | List of 32-byte credential IDs bound to this identity DID. |
+| `(Symbol("VC_REVOKE"), Address, u64)` | Persistent | `u128` | Extended on write | Issuer's revocation bitmap: word `n` holds the bits of indexes `128n` to `128n + 127`. |
 | `(Symbol("PREP_ADD_GUARD"), Address, Address)` | Temporary | `PrepareGuardianAddition` | Transaction lifetime | Staged 2PC state for adding a guardian. |
 | `(Symbol("PREP_REM_GUARD"), Address, Address)` | Temporary | `PrepareGuardianRemoval` | Transaction lifetime | Staged 2PC state for removing a guardian. |
 | `(Symbol("PREP_SET_THRESH"), Address)` | Temporary | `PrepareThresholdChange` | Transaction lifetime | Staged 2PC state for modifying recovery threshold. |

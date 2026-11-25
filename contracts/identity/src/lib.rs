@@ -10,10 +10,12 @@
 //! - **Two-Phase Operations**: Offers prepare/commit/rollback workflows for guardian and threshold modifications.
 //! - **ZK Integration**: Connects with `zk_verifier` smart contract for privacy-preserving proof validation.
 //! - **Credential Binding**: Links off-chain/on-chain credentials to identity addresses.
+//! - **Credential Revocation**: Lets issuers revoke credentials without exposing their holders.
 
 pub mod credential;
 pub mod events;
 pub mod recovery;
+pub mod revocation;
 
 use credential::CredentialError;
 use recovery::{RecoveryError, RecoveryRequest};
@@ -703,6 +705,21 @@ impl IdentityContract {
         creds.contains(&credential_id)
     }
 
+    // ── Credential revocation ────────────────────────────────────────────────
+
+    /// Permanently revoke the credential at `index` of the issuer's own registry.
+    ///
+    /// Every issuer has a separate registry, so an issuer can only revoke credentials it issued.
+    pub fn revoke(env: Env, issuer: Address, index: u64) {
+        issuer.require_auth();
+        revocation::revoke(&env, &issuer, index);
+    }
+
+    /// Check if `issuer` has revoked its credential at `index`.
+    pub fn is_revoked(env: Env, issuer: Address, index: u64) -> bool {
+        revocation::is_revoked(&env, &issuer, index)
+    }
+
     // ── Internal helpers ─────────────────────────────────────────────────────
 
     /// Move credential bindings from a recovered identity to its new address.
@@ -724,6 +741,18 @@ impl IdentityContract {
             env.storage().persistent().set(&to_key, &merged);
             env.storage().persistent().remove(&from_key);
         }
+    }
+
+    /// Revoke a credential by its index. Only the issuer can revoke.
+    pub fn revoke(env: Env, issuer: Address, index: u64) -> Result<(), CredentialError> {
+        issuer.require_auth();
+        revocation::revoke(&env, &issuer, index);
+        Ok(())
+    }
+
+    /// Check if a credential has been revoked by its issuer.
+    pub fn is_revoked(env: Env, issuer: Address, index: u64) -> bool {
+        revocation::is_revoked(&env, &issuer, index)
     }
 
     fn require_active_owner(env: &Env, caller: &Address) -> Result<(), RecoveryError> {

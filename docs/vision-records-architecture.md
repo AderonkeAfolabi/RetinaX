@@ -207,7 +207,7 @@ flowchart TD
 | `(CONSENT, patient, grantee)` | Persistent | Consent grants |
 | `(USER, address)` | Persistent | User registration data |
 | `(EMRG_ACC, id)` | Persistent | Emergency access grants |
-| `(EMRG_PAT, patient, id)` | Persistent | Emergency access by patient |
+| `(EMRG_PAT, patient)` | Persistent | Patient's emergency access ID list |
 | `ADMIN` | Instance | Contract admin address |
 | `PEND_ADM` | Instance | Pending admin transfer |
 | `INIT` | Instance | Initialization flag |

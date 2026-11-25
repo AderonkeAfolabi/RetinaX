@@ -354,6 +354,35 @@ assigns registered tenants to plans.
 `price_per_cycle` is added to the postpaid invoice of every cycle the tenant is on the plan, even when the tenant used
 no gas. Prepaid tenants keep paying for gas from their balance, and the base charge does not change that.
 
+### Usage History (#532)
+
+Every `record_gas` call adds an entry to the history of the tenant and of each of its ancestors, with the operation, the
+gas units charged for it and the time.
+
+- `get_usage_history(tenant, limit: Option<u32>, before: Option<u64>) -> Result<UsageHistoryPage, MeteringError>`: newest
+  first, paginated like `GET /api/audit-logs/{patient_id}`. `limit` is 1 to 200 (default 50). Pass a page's `next_cursor`
+  as `before` to get the next page; it is `None` on the last page. Entry IDs are never reused, so a cursor stays valid
+  while entries are added or evicted. `InvalidInput` if `limit` or `before` is out of range.
+- `set_history_cap(caller, cap: u32)`: admin only. Entries kept per tenant, 1 to 200 (default 32).
+
+**Design.** The history shares the ledger entry of the tenant's usage counters, so recording adds bytes but no second
+write. When the cap is reached, the oldest entries are dropped on the same write. A lowered cap hides older entries at
+once, and each tenant's stored entry shrinks on its next write.
+
+**Cost** of one `record_gas` with a full history at the default cap, measured with `env.cost_estimate()` (soroban-sdk
+25.1.1, native contract, so without Wasm execution):
+
+| Tenant levels | Write entries | Write bytes | CPU instructions | Fee (stroops) |
+| ------------- | ------------- | ----------- | ---------------- | ------------- |
+| 1, before     | 2             | 368         | 153,992          | 1,313,309     |
+| 1, after      | 2             | 2,528       | 320,174          | 1,321,108     |
+| 4, before     | 5             | 1,256       | 502,983          | 1,374,287     |
+| 4, after      | 5             | 9,896       | 1,167,711        | 1,405,481     |
+
+Until a tenant's history is full, each entry also pays rent for its 64 bytes (about 2.26 million stroops in the same
+estimate). `open_billing_cycle` rewrites every tenant's entry: with 45 full histories it writes 111,216 bytes of the
+132,096 allowed per transaction at the default cap, and at a cap of 200 only 9 tenants fit.
+
 ## Data Types
 
 ### Plan

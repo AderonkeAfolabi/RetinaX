@@ -6,6 +6,10 @@
 * **offchain-server:** add cursor pagination and Stellar Ed25519 signature header authentication for `/api/audit-logs` ([#472](https://github.com/RetinaX-Org/RetinaX/issues/472))
 * **offchain-server:** add OpenAPI 3.0 specification, Swagger UI documentation at `/docs`, and database migration tooling ([#473](https://github.com/RetinaX-Org/RetinaX/issues/473))
 * **website:** audit and enforce WCAG 2.1 AA compliant color contrast tokens for light and dark themes ([#474](https://github.com/RetinaX-Org/RetinaX/issues/474))
+* **vision_records:** add `get_emergency_access_report` so patients can list every emergency access to their data ([#448](https://github.com/RetinaX-Org/RetinaX/issues/448))
+* **identity:** add a verifiable credential revocation registry (`revoke`, `is_revoked`) that does not expose holders ([#450](https://github.com/RetinaX-Org/RetinaX/issues/450))
+* **metering:** add bounded per-tenant usage history with FIFO eviction, paginated queries, and configurable cap ([#532](https://github.com/RetinaX-Org/RetinaX/issues/532))
+* **offchain-server:** test that every error response uses a consistent JSON shape ([#528](https://github.com/RetinaX-Org/RetinaX/issues/528))
 
 ## 1.0.0 (2026-02-21)
 
