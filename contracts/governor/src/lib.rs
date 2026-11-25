@@ -1,9 +1,11 @@
 #![no_std]
+// Retain the existing Soroban event topics and payload layouts for deployed consumers.
+#![allow(deprecated)]
 #![allow(clippy::too_many_arguments)]
 
 //! # Governor DAO
 //!
-//! A governance contract for the Teye contract ecosystem featuring:
+//! A governance contract for the RetinaX contract ecosystem featuring:
 //!
 //! - **Quadratic voting**: `vote_power = sqrt(staked_tokens) × loyalty_multiplier`
 //! - **Time-weighted influence**: stakers who hold longer earn up to 2× vote weight
@@ -28,9 +30,8 @@ use delegation::Delegation;
 use execution::timelock_duration;
 use proposal::{
     default_category_config, load as load_proposal, load_supply_snapshot, next_id,
-    pass_threshold_bps, quorum_bps, store as store_proposal, store_supply_snapshot,
-    veto_threshold_bps, CategoryConfig, Proposal, ProposalAction, ProposalCategory, ProposalPhase,
-    ProposalType,
+    store as store_proposal, store_supply_snapshot, veto_threshold_bps, CategoryConfig, Proposal,
+    ProposalAction, ProposalCategory, ProposalPhase, ProposalType,
 };
 use voting::{
     compute_vote_power, has_committed, has_voted, load_commit, store_commit, store_vote,
@@ -107,9 +108,9 @@ impl GovernorContract {
 
     /// Bootstrap the governor.
     ///
-    /// * `staking_contract`  — address of the Teye staking contract; queried
+    /// * `staking_contract`  — address of the RetinaX staking contract; queried
     ///                         for each voter's staked balance and stake age.
-    /// * `treasury_contract` — address of the Teye treasury contract; called
+    /// * `treasury_contract` — address of the RetinaX treasury contract; called
     ///                         for TreasurySpend proposals.
     /// * `total_vote_supply` — total token supply used to compute quorum
     ///                         percentages (can be updated by admin later).
@@ -444,10 +445,9 @@ impl GovernorContract {
             return Err(ContractError::WrongPhase);
         }
         // During timelock only Veto reveals are accepted.
-        if matches!(proposal.phase, ProposalPhase::Timelock) {
-            if !matches!(choice, VoteChoice::Veto) {
-                return Err(ContractError::WrongPhase);
-            }
+        if matches!(proposal.phase, ProposalPhase::Timelock) && !matches!(choice, VoteChoice::Veto)
+        {
+            return Err(ContractError::WrongPhase);
         }
 
         if has_voted(&env, proposal_id, &voter) {
@@ -813,7 +813,7 @@ impl GovernorContract {
     fn hash_commitment(
         env: &Env,
         proposal_id: u64,
-        voter: &Address,
+        _voter: &Address,
         choice: &VoteChoice,
         salt: &BytesN<32>,
     ) -> BytesN<32> {

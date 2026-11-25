@@ -30,8 +30,11 @@ Welcome to the RetinaX documentation. This index groups every guide by the audie
 - [AI Integration](ai_integration.md) — AI oracle integration, verification, and anomaly flags.
 - [Analytics](analytics.md) — On-chain analytics design and aggregate reporting.
 - [Governance](governance.md) — Governor, timelock, and admin tier governance model.
+- [Timelock Guide](timelock.md) — Timelock contract guide, queue lifecycle, and error reference.
 - [Staking](staking.md) — Staking model and validator/reward mechanics.
 - [Treasury](treasury.md) — Treasury controls, multisig, and fund management.
+- [Vault Guide](vault.md) — Vault contract, multi-guardian thresholds, and deadman grace period.
+- [State Channel Design](state_channel.md) — State channel forced settlement, dispute window, and fraud proofs.
 - [ADR Template](adr/0000-template.md) — Template for recording architecture decisions.
 - [ADR 0001: Storage Design](adr/0001-storage-design.md) — Storage layout and key design decision.
 - [ADR 0002: Access Control Design](adr/0002-access-control-design.md) — Access-control model decision.
@@ -68,9 +71,11 @@ Welcome to the RetinaX documentation. This index groups every guide by the audie
 - [FHIR API](api/fhir.md) — FHIR resource registration and validation API reference.
 - [Governor API](api/governor.md) — Proposal, voting, and execution API reference.
 - [Identity API](api/identity.md) — DID, credential, and recovery API reference.
+- [DID Resolution](did-resolution.md) — How on-chain DID state maps to W3C DID documents.
 - [Metering API](api/metering.md) — Metering and rate-limit API reference.
 - [Staking API](api/staking.md) — Staking, rewards, and tier API reference.
 - [Treasury API](api/treasury.md) — Treasury transfer and multisig API reference.
+- [Vault API](api/vault.md) — Key custody and multi-asset vault accounting API reference.
 - [ZK Verifier API](api/zk_verifier.md) — Proof verification and verifier management API reference.
 - [ZK Voting API](api/zk_voting.md) — Private voting and proof verification API reference.
 - [SDK Home](sdk/README.md) — Overview of available RetinaX SDK packages.
@@ -108,7 +113,7 @@ Welcome to the RetinaX documentation. This index groups every guide by the audie
 - [Emergency Contacts](emergency-contacts.md) — Escalation contacts for urgent incidents.
 - [Release Management](release-management.md) — Release planning, tagging, and rollout process.
 - [RBAC Quick Reference](rbac-quick-reference.md) — Fast reference for role and permission operations.
-- [Rate Limiting](rate-limiting.md) — Rate-limit configuration and monitoring guidance.
+- [Rate Limiting](security/rate-limiting.md) — Rate-limit configuration and monitoring guidance.
 
 ## Auditors
 

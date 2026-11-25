@@ -21,10 +21,9 @@ use soroban_sdk::{
 };
 
 use crate::{
-    delegation,
     proposal::{ProposalAction, ProposalPhase, ProposalType},
     voting::{compute_vote_power, isqrt, loyalty_multiplier_scaled, VoteChoice, SCALE},
-    ContractError, GovernorContract, GovernorContractClient,
+    GovernorContract, GovernorContractClient,
 };
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
@@ -34,7 +33,7 @@ fn create_env() -> Env {
 }
 
 fn register_governor(env: &Env) -> (Address, GovernorContractClient<'_>) {
-    let contract_id = env.register_contract(None, GovernorContract);
+    let contract_id = env.register(GovernorContract, ());
     let client = GovernorContractClient::new(env, &contract_id);
     (contract_id, client)
 }
@@ -630,11 +629,10 @@ fn test_emergency_veto_guardian() {
     let env = create_env();
     env.mock_all_auths();
     let (contract_id, client) = register_governor(&env);
-    default_init(&env, &client);
-
     let admin = Address::generate(&env);
-    // Replace admin with test admin
-    env.storage().instance().set(&crate::ADMIN, &admin);
+    let staking = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    client.initialize(&admin, &staking, &treasury, &500i128);
 
     let guardian = Address::generate(&env);
     let attacker = Address::generate(&env);
@@ -696,7 +694,9 @@ fn test_proposal_category_config() {
     default_init(&env, &client);
 
     let admin = Address::generate(&env);
-    env.storage().instance().set(&crate::ADMIN, &admin);
+    env.as_contract(&contract_id, || {
+        env.storage().instance().set(&crate::ADMIN, &admin)
+    });
 
     // Configure ContractUpgrade category with 35% quorum and 66% threshold
     client.set_category_config(

@@ -22,6 +22,7 @@ pub mod prescription;
 pub mod provider;
 pub mod rate_limit;
 pub mod rbac;
+pub mod retention;
 pub mod validation;
 
 mod types;
@@ -48,15 +49,19 @@ use soroban_sdk::{
     contract, contractimpl, symbol_short, Address, Bytes, BytesN, Env, String, Symbol, Vec,
 };
 
-use teye_common::lineage::{self, RelationshipKind};
-use teye_common::provenance_graph::{self, LineageAccessResult, ProvenanceExport};
-use teye_common::state_machine::{
+use retinax_common::lineage::{self, RelationshipKind};
+use retinax_common::provenance_graph::{self, LineageAccessResult, ProvenanceExport};
+use retinax_common::state_machine::{
     self, EntityKind, LifecycleState, TransitionContext, TransitionRecord,
 };
-use teye_common::{
+use retinax_common::{
     admin_tiers, concurrency::ConflictEntry, concurrency::FieldChange,
     concurrency::ResolutionStrategy, progressive_auth, risk_engine, session, whitelist, AdminTier,
-    KeyManager, MeteringOpType, UpdateOutcome, VersionStamp,
+    MeteringOpType, UpdateOutcome, VersionStamp,
+};
+use teye_common::{
+    keys::memory::{hex_to_bytes, KeyManager},
+    soroban_str_to_std,
 };
 
 /// Re-export the contract-specific error type at the crate root.
@@ -72,8 +77,8 @@ pub use errors::{create_error_context, log_error};
 pub use audit::{AccessAction, AccessResult};
 pub use emergency::{EmergencyAccess, EmergencyAuditEntry, EmergencyCondition, EmergencyStatus};
 pub use examination::{
-    EyeExamination, IntraocularPressure, OptFundusPhotography, OptRetinalImaging, OptVisualField,
-    SlitLampFindings, VisualAcuity,
+    ExaminationVersion, EyeExamination, IntraocularPressure, OptFundusPhotography,
+    OptRetinalImaging, OptVisualField, SlitLampFindings, VisualAcuity,
 };
 pub use insurance::{InsuranceInfo, OptionalInsuranceInfo};
 pub use patient_profile::{EmergencyContact, OptionalEmergencyContact, PatientProfile};
@@ -147,8 +152,8 @@ fn rate_limit_action_hash(
 fn encryption_key_action_hash(env: &Env, version: &String, key: &String) -> BytesN<32> {
     let mut payload = Bytes::new(env);
     payload.append(&Bytes::from_slice(env, b"SET_ENC"));
-    let version_std = version.to_string();
-    let key_std = key.to_string();
+    let version_std = soroban_str_to_std(version);
+    let key_std = soroban_str_to_std(key);
     payload.append(&Bytes::from_slice(env, version_std.as_bytes()));
     payload.append(&Bytes::from_slice(env, key_std.as_bytes()));
     env.crypto().sha256(&payload).into()
@@ -181,7 +186,7 @@ pub struct VisionRecordsContract;
 #[allow(clippy::too_many_arguments)]
 impl VisionRecordsContract {
     fn meter_op(_env: &Env, _caller: &Address, _op_type: MeteringOpType) {
-        // Simple mock since metering is not fully implemented in teye_common yet or it was removed.
+        // Simple mock since metering is not fully implemented in retinax_common yet or it was removed.
     }
 
     fn emit_access_violation(env: &Env, caller: &Address, action: &str, required_permission: &str) {
@@ -289,7 +294,7 @@ impl VisionRecordsContract {
 
     #[allow(dead_code)]
     fn parse_key_version_u32(version: &String) -> Option<u32> {
-        version.to_string().parse::<u32>().ok()
+        soroban_str_to_std(version).parse::<u32>().ok()
     }
 
     fn enforce_rate_limit(env: &Env, caller: &Address) -> Result<(), ContractError> {
@@ -363,10 +368,12 @@ mod prescription_tests;
 #[cfg(test)]
 mod test_archive;
 #[cfg(test)]
-mod test_portability;
-#[cfg(test)]
 mod test_insurance_endpoints;
 #[cfg(test)]
 mod test_multisig;
 #[cfg(test)]
+mod test_portability;
+#[cfg(test)]
 mod test_rate_limit_bypass;
+#[cfg(test)]
+mod test_retention;

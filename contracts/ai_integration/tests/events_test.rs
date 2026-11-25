@@ -81,6 +81,7 @@ fn test_emits_expected_events_for_standard_flow() {
         &String::from_str(&env, "sha256:endpoint-v7"),
     );
     let expected_provider = AiProvider {
+        model_version: 1,
         provider_id: 7,
         operator: operator.clone(),
         name: String::from_str(&env, "Provider Event"),
@@ -104,6 +105,8 @@ fn test_emits_expected_events_for_standard_flow() {
         &String::from_str(&env, "retina_triage"),
     );
     let expected_request = AnalysisRequest {
+        model_version: 1,
+        pinned_model_version: None,
         request_id,
         provider_id: 7,
         requester: requester.clone(),
@@ -129,6 +132,7 @@ fn test_emits_expected_events_for_standard_flow() {
     );
     assert_eq!(status, RequestStatus::Completed);
     let expected_stored_result = AnalysisResult {
+        model_version: 1,
         request_id,
         provider_id: 7,
         output_hash: String::from_str(&env, "sha256:output-501"),
@@ -153,6 +157,7 @@ fn test_emits_expected_events_for_standard_flow() {
         &String::from_str(&env, "sha256:verify-501"),
     );
     let expected_verified_result = AnalysisResult {
+        model_version: 1,
         request_id,
         provider_id: 7,
         output_hash: String::from_str(&env, "sha256:output-501"),
@@ -204,6 +209,7 @@ fn test_emits_flagged_and_rejected_result_events() {
     );
     assert_eq!(status, RequestStatus::Flagged);
     let expected_stored_result = AnalysisResult {
+        model_version: 1,
         request_id,
         provider_id: 11,
         output_hash: String::from_str(&env, "sha256:output-777"),
@@ -228,6 +234,7 @@ fn test_emits_flagged_and_rejected_result_events() {
         &String::from_str(&env, "sha256:verify-777"),
     );
     let expected_verified_result = AnalysisResult {
+        model_version: 1,
         request_id,
         provider_id: 11,
         output_hash: String::from_str(&env, "sha256:output-777"),

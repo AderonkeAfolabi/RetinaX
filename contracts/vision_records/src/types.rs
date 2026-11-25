@@ -113,6 +113,7 @@ pub struct VisionRecord {
     pub key_version: Option<String>,
     pub created_at: u64,
     pub updated_at: u64,
+    pub retain_until: Option<u64>,
 }
 
 /// Access grant structure

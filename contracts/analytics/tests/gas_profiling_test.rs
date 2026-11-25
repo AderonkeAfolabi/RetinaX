@@ -264,11 +264,7 @@ fn bench_cross_period_comparison_h1_vs_h2() {
     });
 
     // Both halves must have equal cost ± 10 % (symmetric workload).
-    let diff = if cpu_h1 > cpu_h2 {
-        cpu_h1 - cpu_h2
-    } else {
-        cpu_h2 - cpu_h1
-    };
+    let diff = cpu_h1.abs_diff(cpu_h2);
     let tolerance = cpu_h1 / 10;
     std::println!("[REGRESSION] cross_period_symmetry: h1={cpu_h1}, h2={cpu_h2}, diff={diff}, tol={tolerance}");
     assert!(
@@ -312,11 +308,7 @@ fn bench_cross_period_comparison_year_vs_year() {
     );
 
     // Both full-year queries must have equal cost ± 10 %.
-    let diff = if cpu_a > cpu_b {
-        cpu_a - cpu_b
-    } else {
-        cpu_b - cpu_a
-    };
+    let diff = cpu_a.abs_diff(cpu_b);
     let tolerance = cpu_a / 10;
     assert!(
         diff <= tolerance,

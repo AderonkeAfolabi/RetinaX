@@ -435,8 +435,8 @@ fuzz_target!(|operations: Vec<DosOperation>| {
 
 - [Rate Limiting Best Practices](https://stripe.com/blog/rate-limiters)
 - [Circuit Breaker Pattern](https://martinfowler.com/bliki/CircuitBreaker.html)
-- [DoS Attack Mitigation](https://owasp.org/www-project-ddos-protection/)
-- [Reentrancy Attacks](https://consensys.github.io/smart-contract-best-practices/attacks/reentrancy/)
+- DoS Attack Mitigation
+- Reentrancy Attacks
 
 ---
 

@@ -86,8 +86,8 @@ fn test_state_unchanged_after_failed_reinitialize() {
     let hash = String::from_str(&env, "sha256:abc");
     client.register_schema(&admin, &topic, &1, &hash);
     let payload = String::from_str(&env, "p");
-    client.publish_event(&admin, &topic, &1, &payload);
-    client.publish_event(&admin, &topic, &1, &payload);
+    client.publish_event(&admin, &topic, &1, &payload, &None);
+    client.publish_event(&admin, &topic, &1, &payload, &None);
 
     let count_before = client.get_event_count();
 
@@ -132,7 +132,7 @@ fn test_is_initialized_after_initialize() {
 /// After initialize(), get_admin() must return the exact address passed in.
 #[test]
 fn test_admin_set_correctly_on_initialize() {
-    let (env, client, admin) = setup();
+    let (_env, client, admin) = setup();
     let stored_admin = client.get_admin();
     assert_eq!(
         stored_admin, admin,
@@ -227,7 +227,7 @@ fn test_publish_before_initialize_fails() {
     let topic = String::from_str(&env, "records.vision.create");
     let payload = String::from_str(&env, "p");
 
-    let result = client.try_publish_event(&caller, &topic, &1, &payload);
+    let result = client.try_publish_event(&caller, &topic, &1, &payload, &None);
     match result {
         Err(Ok(e)) => assert_eq!(e, EventError::NotInitialized),
         _ => panic!("Expected NotInitialized error"),

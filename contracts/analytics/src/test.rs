@@ -126,10 +126,22 @@ fn dp_params_default_until_the_admin_sets_them() {
 fn dp_params_outside_the_bounds_are_rejected_and_leave_the_old_values() {
     let (_env, client, _admin, _aggregator) = setup();
 
-    assert_eq!(client.try_set_dp_params(&0, &10), Err(Ok(ContractError::InvalidInput)));
-    assert_eq!(client.try_set_dp_params(&11, &10), Err(Ok(ContractError::InvalidInput)));
-    assert_eq!(client.try_set_dp_params(&1, &0), Err(Ok(ContractError::InvalidInput)));
-    assert_eq!(client.try_set_dp_params(&1, &1_000_001), Err(Ok(ContractError::InvalidInput)));
+    assert_eq!(
+        client.try_set_dp_params(&0, &10),
+        Err(Ok(ContractError::InvalidInput))
+    );
+    assert_eq!(
+        client.try_set_dp_params(&11, &10),
+        Err(Ok(ContractError::InvalidInput))
+    );
+    assert_eq!(
+        client.try_set_dp_params(&1, &0),
+        Err(Ok(ContractError::InvalidInput))
+    );
+    assert_eq!(
+        client.try_set_dp_params(&1, &1_000_001),
+        Err(Ok(ContractError::InvalidInput))
+    );
 
     let unchanged = client.get_dp_params();
     assert_eq!(unchanged.epsilon, 1);
@@ -163,7 +175,10 @@ fn aggregate_noise_follows_the_configured_parameters() {
     client.set_dp_params(&1, &10);
     client.aggregate_records(&aggregator, &kind, &other, &records);
     let noisy = client.get_metric(&kind, &other).sum;
-    assert!((5..=25).contains(&noisy), "noisy sum {noisy} outside 15 +/- 10");
+    assert!(
+        (5..=25).contains(&noisy),
+        "noisy sum {noisy} outside 15 +/- 10"
+    );
 }
 
 #[test]

@@ -86,8 +86,8 @@ mod hierarchy;
 mod rotation;
 
 use soroban_sdk::{
-    contract, contractclient, contracterror, contractimpl, contracttype, symbol_short, Address,
-    Bytes, BytesN, Env, Symbol, Vec,
+    contractclient, contracterror, contracttype, symbol_short, Address, Bytes, BytesN, Env, Symbol,
+    Vec,
 };
 
 #[contractclient(name = "IdentityContractClient")]
@@ -304,10 +304,16 @@ pub enum ContractError {
 }
 
 /// Main contract implementation for hierarchical key management.
-#[contract]
+#[cfg_attr(
+    not(all(target_family = "wasm", feature = "library")),
+    soroban_sdk::contract
+)]
 pub struct KeyManagerContract;
 
-#[contractimpl]
+#[cfg_attr(
+    not(all(target_family = "wasm", feature = "library")),
+    soroban_sdk::contractimpl
+)]
 #[allow(clippy::too_many_arguments)]
 impl KeyManagerContract {
     /// Initialize the contract with admin and identity contract.
@@ -900,7 +906,7 @@ impl KeyManagerContract {
         }
 
         let now = env.ledger().timestamp();
-        if now < request.execute_after {
+        if now <= request.execute_after {
             return Err(ContractError::CooldownNotExpired);
         }
 
@@ -922,6 +928,59 @@ impl KeyManagerContract {
         );
 
         Ok(next_version)
+    }
+
+    /// Cancel an active recovery request.
+    ///
+    /// Can be called by the key owner or contract admin to abort a pending recovery.
+    ///
+    /// # Arguments
+    /// * `caller` - Key owner or admin
+    /// * `key_id` - Key whose recovery to cancel
+    ///
+    /// # Errors
+    /// * [`ContractError::KeyNotFound`] - Key doesn't exist
+    /// * [`ContractError::Unauthorized`] - Caller is not owner or admin
+    /// * [`ContractError::RecoveryNotActive`] - No active recovery request
+    ///
+    /// # Events
+    /// * `AUDIT` - Published with action `REC_CAN`
+    pub fn cancel_recovery(
+        env: Env,
+        caller: Address,
+        key_id: BytesN<32>,
+    ) -> Result<(), ContractError> {
+        caller.require_auth();
+        let record = Self::load_key_record(&env, &key_id)?;
+        Self::require_owner_or_admin(&env, &caller, &record.owner)?;
+
+        let key = (RECOVERY, key_id.clone());
+        if !env.storage().persistent().has(&key) {
+            return Err(ContractError::RecoveryNotActive);
+        }
+
+        env.storage().persistent().remove(&key);
+
+        Self::audit(
+            &env,
+            caller,
+            symbol_short!("REC_CAN"),
+            Some(key_id),
+            &record.id,
+        );
+
+        Ok(())
+    }
+
+    /// Get an active recovery request for a key.
+    ///
+    /// # Arguments
+    /// * `key_id` - Key to query
+    ///
+    /// # Returns
+    /// The pending recovery request if one is active, None otherwise
+    pub fn get_recovery_request(env: Env, key_id: BytesN<32>) -> Option<RecoveryRequest> {
+        env.storage().persistent().get(&(RECOVERY, key_id))
     }
 
     /// Get a key's metadata record.
@@ -1193,4 +1252,21 @@ impl KeyManagerContract {
         data.extend_from_array(&request.approvals.len().to_be_bytes());
         env.crypto().sha256(&data).into()
     }
+}
+
+#[cfg(all(target_family = "wasm", feature = "library"))]
+#[contractclient(name = "KeyManagerContractClient")]
+#[allow(dead_code)]
+pub trait KeyManagerInterface {
+    fn derive_record_key(
+        env: Env,
+        key_id: BytesN<32>,
+        record_id: u64,
+    ) -> Result<DerivedKey, ContractError>;
+    fn derive_record_key_with_version(
+        env: Env,
+        key_id: BytesN<32>,
+        record_id: u64,
+        version: u32,
+    ) -> Result<DerivedKey, ContractError>;
 }

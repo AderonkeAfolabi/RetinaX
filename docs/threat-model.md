@@ -39,6 +39,9 @@ This document applies the STRIDE (Spoofing, Tampering, Repudiation, Information 
 | Tamper with staking balances or reward rate | Staking | State in contract only; admin rate/lock changes via timelock and optional multisig. | Low |
 | Tamper with recovery state | Identity | Guardian list and recovery request stored on-chain; only owner/guardians can change. | Low |
 | Upgrade contract to malicious WASM | All | Stellar upgrade flow; governance should require multisig or DAO. | Depends on deployment governance |
+| Executor submits forged result with fake proof | Delegation | `verify_execution_proof` cryptographically verifies `proof == SHA-256(input || result)`; `update_task` asserts verification before allowing `Completed` status; failed proofs slash executor reputation and emit `TSK_REJ` event. | Low |
+| Executor submits mismatched result (right task ID, wrong output) | Delegation | Proof computation strictly binds `input_data` and `result`; mismatched output hashes fail verification, resulting in task `Failed` status and executor slashing. | Low |
+| Closing counterparty submits stale state during unilateral close | State Channel | Configurable dispute window permits counterparty to submit fraud proof (`nonce > current_nonce`) to override stale state; invalid disputes incur capacity penalties. | Low |
 
 ---
 
@@ -76,6 +79,7 @@ This document applies the STRIDE (Spoofing, Tampering, Repudiation, Information 
 | Pause entire contract | Vision records | Circuit breaker can pause by scope (e.g. function); only authorized admin. | Operational (admin can DoS intentionally) |
 | Lock period or reward rate set to extreme values | Staking | Admin-controlled; multisig and timelock reduce single-point abuse. | Low |
 | Guardian list or recovery stuck | Identity | Max 5 guardians; owner can cancel recovery; threshold must be ≤ guardian count. | Low |
+| Counterparty stalls or disappears to permanently lock channel funds | State Channel | Forced settlement protocol via `unilateral_close` enforces a finite dispute window; upon expiry, `settle()` closes channel and finalizes balances without requiring counterparty response. | Low |
 
 ---
 

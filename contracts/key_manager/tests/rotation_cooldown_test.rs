@@ -7,7 +7,9 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use key_manager::{ContractError, KeyManagerContract, KeyManagerContractClient, KeyPolicy, KeyType};
+use key_manager::{
+    ContractError, KeyManagerContract, KeyManagerContractClient, KeyPolicy, KeyType,
+};
 use soroban_sdk::{testutils::Address as _, testutils::Ledger, Address, BytesN, Env, Vec};
 
 const INTERVAL: u64 = 3_600;

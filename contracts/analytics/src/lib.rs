@@ -225,13 +225,15 @@ impl AnalyticsContract {
         if !DifferentialPrivacy::validate(epsilon, sensitivity) {
             return Err(ContractError::InvalidInput);
         }
-        env.storage()
-            .instance()
-            .set(&DP_PARAMS, &DpParams { epsilon, sensitivity });
-        env.events().publish(
-            (symbol_short!("DP_SET"), admin),
-            (epsilon, sensitivity),
+        env.storage().instance().set(
+            &DP_PARAMS,
+            &DpParams {
+                epsilon,
+                sensitivity,
+            },
         );
+        env.events()
+            .publish((symbol_short!("DP_SET"), admin), (epsilon, sensitivity));
         Ok(())
     }
 

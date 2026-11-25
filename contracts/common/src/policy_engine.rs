@@ -456,7 +456,16 @@ mod tests {
     use super::*;
     use crate::policy_dsl::*;
     use soroban_sdk::testutils::Address as _;
-    use soroban_sdk::{Address, Env, String, Vec};
+    use soroban_sdk::{contract, Address, Env, String, Vec};
+
+    /// Storage APIs require a contract context; run `f` inside a throwaway one.
+    #[contract]
+    struct MockContract;
+
+    fn with_contract<F: FnOnce() -> R, R>(env: &Env, f: F) -> R {
+        let contract_id = env.register(MockContract, ());
+        env.as_contract(&contract_id, f)
+    }
 
     fn test_ctx(env: &Env) -> EvalContext {
         let subject = Address::generate(env);
@@ -670,95 +679,109 @@ mod tests {
     #[test]
     fn store_and_evaluate_policy() {
         let env = Env::default();
-        let ctx = test_ctx(&env);
+        with_contract(&env, || {
+            let ctx = test_ctx(&env);
 
-        let policy = make_policy_def(
-            &env,
-            "allow_doctors",
-            PolicyRule::Allow,
-            PolicyEffect::Permit,
-            1,
-        );
-        store_policy(&env, &policy);
+            let policy = make_policy_def(
+                &env,
+                "allow_doctors",
+                PolicyRule::Allow,
+                PolicyEffect::Permit,
+                1,
+            );
+            store_policy(&env, &policy);
 
-        let result = evaluate(&env, &ctx);
-        assert_eq!(result.effect, PolicyEffect::Permit);
+            let result = evaluate(&env, &ctx);
+            assert_eq!(result.effect, PolicyEffect::Permit);
+        });
     }
 
     #[test]
     fn store_and_remove_policy() {
         let env = Env::default();
-        let ctx = test_ctx(&env);
+        with_contract(&env, || {
+            let ctx = test_ctx(&env);
 
-        let policy = make_policy_def(&env, "temp", PolicyRule::Allow, PolicyEffect::Permit, 1);
-        store_policy(&env, &policy);
-        assert_eq!(list_policies(&env).len(), 1);
+            let policy = make_policy_def(&env, "temp", PolicyRule::Allow, PolicyEffect::Permit, 1);
+            store_policy(&env, &policy);
+            assert_eq!(list_policies(&env).len(), 1);
 
-        remove_policy(&env, &policy.id);
-        assert!(list_policies(&env).is_empty());
+            remove_policy(&env, &policy.id);
+            assert!(list_policies(&env).is_empty());
 
-        // Evaluate with no policies -> default deny
-        let result = evaluate(&env, &ctx);
-        assert_eq!(result.effect, PolicyEffect::Deny);
+            // Evaluate with no policies -> default deny
+            let result = evaluate(&env, &ctx);
+            assert_eq!(result.effect, PolicyEffect::Deny);
+        });
     }
 
     #[test]
     fn cached_evaluation_returns_same_result() {
         let env = Env::default();
-        let ctx = test_ctx(&env);
+        with_contract(&env, || {
+            let ctx = test_ctx(&env);
 
-        let policy = make_policy_def(&env, "cached", PolicyRule::Allow, PolicyEffect::Permit, 1);
-        store_policy(&env, &policy);
+            let policy =
+                make_policy_def(&env, "cached", PolicyRule::Allow, PolicyEffect::Permit, 1);
+            store_policy(&env, &policy);
 
-        let hint = String::from_str(&env, "test_cache_key");
-        let r1 = evaluate_cached(&env, &ctx, &hint);
-        let r2 = evaluate_cached(&env, &ctx, &hint);
-        assert_eq!(r1.effect, r2.effect);
+            let hint = String::from_str(&env, "test_cache_key");
+            let r1 = evaluate_cached(&env, &ctx, &hint);
+            let r2 = evaluate_cached(&env, &ctx, &hint);
+            assert_eq!(r1.effect, r2.effect);
+        });
     }
 
     #[test]
     fn cache_invalidated_on_policy_change() {
         let env = Env::default();
-        let ctx = test_ctx(&env);
+        with_contract(&env, || {
+            let ctx = test_ctx(&env);
 
-        let policy = make_policy_def(&env, "v1", PolicyRule::Allow, PolicyEffect::Permit, 1);
-        store_policy(&env, &policy);
+            let policy = make_policy_def(&env, "v1", PolicyRule::Allow, PolicyEffect::Permit, 1);
+            store_policy(&env, &policy);
 
-        let hint = String::from_str(&env, "cache_inv_test");
-        let r1 = evaluate_cached(&env, &ctx, &hint);
-        assert_eq!(r1.effect, PolicyEffect::Permit);
+            let hint = String::from_str(&env, "cache_inv_test");
+            let r1 = evaluate_cached(&env, &ctx, &hint);
+            assert_eq!(r1.effect, PolicyEffect::Permit);
 
-        // Store a new deny policy — bumps generation
-        let deny_policy =
-            make_policy_def(&env, "v1_deny", PolicyRule::Allow, PolicyEffect::Deny, 0);
-        store_policy(&env, &deny_policy);
+            // Store a new deny policy — bumps generation
+            let deny_policy =
+                make_policy_def(&env, "v1_deny", PolicyRule::Allow, PolicyEffect::Deny, 0);
+            store_policy(&env, &deny_policy);
 
-        // Cache is invalidated; re-evaluates
-        let r2 = evaluate_cached(&env, &ctx, &hint);
-        // Now deny override kicks in
-        assert_eq!(r2.effect, PolicyEffect::Deny);
+            // Cache is invalidated; re-evaluates
+            let r2 = evaluate_cached(&env, &ctx, &hint);
+            // Now deny override kicks in
+            assert_eq!(r2.effect, PolicyEffect::Deny);
+        });
     }
 
     #[test]
     fn simulation_returns_indeterminate_when_no_policies() {
         let env = Env::default();
-        let ctx = test_ctx(&env);
-        let sim = simulate(&env, &ctx);
-        assert_eq!(sim.verdict, SimulationVerdict::Indeterminate);
-        assert_eq!(sim.evaluated_count, 0);
+        with_contract(&env, || {
+            let ctx = test_ctx(&env);
+            let sim = simulate(&env, &ctx);
+            assert_eq!(sim.verdict, SimulationVerdict::Indeterminate);
+            assert_eq!(sim.evaluated_count, 0);
+        });
     }
 
     #[test]
     fn simulation_evaluates_policies() {
         let env = Env::default();
-        let ctx = test_ctx(&env);
+        with_contract(&env, || {
+            let ctx = test_ctx(&env);
 
-        let policy = make_policy_def(&env, "sim_test", PolicyRule::Allow, PolicyEffect::Permit, 1);
-        store_policy(&env, &policy);
+            let policy =
+                make_policy_def(&env, "sim_test", PolicyRule::Allow, PolicyEffect::Permit, 1);
+            store_policy(&env, &policy);
 
-        let sim = simulate(&env, &ctx);
-        assert_eq!(sim.verdict, SimulationVerdict::Permitted);
-        assert_eq!(sim.evaluated_count, 1);
+            let sim = simulate(&env, &ctx);
+            assert_eq!(sim.verdict, SimulationVerdict::Permitted);
+            assert_eq!(sim.evaluated_count, 1);
+        });
     }
 
     #[test]
@@ -780,99 +803,104 @@ mod tests {
     #[test]
     fn complex_boolean_policy() {
         let env = Env::default();
-        let ctx = test_ctx(&env); // role=doctor, dept=cardiology, 10AM
+        with_contract(&env, || {
+            let ctx = test_ctx(&env); // role=doctor, dept=cardiology, 10AM
 
-        // Build: (role == doctor) AND (dept IN [cardiology, neuro]) AND (9-17 hours)
-        let mut role_vals = Vec::new(&env);
-        role_vals.push_back(String::from_str(&env, "doctor"));
-        let role_cond = PolicyRule::Attribute(AttributeCondition {
-            key: String::from_str(&env, "role"),
-            operator: AttrOperator::Eq,
-            values: role_vals,
+            // Build: (role == doctor) AND (dept IN [cardiology, neuro]) AND (9-17 hours)
+            let mut role_vals = Vec::new(&env);
+            role_vals.push_back(String::from_str(&env, "doctor"));
+            let role_cond = PolicyRule::Attribute(AttributeCondition {
+                key: String::from_str(&env, "role"),
+                operator: AttrOperator::Eq,
+                values: role_vals,
+            });
+
+            let mut dept_vals = Vec::new(&env);
+            dept_vals.push_back(String::from_str(&env, "cardiology"));
+            dept_vals.push_back(String::from_str(&env, "neurology"));
+            let dept_cond = PolicyRule::Attribute(AttributeCondition {
+                key: String::from_str(&env, "department"),
+                operator: AttrOperator::In,
+                values: dept_vals,
+            });
+
+            let time_cond = PolicyRule::Temporal(TemporalConstraint {
+                valid_from: 0,
+                valid_until: 0,
+                allowed_hour_start: 9,
+                allowed_hour_end: 17,
+                allowed_days_mask: 0,
+            });
+
+            let mut and_children = Vec::new(&env);
+            and_children.push_back(role_cond);
+            and_children.push_back(dept_cond);
+            and_children.push_back(time_cond);
+
+            let complex_rule = PolicyRule::And(and_children);
+
+            let policy = make_policy_def(
+                &env,
+                "complex_access",
+                complex_rule,
+                PolicyEffect::Permit,
+                1,
+            );
+            store_policy(&env, &policy);
+
+            let result = evaluate(&env, &ctx);
+            assert_eq!(result.effect, PolicyEffect::Permit);
         });
-
-        let mut dept_vals = Vec::new(&env);
-        dept_vals.push_back(String::from_str(&env, "cardiology"));
-        dept_vals.push_back(String::from_str(&env, "neurology"));
-        let dept_cond = PolicyRule::Attribute(AttributeCondition {
-            key: String::from_str(&env, "department"),
-            operator: AttrOperator::In,
-            values: dept_vals,
-        });
-
-        let time_cond = PolicyRule::Temporal(TemporalConstraint {
-            valid_from: 0,
-            valid_until: 0,
-            allowed_hour_start: 9,
-            allowed_hour_end: 17,
-            allowed_days_mask: 0,
-        });
-
-        let mut and_children = Vec::new(&env);
-        and_children.push_back(role_cond);
-        and_children.push_back(dept_cond);
-        and_children.push_back(time_cond);
-
-        let complex_rule = PolicyRule::And(and_children);
-
-        let policy = make_policy_def(
-            &env,
-            "complex_access",
-            complex_rule,
-            PolicyEffect::Permit,
-            1,
-        );
-        store_policy(&env, &policy);
-
-        let result = evaluate(&env, &ctx);
-        assert_eq!(result.effect, PolicyEffect::Permit);
     }
 
     #[test]
     fn resolution_strategy_can_be_changed() {
         let env = Env::default();
+        with_contract(&env, || {
+            set_resolution_strategy(&env, ResolutionStrategy::PermitOverride);
+            assert_eq!(
+                get_resolution_strategy(&env),
+                ResolutionStrategy::PermitOverride
+            );
 
-        set_resolution_strategy(&env, ResolutionStrategy::PermitOverride);
-        assert_eq!(
-            get_resolution_strategy(&env),
-            ResolutionStrategy::PermitOverride
-        );
-
-        set_resolution_strategy(&env, ResolutionStrategy::FirstApplicable);
-        assert_eq!(
-            get_resolution_strategy(&env),
-            ResolutionStrategy::FirstApplicable
-        );
+            set_resolution_strategy(&env, ResolutionStrategy::FirstApplicable);
+            assert_eq!(
+                get_resolution_strategy(&env),
+                ResolutionStrategy::FirstApplicable
+            );
+        });
     }
 
     #[test]
     fn policy_versioning_upgrade() {
         let env = Env::default();
-        let ctx = test_ctx(&env);
+        with_contract(&env, || {
+            let ctx = test_ctx(&env);
 
-        let v1 = make_policy_def(
-            &env,
-            "versioned",
-            PolicyRule::Allow,
-            PolicyEffect::Permit,
-            1,
-        );
-        store_policy(&env, &v1);
+            let v1 = make_policy_def(
+                &env,
+                "versioned",
+                PolicyRule::Allow,
+                PolicyEffect::Permit,
+                1,
+            );
+            store_policy(&env, &v1);
 
-        // Upgrade to v2 with same name — replaces in index
-        let mut v2 = v1.clone();
-        v2.id.version = 2;
-        v2.rule = PolicyRule::Deny;
-        v2.effect = PolicyEffect::Deny;
-        store_policy(&env, &v2);
+            // Upgrade to v2 with same name — replaces in index
+            let mut v2 = v1.clone();
+            v2.id.version = 2;
+            v2.rule = PolicyRule::Deny;
+            v2.effect = PolicyEffect::Deny;
+            store_policy(&env, &v2);
 
-        // Only one policy in index (upgraded)
-        assert_eq!(list_policies(&env).len(), 1);
+            // Only one policy in index (upgraded)
+            assert_eq!(list_policies(&env).len(), 1);
 
-        let result = evaluate(&env, &ctx);
-        // v2 rule is Deny with effect Deny: rule_result=false => invert(Deny)=Permit
-        // Actually: rule is Deny (evaluates false), effect is Deny, so final = invert(Deny) = Permit
-        // Let me re-check: evaluate_rule(Deny) = false; since rule_result is false, effect = invert(Deny) = Permit
-        assert_eq!(result.effect, PolicyEffect::Permit);
+            let result = evaluate(&env, &ctx);
+            // v2 rule is Deny with effect Deny: rule_result=false => invert(Deny)=Permit
+            // Actually: rule is Deny (evaluates false), effect is Deny, so final = invert(Deny) = Permit
+            // Let me re-check: evaluate_rule(Deny) = false; since rule_result is false, effect = invert(Deny) = Permit
+            assert_eq!(result.effect, PolicyEffect::Permit);
+        });
     }
 }

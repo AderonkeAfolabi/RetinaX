@@ -6,7 +6,7 @@ Welcome to RetinaX! This guide will help you set up your local environment and g
 
 Before diving in, ensure you have the following installed on your system:
 - **Rust 1.78.0+**: The core language for Soroban smart contracts. [Install Rust](https://www.rust-lang.org/tools/install).
-- **Soroban CLI v23.1.4+**: Essential for compiling and deploying contracts on the Stellar network. [Install Soroban](https://soroban.stellar.org/docs/getting-started/installation).
+- **Soroban CLI v23.1.4+**: Essential for compiling and deploying contracts on the Stellar network. [Install Soroban](https://developers.stellar.org/docs/tools/cli/install-cli).
 - **Git**: For version control.
 - **Make**: For using the provided Makefile automation.
 
@@ -17,7 +17,7 @@ The repository includes a setup script that automates the installation of target
 
 ```bash
 # Clone the repository
-git clone https://github.com/Ogbodo-Oluebube/RetinaX.git
+git clone https://github.com/RetinaX-Org/RetinaX.git
 cd RetinaX
 
 # Run the setup script

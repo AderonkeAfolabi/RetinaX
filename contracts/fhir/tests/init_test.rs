@@ -11,12 +11,11 @@ fn test_double_initialization() {
     let client = FhirContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
-    let registry = Address::generate(&env);
 
     // First initialization should succeed
-    client.initialize(&admin, &registry);
+    client.initialize(&admin);
 
     // Second initialization should fail with AlreadyInitialized error
-    let result = client.try_initialize(&admin, &registry);
+    let result = client.try_initialize(&admin);
     assert_eq!(result, Err(Ok(FhirError::AlreadyInitialized.into())));
 }

@@ -62,5 +62,23 @@ pub fn get_task(env: &Env, id: u64) -> Option<Task> {
 }
 
 pub fn update_task(env: &Env, task: Task) {
+    if task.status == TaskStatus::Completed {
+        let result = task
+            .result
+            .as_ref()
+            .expect("Result required for completed task");
+        let proof = task
+            .proof
+            .as_ref()
+            .expect("Proof required for completed task");
+        if !crate::verification::verify_execution_proof(
+            env,
+            task.input_data.clone(),
+            result.clone(),
+            proof.clone(),
+        ) {
+            panic!("Cannot mark task complete: verification failed");
+        }
+    }
     env.storage().persistent().set(&(TASKS, task.id), &task);
 }

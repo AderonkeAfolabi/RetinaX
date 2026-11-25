@@ -149,7 +149,7 @@ fn test_cross_contract_timestamp_consistency() {
 
 #[test]
 fn test_cross_contract_error_isolation() {
-    let (env, ai_client, admin) = setup();
+    let (env, ai_client, _admin) = setup();
 
     let unauthorized_user = Address::generate(&env);
 
@@ -224,7 +224,7 @@ fn test_cross_contract_resource_isolation() {
 
 #[test]
 fn test_cross_contract_state_isolation() {
-    let (env, ai_client, admin) = setup();
+    let (env, ai_client, _admin) = setup();
 
     // Register mock contract
     let mock_contract_id = env.register(MockAnalysisContract, ());
