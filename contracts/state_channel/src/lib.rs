@@ -2,7 +2,7 @@
 
 use common::CommonError;
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Symbol};
-use teye_common as common;
+use retinax_common as common;
 
 pub mod channel;
 pub mod dispute;
@@ -10,6 +10,8 @@ pub mod settlement;
 
 #[cfg(test)]
 mod test;
+#[cfg(test)]
+mod test_signature_validation;
 
 const VISION_RECORDS: Symbol = symbol_short!("V_REC");
 const ADMIN: Symbol = symbol_short!("ADMIN");
@@ -31,7 +33,40 @@ impl StateChannelContract {
         env.storage()
             .instance()
             .set(&VISION_RECORDS, &vision_records);
+        env.storage()
+            .instance()
+            .set(&symbol_short!("DISP_WIN"), &86_400u64);
         Ok(())
+    }
+
+    pub fn set_dispute_window(
+        env: Env,
+        admin: Address,
+        window_secs: u64,
+    ) -> Result<(), CommonError> {
+        admin.require_auth();
+        let stored_admin: Address = env
+            .storage()
+            .instance()
+            .get(&ADMIN)
+            .ok_or(CommonError::NotInitialized)?;
+        if admin != stored_admin {
+            return Err(CommonError::AccessDenied);
+        }
+        if window_secs == 0 {
+            return Err(CommonError::InvalidInput);
+        }
+        env.storage()
+            .instance()
+            .set(&symbol_short!("DISP_WIN"), &window_secs);
+        Ok(())
+    }
+
+    pub fn get_dispute_window(env: Env) -> u64 {
+        env.storage()
+            .instance()
+            .get(&symbol_short!("DISP_WIN"))
+            .unwrap_or(86_400)
     }
 
     pub fn open_channel(
@@ -42,6 +77,17 @@ impl StateChannelContract {
     ) -> Result<u64, CommonError> {
         patient.require_auth();
         channel::open(&env, patient, provider, capacity)
+    }
+
+    pub fn open_channel_with_timeout(
+        env: Env,
+        patient: Address,
+        provider: Address,
+        capacity: u64,
+        dispute_window: u64,
+    ) -> Result<u64, CommonError> {
+        patient.require_auth();
+        channel::open_with_timeout(&env, patient, provider, capacity, dispute_window)
     }
 
     pub fn cooperative_close(

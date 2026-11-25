@@ -24,3 +24,8 @@ pub fn publish_task_result_submitted(env: &Env, task_id: u64, executor: Address,
     env.events()
         .publish((symbol_short!("TSK_RES"), task_id, success), executor);
 }
+
+pub fn publish_task_result_rejected(env: &Env, task_id: u64, executor: Address) {
+    env.events()
+        .publish((symbol_short!("TSK_REJ"), task_id), executor);
+}

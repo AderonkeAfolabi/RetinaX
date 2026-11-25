@@ -22,6 +22,7 @@ pub mod prescription;
 pub mod provider;
 pub mod rate_limit;
 pub mod rbac;
+pub mod retention;
 pub mod validation;
 
 mod types;
@@ -48,12 +49,12 @@ use soroban_sdk::{
     contract, contractimpl, symbol_short, Address, Bytes, BytesN, Env, String, Symbol, Vec,
 };
 
-use teye_common::lineage::{self, RelationshipKind};
-use teye_common::provenance_graph::{self, LineageAccessResult, ProvenanceExport};
-use teye_common::state_machine::{
+use retinax_common::lineage::{self, RelationshipKind};
+use retinax_common::provenance_graph::{self, LineageAccessResult, ProvenanceExport};
+use retinax_common::state_machine::{
     self, EntityKind, LifecycleState, TransitionContext, TransitionRecord,
 };
-use teye_common::{
+use retinax_common::{
     admin_tiers, concurrency::ConflictEntry, concurrency::FieldChange,
     concurrency::ResolutionStrategy, progressive_auth, risk_engine, session, whitelist, AdminTier,
     KeyManager, MeteringOpType, UpdateOutcome, VersionStamp,
@@ -181,7 +182,7 @@ pub struct VisionRecordsContract;
 #[allow(clippy::too_many_arguments)]
 impl VisionRecordsContract {
     fn meter_op(_env: &Env, _caller: &Address, _op_type: MeteringOpType) {
-        // Simple mock since metering is not fully implemented in teye_common yet or it was removed.
+        // Simple mock since metering is not fully implemented in retinax_common yet or it was removed.
     }
 
     fn emit_access_violation(env: &Env, caller: &Address, action: &str, required_permission: &str) {
@@ -370,3 +371,5 @@ mod test_insurance_endpoints;
 mod test_multisig;
 #[cfg(test)]
 mod test_rate_limit_bypass;
+#[cfg(test)]
+mod test_retention;

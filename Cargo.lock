@@ -7,6 +7,7 @@ name = "access_control"
 version = "1.2.2"
 dependencies = [
  "common",
+ "proptest",
  "soroban-sdk",
 ]
 
@@ -621,6 +622,7 @@ checksum = "0c9ea0ac24bc397ab3c98583a3c9ba74fa56b09a4449bbe172b9b1ddb016027a"
 name = "common"
 version = "1.2.2"
 dependencies = [
+ "ed25519-dalek",
  "soroban-sdk",
 ]
 
@@ -1481,6 +1483,7 @@ name = "key_manager"
 version = "1.2.2"
 dependencies = [
  "identity",
+ "proptest",
  "soroban-sdk",
 ]
 
@@ -1852,6 +1855,21 @@ name = "regex-syntax"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a96887878f22d7bad8a3b6dc5b7440e0ada9a245242924394987b21cf2210a4c"
+
+[[package]]
+name = "retinax-delegation"
+version = "1.2.2"
+dependencies = [
+ "soroban-sdk",
+]
+
+[[package]]
+name = "retinax-state-channel"
+version = "1.2.2"
+dependencies = [
+ "common",
+ "soroban-sdk",
+]
 
 [[package]]
 name = "rfc6979"
@@ -2315,6 +2333,7 @@ version = "1.2.2"
 dependencies = [
  "audit",
  "common",
+ "proptest",
  "soroban-sdk",
 ]
 
@@ -2435,21 +2454,6 @@ dependencies = [
  "soroban-sdk",
  "staking",
  "vision_records",
-]
-
-[[package]]
-name = "teye-delegation"
-version = "1.2.2"
-dependencies = [
- "soroban-sdk",
-]
-
-[[package]]
-name = "teye-state-channel"
-version = "1.2.2"
-dependencies = [
- "common",
- "soroban-sdk",
 ]
 
 [[package]]
@@ -3020,6 +3024,7 @@ dependencies = [
 name = "zk_voting"
 version = "1.2.2"
 dependencies = [
+ "proptest",
  "soroban-sdk",
  "zk_verifier",
 ]

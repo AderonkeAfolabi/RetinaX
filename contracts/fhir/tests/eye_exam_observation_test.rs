@@ -243,3 +243,85 @@ fn test_free_functions_match_contract_entrypoints() {
         Err(FhirError::InvalidRecordData)
     );
 }
+
+// ── Boundary tests for each eye-examination rule (issue #531) ────────────────
+
+/// The smallest observation that satisfies every rule: a one-character
+/// subject, the earliest non-zero timestamp, and the fields no rule checks
+/// (`id`, `value`) left empty.
+fn minimal_observation(env: &Env) -> Observation {
+    Observation {
+        id: String::from_str(env, ""),
+        subject_id: String::from_str(env, "p"),
+        value: String::from_str(env, ""),
+        effective_datetime: 1,
+        ..valid_observation(env)
+    }
+}
+
+#[test]
+fn test_minimal_eye_exam_observation_passes() {
+    let (env, client) = setup();
+    assert_eq!(
+        client.try_validate_eye_exam_observation(&minimal_observation(&env)),
+        Ok(Ok(()))
+    );
+}
+
+#[test]
+fn test_eye_exam_missing_code_system_is_invalid_record_data() {
+    let (env, client) = setup();
+    let mut obs = minimal_observation(&env);
+    obs.code_system = String::from_str(&env, "");
+    assert_eq!(
+        client.try_validate_eye_exam_observation(&obs),
+        Err(Ok(FhirError::InvalidRecordData))
+    );
+}
+
+#[test]
+fn test_eye_exam_missing_code_value_is_invalid_record_data() {
+    let (env, client) = setup();
+    let mut obs = minimal_observation(&env);
+    obs.code_value = String::from_str(&env, "");
+    assert_eq!(
+        client.try_validate_eye_exam_observation(&obs),
+        Err(Ok(FhirError::InvalidRecordData))
+    );
+}
+
+#[test]
+fn test_eye_exam_zero_effective_datetime_is_invalid_record_data() {
+    let (env, client) = setup();
+    let mut obs = minimal_observation(&env);
+    obs.effective_datetime = 0;
+    assert_eq!(
+        client.try_validate_eye_exam_observation(&obs),
+        Err(Ok(FhirError::InvalidRecordData))
+    );
+}
+
+#[test]
+fn test_eye_exam_unsupported_code_system_is_invalid_payload() {
+    let (env, client) = setup();
+    let mut obs = minimal_observation(&env);
+    // One character away from the canonical LOINC URI.
+    obs.code_system = String::from_str(&env, "http://loinc.org/");
+    assert_eq!(
+        client.try_validate_eye_exam_observation(&obs),
+        Err(Ok(FhirError::InvalidPayload))
+    );
+}
+
+#[test]
+fn test_eye_exam_unrecognised_snomed_code_is_invalid_payload() {
+    let (env, client) = setup();
+    let mut obs = minimal_observation(&env);
+    obs.code_system = String::from_str(&env, SNOMED_SYSTEM);
+    // One digit away from SNOMED_VISUAL_ACUITY.
+    obs.code_value = String::from_str(&env, "363983008");
+    assert_eq!(
+        client.try_validate_eye_exam_observation(&obs),
+        Err(Ok(FhirError::InvalidPayload))
+    );
+}

@@ -30,8 +30,11 @@ Welcome to the RetinaX documentation. This index groups every guide by the audie
 - [AI Integration](ai_integration.md) — AI oracle integration, verification, and anomaly flags.
 - [Analytics](analytics.md) — On-chain analytics design and aggregate reporting.
 - [Governance](governance.md) — Governor, timelock, and admin tier governance model.
+- [Timelock Guide](timelock.md) — Timelock contract guide, queue lifecycle, and error reference.
 - [Staking](staking.md) — Staking model and validator/reward mechanics.
 - [Treasury](treasury.md) — Treasury controls, multisig, and fund management.
+- [Vault Guide](vault.md) — Vault contract, multi-guardian thresholds, and deadman grace period.
+- [State Channel Design](state_channel.md) — State channel forced settlement, dispute window, and fraud proofs.
 - [ADR Template](adr/0000-template.md) — Template for recording architecture decisions.
 - [ADR 0001: Storage Design](adr/0001-storage-design.md) — Storage layout and key design decision.
 - [ADR 0002: Access Control Design](adr/0002-access-control-design.md) — Access-control model decision.

@@ -91,6 +91,7 @@ impl VaultContract {
         inactivity_timeout_secs: u64,
         data_ref_hash: String,
         secret_seed: BytesN<32>,
+        grace_period_secs: Option<u64>,
     ) -> Result<VaultSnapshot, VaultError> {
         Self::require_init(&env)?;
         owner.require_auth();
@@ -120,6 +121,7 @@ impl VaultContract {
             shard_count,
             emergency_threshold,
             inactivity_timeout_secs,
+            grace_period_secs: grace_period_secs.unwrap_or(0),
         };
 
         let now = env.ledger().timestamp();
@@ -135,6 +137,9 @@ impl VaultContract {
         env.storage()
             .persistent()
             .set(&(VAULT, owner.clone()), &record);
+        env.storage()
+            .persistent()
+            .set(&(symbol_short!("GRACE"), owner.clone()), &policy.grace_period_secs);
 
         let shares = sss::split(
             secret_seed.to_array(),
@@ -173,11 +178,7 @@ impl VaultContract {
         Self::require_init(&env)?;
         requester.require_auth();
 
-        let record: VaultRecord = env
-            .storage()
-            .persistent()
-            .get(&(VAULT, owner.clone()))
-            .ok_or(VaultError::VaultNotFound)?;
+        let record = Self::get_vault_record(&env, &owner)?;
         if shares.len() < record.policy.threshold {
             return Err(VaultError::InsufficientShares);
         }
@@ -212,11 +213,7 @@ impl VaultContract {
         Self::require_init(&env)?;
         guardian.require_auth();
 
-        let record: VaultRecord = env
-            .storage()
-            .persistent()
-            .get(&(VAULT, owner.clone()))
-            .ok_or(VaultError::VaultNotFound)?;
+        let record = Self::get_vault_record(&env, &owner)?;
         let stored: Option<VaultShare> =
             env.storage()
                 .persistent()
@@ -233,11 +230,7 @@ impl VaultContract {
     pub fn emergency_reconstruct(env: Env, owner: Address) -> Result<BytesN<32>, VaultError> {
         Self::require_init(&env)?;
 
-        let record: VaultRecord = env
-            .storage()
-            .persistent()
-            .get(&(VAULT, owner.clone()))
-            .ok_or(VaultError::VaultNotFound)?;
+        let record = Self::get_vault_record(&env, &owner)?;
         let identity: Address = env
             .storage()
             .instance()
@@ -289,11 +282,7 @@ impl VaultContract {
         Self::require_init(&env)?;
         owner.require_auth();
 
-        let mut record: VaultRecord = env
-            .storage()
-            .persistent()
-            .get(&(VAULT, owner.clone()))
-            .ok_or(VaultError::VaultNotFound)?;
+        let mut record = Self::get_vault_record(&env, &owner)?;
         let identity: Address = env
             .storage()
             .instance()
@@ -332,6 +321,9 @@ impl VaultContract {
         env.storage()
             .persistent()
             .set(&(VAULT, owner.clone()), &record);
+        env.storage()
+            .persistent()
+            .set(&(symbol_short!("GRACE"), owner.clone()), &policy.grace_period_secs);
 
         Ok(RotationEvent {
             owner,
@@ -343,11 +335,7 @@ impl VaultContract {
 
     pub fn touch_activity(env: Env, owner: Address) -> Result<(), VaultError> {
         owner.require_auth();
-        let mut record: VaultRecord = env
-            .storage()
-            .persistent()
-            .get(&(VAULT, owner.clone()))
-            .ok_or(VaultError::VaultNotFound)?;
+        let mut record = Self::get_vault_record(&env, &owner)?;
         record.last_activity_at = env.ledger().timestamp();
         record.deadman_release_at = record
             .last_activity_at
@@ -357,22 +345,100 @@ impl VaultContract {
     }
 
     pub fn trigger_deadman_release(env: Env, owner: Address) -> Result<bool, VaultError> {
-        let record: VaultRecord = env
+        let record = Self::get_vault_record(&env, &owner)?;
+        let grace_override: Option<u64> = env
             .storage()
             .persistent()
-            .get(&(VAULT, owner))
-            .ok_or(VaultError::VaultNotFound)?;
-        if env.ledger().timestamp() < record.deadman_release_at {
+            .get(&(symbol_short!("GRACE"), owner.clone()));
+        let grace = grace_override.unwrap_or(record.policy.grace_period_secs);
+        let effective_release_at = record
+            .deadman_release_at
+            .saturating_add(grace);
+        if env.ledger().timestamp() < effective_release_at {
             return Err(VaultError::DeadmanNotReady);
         }
         Ok(true)
     }
 
-    pub fn get_vault(env: Env, owner: Address) -> Result<VaultRecord, VaultError> {
-        env.storage()
+    pub fn get_grace_period(env: Env, owner: Address) -> u64 {
+        if let Some(g) = env
+            .storage()
             .persistent()
-            .get(&(VAULT, owner))
-            .ok_or(VaultError::VaultNotFound)
+            .get::<_, u64>(&(symbol_short!("GRACE"), owner.clone()))
+        {
+            return g;
+        }
+        if let Ok(rec) = Self::get_vault_record(&env, &owner) {
+            return rec.policy.grace_period_secs;
+        }
+        0
+    }
+
+    pub fn migrate_vault(env: Env, owner: Address) -> Result<(), VaultError> {
+        if let Some(legacy) = env
+            .storage()
+            .persistent()
+            .get::<_, common::LegacyVaultRecord>(&(VAULT, owner.clone()))
+        {
+            let modern = VaultRecord {
+                owner: legacy.owner.clone(),
+                epoch: legacy.epoch,
+                policy: VaultPolicy {
+                    threshold: legacy.policy.threshold,
+                    shard_count: legacy.policy.shard_count,
+                    emergency_threshold: legacy.policy.emergency_threshold,
+                    inactivity_timeout_secs: legacy.policy.inactivity_timeout_secs,
+                    grace_period_secs: 0,
+                },
+                data_ref_hash: legacy.data_ref_hash,
+                created_at: legacy.created_at,
+                last_activity_at: legacy.last_activity_at,
+                deadman_release_at: legacy.deadman_release_at,
+            };
+            env.storage()
+                .persistent()
+                .set(&(VAULT, owner.clone()), &modern);
+            env.storage()
+                .persistent()
+                .set(&(symbol_short!("GRACE"), owner), &0u64);
+        }
+        Ok(())
+    }
+
+    pub fn get_vault(env: Env, owner: Address) -> Result<VaultRecord, VaultError> {
+        Self::get_vault_record(&env, &owner)
+    }
+
+    pub fn get_vault_record(env: &Env, owner: &Address) -> Result<VaultRecord, VaultError> {
+        if let Some(record) = env
+            .storage()
+            .persistent()
+            .get::<_, VaultRecord>(&(VAULT, owner.clone()))
+        {
+            return Ok(record);
+        }
+        if let Some(legacy) = env
+            .storage()
+            .persistent()
+            .get::<_, common::LegacyVaultRecord>(&(VAULT, owner.clone()))
+        {
+            return Ok(VaultRecord {
+                owner: legacy.owner,
+                epoch: legacy.epoch,
+                policy: VaultPolicy {
+                    threshold: legacy.policy.threshold,
+                    shard_count: legacy.policy.shard_count,
+                    emergency_threshold: legacy.policy.emergency_threshold,
+                    inactivity_timeout_secs: legacy.policy.inactivity_timeout_secs,
+                    grace_period_secs: 0,
+                },
+                data_ref_hash: legacy.data_ref_hash,
+                created_at: legacy.created_at,
+                last_activity_at: legacy.last_activity_at,
+                deadman_release_at: legacy.deadman_release_at,
+            });
+        }
+        Err(VaultError::VaultNotFound)
     }
 
     // ── Multi-asset accounting ─────────────────────────────────────────────
