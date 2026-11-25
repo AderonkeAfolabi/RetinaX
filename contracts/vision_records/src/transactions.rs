@@ -189,6 +189,13 @@ impl VisionRecordsContract {
         let counter_key = symbol_short!("REC_CTR");
         env.storage().instance().set(&counter_key, &record_id);
 
+        let retention_period = retention::get_retention_period(&env, &prep_data.record_type);
+        let retain_until = if retention_period > 0 {
+            Some(prep_data.timestamp.saturating_add(retention_period))
+        } else {
+            None
+        };
+
         // Create the actual record
         let record = VisionRecord {
             id: record_id,
@@ -199,6 +206,7 @@ impl VisionRecordsContract {
             key_version: None,
             created_at: prep_data.timestamp,
             updated_at: prep_data.timestamp,
+            retain_until,
         };
 
         // Store the record

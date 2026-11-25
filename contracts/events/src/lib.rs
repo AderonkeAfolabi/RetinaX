@@ -246,7 +246,7 @@ impl EventStreamContract {
     ) -> Result<u64, EventError> {
         subscriber.require_auth();
         Self::require_initialized(&env)?;
-        subscription::create_subscription(&env, &subscriber, &topic_pattern)
+        subscription::create_subscription(&env, &subscriber, &topic_pattern, None)
     }
 
     /// Remove an existing subscription.

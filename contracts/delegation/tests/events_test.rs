@@ -1,18 +1,26 @@
 use soroban_sdk::{
+    symbol_short,
     testutils::{Address as _, Events as _},
-    Env,
+    vec, Address, Env, IntoVal,
 };
 use retinax_delegation::{DelegationContract, DelegationContractClient};
 
 #[test]
-fn test_events() {
+fn initialize_publishes_admin_event() {
     let env = Env::default();
-    env.mock_all_auths();
-
     let contract_id = env.register(DelegationContract, ());
-    let _client = DelegationContractClient::new(&env, &contract_id);
+    let client = DelegationContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
 
-    let _owner = soroban_sdk::Address::generate(&env);
-    let events = env.events().all();
-    assert!(events.is_empty() || !events.is_empty());
+    client.initialize(&admin);
+
+    let expected = vec![
+        &env,
+        (
+            contract_id,
+            vec![&env, symbol_short!("INIT").into_val(&env)],
+            admin.into_val(&env),
+        ),
+    ];
+    assert_eq!(env.events().all(), expected);
 }

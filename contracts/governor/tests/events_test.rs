@@ -3,14 +3,14 @@
 extern crate std;
 
 use governor::{
-    proposal::{ProposalAction, ProposalPhase, ProposalType},
+    proposal::{ProposalAction, ProposalType},
     voting::VoteChoice,
     GovernorContract, GovernorContractClient,
 };
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Events, Ledger},
-    vec, Address, BytesN, Env, IntoVal, String, Vec,
+    vec, Address, BytesN, Env, String,
 };
 
 fn setup() -> (
@@ -93,7 +93,7 @@ fn test_proposal_created_event() {
         },
     ];
 
-    let id = client.create_proposal(
+    let _id = client.create_proposal(
         &proposer,
         &ProposalType::ParameterChange,
         &String::from_str(&env, "Create event"),
@@ -215,7 +215,7 @@ fn test_vote_commit_and_reveal_events() {
 
 #[test]
 fn test_delegation_events() {
-    let (env, contract_id, client, _admin, _staking, _treasury) = setup();
+    let (env, _contract_id, client, _admin, _staking, _treasury) = setup();
 
     let voter = Address::generate(&env);
     let delegate = Address::generate(&env);

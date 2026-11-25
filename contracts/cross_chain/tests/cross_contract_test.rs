@@ -28,7 +28,7 @@ impl MockVisionRecords {
     ) -> Result<(), MockVisionError> {
         bridge_caller.require_auth();
 
-        if payload.len() == 0 {
+        if payload.is_empty() {
             return Err(MockVisionError::BadPayload);
         }
 

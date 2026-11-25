@@ -116,7 +116,12 @@ pub fn assign_role(
     }
 
     let key = (ROLE_ASSIGN, user.clone());
-    if env.storage().persistent().get::<_, RoleAssignment>(&key).is_some() {
+    if env
+        .storage()
+        .persistent()
+        .get::<_, RoleAssignment>(&key)
+        .is_some()
+    {
         return Err(AccessControlError::AlreadyExists);
     }
 

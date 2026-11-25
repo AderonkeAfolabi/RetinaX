@@ -8,6 +8,7 @@
 - [Consent Management](consent-management.md) - Patient consent lifecycle
 - [Deployment Guide](deployment-guide.md) - Healthcare institution setup
 - [Data Classification](data-classification.md) - Data handling categories
+- [Retention Policy & Expiry](retention-policy.md) - Data class retention policy, automatic expiry, and TTL purge (HIPAA & GDPR)
 
 ## 🎯 Audience Guides
 

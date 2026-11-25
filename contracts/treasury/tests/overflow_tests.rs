@@ -3,7 +3,6 @@
 
 #[cfg(test)]
 mod treasury_overflow_tests {
-    use super::*;
 
     #[test]
     fn test_balance_overflow_u64_max() {

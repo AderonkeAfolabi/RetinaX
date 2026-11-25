@@ -397,7 +397,7 @@ fn test_partial_null_combinations() {
     let age_a40 = symbol_short!("A40_64");
     let cond_myo = symbol_short!("MYOPIA");
 
-    let test_cases = vec![
+    let test_cases = [
         // Only region is null
         MetricDimensions {
             region: None,

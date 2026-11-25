@@ -81,10 +81,16 @@ mod tests {
             .map(|_| DifferentialPrivacy::add_laplace_noise(&env, 0, 1, 10))
             .collect();
         let mean = samples.iter().sum::<i128>() as f64 / samples.len() as f64;
-        let distinct = samples.iter().collect::<std::collections::BTreeSet<&i128>>().len();
+        let distinct = samples
+            .iter()
+            .collect::<std::collections::BTreeSet<&i128>>()
+            .len();
 
         assert!(mean.abs() < 1.0, "mean {mean} should be close to zero");
-        assert!(distinct > 10, "noise should take many distinct values, got {distinct}");
+        assert!(
+            distinct > 10,
+            "noise should take many distinct values, got {distinct}"
+        );
     }
 
     #[test]
@@ -96,13 +102,22 @@ mod tests {
 
     #[test]
     fn validate_enforces_the_configured_bounds() {
-        assert!(DifferentialPrivacy::validate(DEFAULT_EPSILON, DEFAULT_SENSITIVITY));
+        assert!(DifferentialPrivacy::validate(
+            DEFAULT_EPSILON,
+            DEFAULT_SENSITIVITY
+        ));
         assert!(DifferentialPrivacy::validate(MIN_EPSILON, 1));
         assert!(DifferentialPrivacy::validate(MAX_EPSILON, MAX_SENSITIVITY));
         assert!(!DifferentialPrivacy::validate(0, DEFAULT_SENSITIVITY));
-        assert!(!DifferentialPrivacy::validate(MAX_EPSILON + 1, DEFAULT_SENSITIVITY));
+        assert!(!DifferentialPrivacy::validate(
+            MAX_EPSILON + 1,
+            DEFAULT_SENSITIVITY
+        ));
         assert!(!DifferentialPrivacy::validate(DEFAULT_EPSILON, 0));
         assert!(!DifferentialPrivacy::validate(DEFAULT_EPSILON, -1));
-        assert!(!DifferentialPrivacy::validate(DEFAULT_EPSILON, MAX_SENSITIVITY + 1));
+        assert!(!DifferentialPrivacy::validate(
+            DEFAULT_EPSILON,
+            MAX_SENSITIVITY + 1
+        ));
     }
 }

@@ -1,8 +1,6 @@
 extern crate std;
 
-use analytics::{
-    AnalyticsContract, AnalyticsContractClient, ContractError, MetricDimensions, MetricValue,
-};
+use analytics::{AnalyticsContract, AnalyticsContractClient, MetricDimensions};
 use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env, Vec};
 
 fn setup_multi_tenant() -> (Env, AnalyticsContractClient<'static>, Address, Address) {

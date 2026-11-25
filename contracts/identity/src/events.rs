@@ -6,7 +6,7 @@
 
 #![allow(deprecated)] // events().publish migration tracked separately
 
-use soroban_sdk::{contracttype, symbol_short, Address, Env};
+use soroban_sdk::{contracttype, symbol_short, Address, Env, String};
 
 // ── Event payloads ───────────────────────────────────────────────────────────
 
@@ -90,6 +90,30 @@ pub struct ZkCredentialVerifiedEvent {
     pub timestamp: u64,
 }
 
+/// Event payload emitted when a verification key is added to or removed from a DID document.
+/// Topic: `("STREAM", "ID_DIDKY")`
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DidKeyChangedEvent {
+    pub did: String,
+    pub key_id: String,
+    /// `true` when added, `false` when removed.
+    pub added: bool,
+    pub timestamp: u64,
+}
+
+/// Event payload emitted when a service endpoint is added to or removed from a DID document.
+/// Topic: `("STREAM", "ID_DIDSV")`
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DidServiceChangedEvent {
+    pub did: String,
+    pub service_id: String,
+    /// `true` when added, `false` when removed.
+    pub added: bool,
+    pub timestamp: u64,
+}
+
 // ── Publishers ───────────────────────────────────────────────────────────────
 
 /// Emit a streaming event when identity ownership status changes.
@@ -165,6 +189,32 @@ pub fn emit_zk_credential_verified(env: &Env, user: Address, verified: bool) {
         ZkCredentialVerifiedEvent {
             user,
             verified,
+            timestamp: env.ledger().timestamp(),
+        },
+    );
+}
+
+/// Emit a streaming event when a DID verification key changes.
+pub fn emit_did_key_changed(env: &Env, did: String, key_id: String, added: bool) {
+    env.events().publish(
+        (symbol_short!("STREAM"), symbol_short!("ID_DIDKY")),
+        DidKeyChangedEvent {
+            did,
+            key_id,
+            added,
+            timestamp: env.ledger().timestamp(),
+        },
+    );
+}
+
+/// Emit a streaming event when a DID service endpoint changes.
+pub fn emit_did_service_changed(env: &Env, did: String, service_id: String, added: bool) {
+    env.events().publish(
+        (symbol_short!("STREAM"), symbol_short!("ID_DIDSV")),
+        DidServiceChangedEvent {
+            did,
+            service_id,
+            added,
             timestamp: env.ledger().timestamp(),
         },
     );

@@ -2,11 +2,11 @@
 
 extern crate std;
 
-use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env, Vec};
+use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env, Symbol, Vec};
 
 use analytics::{
     homomorphic::{PaillierPrivateKey, PaillierPublicKey},
-    AnalyticsContract, AnalyticsContractClient, ContractError, MetricDimensions, MetricValue,
+    AnalyticsContract, AnalyticsContractClient, ContractError, MetricDimensions,
 };
 
 fn setup() -> (Env, AnalyticsContractClient<'static>, Address, Address) {
@@ -26,9 +26,7 @@ fn setup() -> (Env, AnalyticsContractClient<'static>, Address, Address) {
     };
     let priv_key = PaillierPrivateKey { lambda: 20, mu: 5 };
 
-    client
-        .initialize(&admin, &aggregator, &pub_key, &Some(priv_key))
-        .unwrap();
+    client.initialize(&admin, &aggregator, &pub_key, &Some(priv_key));
 
     (env, client, admin, aggregator)
 }
@@ -227,8 +225,8 @@ fn test_gas_limit_multiple_dimensions_time_buckets() {
         for age_idx in 0..10 {
             for bucket_idx in 0..100 {
                 let dims = MetricDimensions {
-                    region: Some(symbol_short!(&format!("R{}", region_idx))),
-                    age_band: Some(symbol_short!(&format!("A{}", age_idx))),
+                    region: Some(Symbol::new(&env, &format!("R{}", region_idx))),
+                    age_band: Some(Symbol::new(&env, &format!("A{}", age_idx))),
                     condition: None,
                     time_bucket: 1_700_000_000 + bucket_idx as u64,
                 };
@@ -413,7 +411,7 @@ fn test_gas_limit_metric_retrieval_after_massive_aggregation() {
     let dims = MetricDimensions {
         region: Some(symbol_short!("US")),
         age_band: Some(symbol_short!("A40_64")),
-        condition: Some(symbol_short!("HYPERTENSION")),
+        condition: Some(Symbol::new(&env, "HYPERTENSION")),
         time_bucket: 1_700_000_000,
     };
 
@@ -425,9 +423,7 @@ fn test_gas_limit_metric_retrieval_after_massive_aggregation() {
         records.push_back(encrypted);
     }
 
-    client
-        .aggregate_records(&aggregator, &kind, &dims, &records)
-        .unwrap();
+    client.aggregate_records(&aggregator, &kind, &dims, &records);
 
     // Retrieve metric - should be fast despite large aggregation
     let metric = client.get_metric(&kind, &dims);
@@ -461,9 +457,7 @@ fn test_gas_limit_trend_computation_many_buckets() {
             records.push_back(encrypted);
         }
 
-        client
-            .aggregate_records(&aggregator, &kind, &dims, &records)
-            .unwrap();
+        client.aggregate_records(&aggregator, &kind, &dims, &records);
     }
 
     // Retrieve trend across all buckets
@@ -499,9 +493,7 @@ fn test_gas_limit_integer_overflow_protection() {
         records1.push_back(encrypted);
     }
 
-    client
-        .aggregate_records(&aggregator, &kind, &dims, &records1)
-        .unwrap();
+    client.aggregate_records(&aggregator, &kind, &dims, &records1);
 
     // Second aggregation - should saturate instead of overflow
     let mut records2 = Vec::new(&env);
@@ -510,9 +502,7 @@ fn test_gas_limit_integer_overflow_protection() {
         records2.push_back(encrypted);
     }
 
-    client
-        .aggregate_records(&aggregator, &kind, &dims, &records2)
-        .unwrap();
+    client.aggregate_records(&aggregator, &kind, &dims, &records2);
 
     // Verify saturation occurred
     let metric = client.get_metric(&kind, &dims);

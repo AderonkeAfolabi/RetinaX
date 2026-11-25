@@ -160,7 +160,7 @@ fn test_sequential_timestamp_overflow_handling() {
     let patient_id = String::from_str(&env, "sequential-pat");
 
     // Create exchanges at different timestamps including boundaries
-    let test_timestamps = vec![0u64, 1, u64::MAX / 2, u64::MAX - 1, u64::MAX];
+    let test_timestamps = [0u64, 1, u64::MAX / 2, u64::MAX - 1, u64::MAX];
 
     for (idx, ts) in test_timestamps.iter().enumerate() {
         env.ledger().set_timestamp(*ts);

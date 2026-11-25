@@ -410,7 +410,10 @@ pub fn remove_webhook(env: &Env, owner: &Address, webhook_id: u64) -> Result<(),
 /// Returns true if:
 /// - The subscription has no patient filter (None), or
 /// - The subscription patient matches the event's patient exactly
-fn patient_matches(subscription_patient: &Option<Address>, event_patient: &Option<Address>) -> bool {
+fn patient_matches(
+    subscription_patient: &Option<Address>,
+    event_patient: &Option<Address>,
+) -> bool {
     match subscription_patient {
         None => true,
         Some(sub_patient) => event_patient.as_ref() == Some(sub_patient),

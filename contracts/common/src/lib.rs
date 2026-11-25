@@ -24,7 +24,7 @@ extern crate alloc;
 ///
 /// `soroban_sdk::String` only implements `Display` when `std` is available, so
 /// `.to_string()` does not compile for the wasm target; this works everywhere.
-pub(crate) fn soroban_str_to_std(s: &soroban_sdk::String) -> alloc::string::String {
+pub fn soroban_str_to_std(s: &soroban_sdk::String) -> alloc::string::String {
     let mut buf = alloc::vec![0u8; s.len() as usize];
     s.copy_into_slice(&mut buf);
     alloc::string::String::from_utf8_lossy(&buf).into_owned()
@@ -60,6 +60,12 @@ pub mod pausable;
 /// Feature-gated: only compiled when the `policy` feature is enabled.
 #[cfg(feature = "policy")]
 pub mod policy_dsl;
+#[cfg(all(test, feature = "policy"))]
+mod policy_dsl_test;
+/// Policy evaluation engine (storage, caching, simulation) built on the DSL.
+/// Feature-gated: only compiled when the `policy` feature is enabled.
+#[cfg(feature = "policy")]
+pub mod policy_engine;
 pub mod progressive_auth;
 /// Higher-level provenance traversal, access checks, and export helpers.
 /// Feature-gated: only compiled when the `provenance` feature is enabled.
@@ -79,6 +85,8 @@ pub mod state_machine;
 pub mod transaction;
 pub mod vault_types;
 pub mod vector_clock;
+#[cfg(test)]
+mod vector_clock_test;
 /// Lazy-migration storage layer (depends on `migration`).
 /// Feature-gated: only compiled when the `migration` feature is enabled.
 #[cfg(feature = "migration")]

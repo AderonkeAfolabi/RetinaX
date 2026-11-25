@@ -50,7 +50,11 @@ mod storage_collision_tests {
             .map(|(key, contracts)| format!("Key '{}' used in: {:?}", key, contracts))
             .collect();
 
-        assert!(collisions.is_empty(), "Storage key collisions detected:\n{}", collisions.join("\n"));
+        assert!(
+            collisions.is_empty(),
+            "Storage key collisions detected:\n{}",
+            collisions.join("\n")
+        );
     }
 
     #[test]

@@ -32,3 +32,10 @@ To ensure that an auditor's view of the log hasn't been maliciously truncated or
 
 ### 3. Private Auditing
 Using `SearchEngine` with a specific `SearchKey`, authorized auditors can index and query specific events (like all actions by `alice`) without exposing the query terms or log contents to unauthorized observers on the ledger.
+
+### 4. Checkpoint Anchoring and Inclusion Proofs
+Periodic anchoring commits the Merkle root of a segment to persistent storage as a `CheckpointRecord`, emitting a `CHECKPNT` event.
+- **Checkpoint Anchoring (`checkpoint`)**: Computes RFC 6962 compliant Merkle root over all segment entries and stores historical and latest checkpoint records.
+- **Inclusion Proofs (`get_inclusion_proof`)**: Generates sibling node hashes along the path from leaf to root in O(log n) steps.
+- **On-chain Verification (`verify_inclusion`)**: Validates membership of an audit entry against an anchored root using the sibling hashes in O(log n) time.
+- **Leaf Hashing (`compute_entry_leaf_hash`)**: Hashes entry fields with an RFC 6962 leaf domain separator `0x00`. Internal nodes are hashed with separator `0x01`.

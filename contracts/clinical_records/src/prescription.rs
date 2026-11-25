@@ -4,14 +4,16 @@ use crate::admin::{
 };
 use crate::errors::ContractError;
 use crate::examination::validate_string;
+use crate::fhir_interface::types::{
+    MedicationRequest, MedicationRequestIntent, MedicationRequestStatus,
+};
+use crate::fhir_interface::validation;
 use crate::migration;
 use crate::session::{resolve_caller, PRESCRIPTION_LEVEL};
 use crate::types::{
     BatchPrescriptionInput, LensType, OptionalContactLensData, Prescription, PrescriptionData,
 };
-use access_control::Permission;
-use fhir::types::{MedicationRequest, MedicationRequestIntent, MedicationRequestStatus};
-use fhir::validation;
+use crate::Permission;
 use soroban_sdk::{symbol_short, Address, Env, String, Symbol, Vec};
 
 pub const PRESCRIPTION_KEY: Symbol = symbol_short!("RX");
@@ -278,24 +280,24 @@ pub fn prescription_to_fhir(env: &Env, rx: &Prescription, subject_id: String) ->
         "OD: SPH {sr} [{csr}] CYL {cr} [{ccr}] AXIS {ar} [{car}] ADD {adr} [{adrc}]; \
          OS: SPH {sl} [{csl}] CYL {cl} [{ccl}] AXIS {al} [{cal}] ADD {adl} [{adlc}]; \
          PD R {pdr} L {pdl} mm [{cpd}]",
-        sr = rx.right_eye.sphere,
+        sr = crate::contract_text(&rx.right_eye.sphere),
         csr = validation::LOINC_RX_SPHERE_RIGHT,
-        cr = rx.right_eye.cylinder,
+        cr = crate::contract_text(&rx.right_eye.cylinder),
         ccr = validation::LOINC_RX_CYLINDER_RIGHT,
-        ar = rx.right_eye.axis,
+        ar = crate::contract_text(&rx.right_eye.axis),
         car = validation::LOINC_RX_AXIS_RIGHT,
-        adr = rx.right_eye.add,
+        adr = crate::contract_text(&rx.right_eye.add),
         adrc = validation::LOINC_RX_ADD_RIGHT,
-        sl = rx.left_eye.sphere,
+        sl = crate::contract_text(&rx.left_eye.sphere),
         csl = validation::LOINC_RX_SPHERE_LEFT,
-        cl = rx.left_eye.cylinder,
+        cl = crate::contract_text(&rx.left_eye.cylinder),
         ccl = validation::LOINC_RX_CYLINDER_LEFT,
-        al = rx.left_eye.axis,
+        al = crate::contract_text(&rx.left_eye.axis),
         cal = validation::LOINC_RX_AXIS_LEFT,
-        adl = rx.left_eye.add,
+        adl = crate::contract_text(&rx.left_eye.add),
         adlc = validation::LOINC_RX_ADD_LEFT,
-        pdr = rx.right_eye.pd,
-        pdl = rx.left_eye.pd,
+        pdr = crate::contract_text(&rx.right_eye.pd),
+        pdl = crate::contract_text(&rx.left_eye.pd),
         cpd = validation::LOINC_RX_PD_BINOCULAR,
     );
 
@@ -304,9 +306,9 @@ pub fn prescription_to_fhir(env: &Env, rx: &Prescription, subject_id: String) ->
             "{}; CL [{}]: BC {} DIA {} brand {}",
             dosage,
             validation::SNOMED_CONTACT_LENSES,
-            cl.base_curve,
-            cl.diameter,
-            cl.brand
+            crate::contract_text(&cl.base_curve),
+            crate::contract_text(&cl.diameter),
+            crate::contract_text(&cl.brand)
         );
     }
 

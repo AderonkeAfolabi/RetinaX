@@ -64,6 +64,7 @@ fn test_zero_inactivity_timeout_is_immediately_releasable() {
 
     let seed = BytesN::from_array(&env, &[1u8; 32]);
     let data_ref = String::from_str(&env, "ipfs://zero");
+    let snapshot: VaultSnapshot = vault.configure_vault(&owner, &2, &3, &3, &0, &data_ref, &seed);
     let snapshot: VaultSnapshot =
         vault.configure_vault(&owner, &2, &3, &3, &0, &data_ref, &seed, &None);
 

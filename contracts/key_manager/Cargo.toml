@@ -10,6 +10,7 @@ rust-version.workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [features]
+library = []
 testutils = ["soroban-sdk/testutils"]
 
 [dependencies]

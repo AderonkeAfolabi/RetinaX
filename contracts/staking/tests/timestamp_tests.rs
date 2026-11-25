@@ -3,7 +3,6 @@
 
 #[cfg(test)]
 mod staking_timestamp_tests {
-    use super::*;
 
     #[test]
     fn test_loyalty_calculation_timestamp_zero() {
@@ -28,7 +27,6 @@ mod staking_timestamp_tests {
     #[test]
     fn test_staking_period_overflow() {
         // Test staking period calculation that could overflow
-        let stake_start = 0u64;
         let current_time = u64::MAX;
 
         // Calculate days staked

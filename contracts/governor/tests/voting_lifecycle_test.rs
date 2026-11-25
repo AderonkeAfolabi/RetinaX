@@ -320,7 +320,8 @@ fn test_quorum_not_met_proposal_expires() {
     let salt = BytesN::from_array(&ctx.env, &[42u8; 32]);
     let commit = compute_commitment(&ctx.env, prop_id, &VoteChoice::For, &salt);
     ctx.client.commit_vote(&voter, &prop_id, &commit);
-    ctx.client.reveal_vote(&voter, &prop_id, &VoteChoice::For, &salt);
+    ctx.client
+        .reveal_vote(&voter, &prop_id, &VoteChoice::For, &salt);
 
     // Voting period elapses
     advance_time(&ctx.env, 5 * 86_400 + 1);
@@ -456,7 +457,10 @@ fn test_commit_reveal_voting_edge_cases_and_validation() {
     );
 
     // 4. Valid Commit
-    assert!(ctx.client.try_commit_vote(&voter, &prop_id, &commit).is_ok());
+    assert!(ctx
+        .client
+        .try_commit_vote(&voter, &prop_id, &commit)
+        .is_ok());
     assert!(ctx.client.has_committed(&prop_id, &voter));
 
     // 5. Double commit -> AlreadyCommitted
@@ -693,7 +697,7 @@ fn test_all_proposal_types_quorum_and_timelock_requirements() {
         (ProposalType::ParameterChange, 2 * 86_400u64, 1_500u32), // 2 days, 15% quorum
         (ProposalType::PolicyModification, 2 * 86_400u64, 2_000u32), // 2 days, 20% quorum
         (ProposalType::ContractUpgrade, 7 * 86_400u64, 3_000u32), // 7 days, 30% quorum
-        (ProposalType::EmergencyAction, 21_600u64, 500u32),   // 6 hours, 5% quorum
+        (ProposalType::EmergencyAction, 21_600u64, 500u32),     // 6 hours, 5% quorum
     ];
 
     for (prop_type, expected_timelock, expected_quorum) in types_and_timelocks {
