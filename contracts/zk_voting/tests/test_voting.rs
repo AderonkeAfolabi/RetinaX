@@ -409,3 +409,122 @@ fn test_nullifier_spent_on_one_ballot_is_free_on_another() {
         Err(Ok(VoteError::NullifierAlreadyUsed))
     );
 }
+
+// ── Merkle inclusion proof edge cases (issue #530) ────────────────────────────
+
+/// A tree over the `count` distinct leaves `make_leaf(0)..=make_leaf(count - 1)`.
+fn merkle_tree(env: &Env, count: u8) -> MerkleTree {
+    let mut leaves: Vec<BytesN<32>> = Vec::new(env);
+    for i in 0..count {
+        leaves.push_back(make_leaf(env, i));
+    }
+    MerkleTree::new(env, leaves)
+}
+
+#[test]
+fn test_single_leaf_tree_proves_only_its_leaf() {
+    let env = Env::default();
+    let tree = merkle_tree(&env, 1);
+    let root = tree.root();
+    let leaf = make_leaf(&env, 0);
+    let other = make_leaf(&env, 1);
+    let proof = tree.proof(&env, 0);
+
+    // The only leaf is the root itself, so its proof has no siblings.
+    assert_eq!(root, leaf);
+    assert!(proof.is_empty());
+    assert!(MerkleTree::verify_proof(&env, &root, &leaf, 0, &proof));
+    assert!(!MerkleTree::verify_proof(&env, &root, &other, 0, &proof));
+}
+
+#[test]
+fn test_odd_leaf_count_tree_proves_every_leaf() {
+    let env = Env::default();
+    for count in [3u8, 5, 7] {
+        let tree = merkle_tree(&env, count);
+        let root = tree.root();
+        for i in 0..count {
+            let idx = u32::from(i);
+            let leaf = make_leaf(&env, i);
+            let proof = tree.proof(&env, idx);
+            assert!(
+                MerkleTree::verify_proof(&env, &root, &leaf, idx, &proof),
+                "proof failed for leaf {i} of {count}"
+            );
+        }
+
+        // The padding slot after the last leaf must not admit a new leaf.
+        let idx = u32::from(count);
+        let outsider = make_leaf(&env, count);
+        let proof = tree.proof(&env, idx);
+        assert!(
+            !MerkleTree::verify_proof(&env, &root, &outsider, idx, &proof),
+            "padding admitted a new leaf in a tree of {count}"
+        );
+    }
+}
+
+#[test]
+fn test_last_leaf_proof_is_valid() {
+    let env = Env::default();
+    // Full trees, and odd trees where the last leaf is paired with its padding.
+    for count in [2u8, 3, 4, 5, 8] {
+        let tree = merkle_tree(&env, count);
+        let last = count - 1;
+        let idx = u32::from(last);
+        let leaf = make_leaf(&env, last);
+        let proof = tree.proof(&env, idx);
+        assert!(
+            MerkleTree::verify_proof(&env, &tree.root(), &leaf, idx, &proof),
+            "last-leaf proof failed for {count} leaves"
+        );
+    }
+}
+
+#[test]
+fn test_swapped_sibling_order_is_rejected() {
+    let env = Env::default();
+    let tree = merkle_tree(&env, 4);
+    let root = tree.root();
+
+    for i in 0u8..4 {
+        let idx = u32::from(i);
+        let leaf = make_leaf(&env, i);
+        let proof = tree.proof(&env, idx);
+
+        // Siblings listed root-first instead of leaf-first.
+        let mut swapped: Vec<BytesN<32>> = Vec::new(&env);
+        swapped.push_back(proof.get(1).unwrap());
+        swapped.push_back(proof.get(0).unwrap());
+        assert!(
+            !MerkleTree::verify_proof(&env, &root, &leaf, idx, &swapped),
+            "reordered siblings accepted for leaf {i}"
+        );
+
+        // Sibling hashed on the wrong side of the leaf.
+        assert!(
+            !MerkleTree::verify_proof(&env, &root, &leaf, idx ^ 1, &proof),
+            "wrong-side sibling accepted for leaf {i}"
+        );
+    }
+}
+
+#[test]
+fn test_proof_for_leaf_not_in_tree_is_rejected() {
+    let env = Env::default();
+    let root = merkle_tree(&env, 4).root();
+
+    // A genuine proof, but from a larger tree that does contain the leaf.
+    let larger = merkle_tree(&env, 8);
+    let larger_root = larger.root();
+    let outsider = make_leaf(&env, 4);
+    let proof = larger.proof(&env, 4);
+    assert!(
+        MerkleTree::verify_proof(&env, &larger_root, &outsider, 4, &proof),
+        "proof must be valid in its own tree"
+    );
+    assert!(
+        !MerkleTree::verify_proof(&env, &root, &outsider, 4, &proof),
+        "leaf outside the tree accepted"
+    );
+}

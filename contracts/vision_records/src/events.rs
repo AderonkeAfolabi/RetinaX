@@ -119,6 +119,24 @@ pub struct AccessExpiredEvent {
     pub purged_at: u64,
 }
 
+/// Event published when retention period is set for a data class.
+#[soroban_sdk::contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RetentionPeriodSetEvent {
+    pub admin: Address,
+    pub record_type: RecordType,
+    pub retention_seconds: u64,
+    pub timestamp: u64,
+}
+
+/// Event published when an expired record is purged from storage.
+#[soroban_sdk::contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RecordPurgedEvent {
+    pub record_id: u64,
+    pub timestamp: u64,
+}
+
 /// Event published when a batch of records is added.
 #[soroban_sdk::contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1714,3 +1732,31 @@ pub fn publish_prescription_updated(
     };
     env.events().publish(topics, data);
 }
+
+/// Publishes an event when retention period is configured for a data class.
+pub fn publish_retention_period_set(
+    env: &Env,
+    admin: Address,
+    record_type: RecordType,
+    retention_seconds: u64,
+) {
+    let topics = (symbol_short!("RET_SET"), admin.clone());
+    let data = RetentionPeriodSetEvent {
+        admin,
+        record_type,
+        retention_seconds,
+        timestamp: env.ledger().timestamp(),
+    };
+    env.events().publish(topics, data);
+}
+
+/// Publishes an event when an expired record is purged from storage.
+pub fn publish_record_purged(env: &Env, record_id: u64) {
+    let topics = (symbol_short!("REC_PURG"), record_id);
+    let data = RecordPurgedEvent {
+        record_id,
+        timestamp: env.ledger().timestamp(),
+    };
+    env.events().publish(topics, data);
+}
+

@@ -13,8 +13,7 @@
 //!    by tracking processed message IDs.
 
 use cross_chain::{
-    bridge::{self, import_record},
-    CrossChainContract, CrossChainContractClient, CrossChainError, CrossChainMessage,
+    bridge, CrossChainContract, CrossChainContractClient, CrossChainError, CrossChainMessage,
 };
 use soroban_sdk::{
     contract, contractimpl, symbol_short, testutils::Address as _, testutils::Ledger, Address,
@@ -35,14 +34,13 @@ impl MockVisionRecords {
         _bridge_caller: Address,
         patient: Address,
         payload: Bytes,
-    ) -> Result<(), ()> {
+    ) {
         env.storage()
             .instance()
             .set(&symbol_short!("LAST_PAT"), &patient);
         env.storage()
             .instance()
             .set(&symbol_short!("LAST_PAY"), &payload);
-        Ok(())
     }
 }
 
@@ -101,7 +99,7 @@ fn test_valid_merkle_proof_accepted() {
 
     // Anchor the state root on target chain
     let exported_root = pkg.state_root.clone();
-    client.anchor_state_root(&exported_root, symbol_short!("ETH"));
+    client.anchor_state_root(&admin, &exported_root, &symbol_short!("ETH"));
 
     // Advance ledger beyond finality window
     env.ledger().with_mut(|l| {
@@ -145,7 +143,7 @@ fn test_invalid_merkle_proof_rejected() {
     );
 
     let exported_root = pkg.state_root.clone();
-    client.anchor_state_root(&exported_root, symbol_short!("ETH"));
+    client.anchor_state_root(&admin, &exported_root, &symbol_short!("ETH"));
 
     // Tamper with the record data to invalidate the proof
     pkg.record_data = Bytes::from_slice(&env, b"tampered_payload");
@@ -241,11 +239,12 @@ fn test_message_within_finality_window_rejected() {
     );
 
     let exported_root = pkg.state_root.clone();
-    client.anchor_state_root(&exported_root, symbol_short!("ETH"));
+    client.anchor_state_root(&admin, &exported_root, &symbol_short!("ETH"));
 
-    // Try to import immediately (within finality window)
-    // Default finality check should reject this
-    let result = client.try_import_record(&pkg, &exported_root);
+    // Try to import immediately with finality_depth > 0 (within finality window)
+    let result = env.as_contract(&bridge_id, || {
+        bridge::import_record(&env, pkg, exported_root, 20)
+    });
     assert!(
         result.is_err(),
         "Message within finality window should be rejected to prevent reorg"
@@ -284,7 +283,7 @@ fn test_message_after_finality_window_accepted() {
     );
 
     let exported_root = pkg.state_root.clone();
-    client.anchor_state_root(&exported_root, symbol_short!("ETH"));
+    client.anchor_state_root(&admin, &exported_root, &symbol_short!("ETH"));
 
     // Advance well beyond finality window (e.g., 100 ledgers)
     env.ledger().with_mut(|l| {
@@ -345,8 +344,8 @@ fn test_out_of_order_messages_handled() {
     // Anchor both roots
     let root1 = pkg1.state_root.clone();
     let root2 = pkg2.state_root.clone();
-    client.anchor_state_root(&root1, symbol_short!("ETH"));
-    client.anchor_state_root(&root2, symbol_short!("ETH"));
+    client.anchor_state_root(&admin, &root1, &symbol_short!("ETH"));
+    client.anchor_state_root(&admin, &root2, &symbol_short!("ETH"));
 
     // Advance beyond finality
     env.ledger().with_mut(|l| {
@@ -484,7 +483,7 @@ fn test_duplicate_record_import_prevented() {
     );
 
     let exported_root = pkg.state_root.clone();
-    client.anchor_state_root(&exported_root, symbol_short!("ETH"));
+    client.anchor_state_root(&admin, &exported_root, &symbol_short!("ETH"));
 
     env.ledger().with_mut(|l| {
         l.sequence_number = l.sequence_number + 50;
@@ -534,7 +533,7 @@ fn test_zero_finality_depth_immediate_import() {
     );
 
     let exported_root = pkg.state_root.clone();
-    client.anchor_state_root(&exported_root, symbol_short!("ETH"));
+    client.anchor_state_root(&admin, &exported_root, &symbol_short!("ETH"));
 
     // With finality_depth=0, should succeed immediately
     // This tests the boundary condition
@@ -588,7 +587,7 @@ fn test_field_proof_verification_on_import() {
     );
 
     let exported_root = pkg.state_root.clone();
-    client.anchor_state_root(&exported_root, symbol_short!("ETH"));
+    client.anchor_state_root(&admin, &exported_root, &symbol_short!("ETH"));
 
     env.ledger().with_mut(|l| {
         l.sequence_number = l.sequence_number + 50;

@@ -31,7 +31,7 @@
 
 use soroban_sdk::{contracttype, symbol_short, Bytes, BytesN, Env, Symbol};
 
-use crate::merkle_tree::{FieldEntry, FieldProof, MerkleProof, SparseMerkleTree, TreeState};
+pub use crate::merkle_tree::{FieldEntry, FieldProof, MerkleProof, SparseMerkleTree, TreeState};
 
 // ---------------------------------------------------------------------------
 // Constants

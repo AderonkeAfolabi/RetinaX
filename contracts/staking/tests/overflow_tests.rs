@@ -89,7 +89,7 @@ mod overflow_boundary_tests {
         let base = 1_000_000u64;
         let mult1 = 1000u64;
         let mult2 = 1000u64;
-        let mult3 = 1000u64;
+        let mult3 = 100_000_000u64;
 
         let step1 = base.checked_mul(mult1);
         assert!(step1.is_some());
