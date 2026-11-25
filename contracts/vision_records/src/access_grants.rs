@@ -394,6 +394,13 @@ impl VisionRecordsContract {
         emergency::get_audit_entries(&env, access_id)
     }
 
+    /// List every emergency access to the patient's data. Only the patient can call this, because
+    /// the report carries the requesters' free-text attestations.
+    pub fn get_emergency_access_report(env: Env, patient: Address) -> Vec<EmergencyAccessReport> {
+        patient.require_auth();
+        emergency::get_emergency_access_report(&env, &patient)
+    }
+
     pub fn access_record_via_emergency(
         env: Env,
         requester: Address,

@@ -31,11 +31,13 @@
 pub mod billing;
 pub mod events;
 pub mod gas_token;
+pub mod history;
 pub mod plans;
 pub mod quota;
 
 use billing::{BillingError, BillingModel, BillingReport, Invoice, TenantUsageRecord};
 use gas_token::GasTokenError;
+use history::UsageHistoryPage;
 use quota::{QuotaError, QuotaUsage, TenantQuota};
 
 use soroban_sdk::{
@@ -437,6 +439,37 @@ impl MeteringContract {
     /// Return current usage counters for a tenant.
     pub fn get_usage(env: Env, tenant: Address) -> QuotaUsage {
         quota::get_usage(&env, &tenant)
+    }
+
+    // ── Usage history ─────────────────────────────────────────────────────────
+
+    /// Set how many usage entries are kept per tenant, 1 to [`history::MAX_HISTORY_CAP`]. Admin only.
+    pub fn set_history_cap(env: Env, caller: Address, cap: u32) -> Result<(), MeteringError> {
+        caller.require_auth();
+        Self::require_admin(&env, &caller)?;
+        if cap == 0 || cap > history::MAX_HISTORY_CAP {
+            return Err(MeteringError::InvalidInput);
+        }
+        history::set_cap(&env, cap);
+        Ok(())
+    }
+
+    /// Return a tenant's recorded operations, newest first.
+    ///
+    /// - `limit`: page size, 1 to [`history::MAX_LIMIT`]. Defaults to [`history::DEFAULT_LIMIT`].
+    /// - `before`: only return entries with an `id` below this, taken from the previous page's
+    ///   `next_cursor`.
+    pub fn get_usage_history(
+        env: Env,
+        tenant: Address,
+        limit: Option<u32>,
+        before: Option<u64>,
+    ) -> Result<UsageHistoryPage, MeteringError> {
+        let limit = limit.unwrap_or(history::DEFAULT_LIMIT);
+        if limit == 0 || limit > history::MAX_LIMIT || before == Some(0) {
+            return Err(MeteringError::InvalidInput);
+        }
+        Ok(quota::get_usage_history(&env, &tenant, limit, before))
     }
 
     // ── Gas recording ─────────────────────────────────────────────────────────

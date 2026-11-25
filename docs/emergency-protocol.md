@@ -328,6 +328,17 @@ Retrieves the complete audit trail for an emergency access.
 **Errors:**
 - `EmergencyAccessNotFound`: Access ID does not exist
 
+### get_emergency_access_report
+
+Lists every emergency access to a patient's data, oldest first: active, expired and revoked, from every requester.
+
+**Parameters:**
+- `patient`: Patient address (must authenticate; nobody else can read the report)
+
+**Returns:** `Vec<EmergencyAccessReport>`, empty if there were none. Each item holds:
+- `access`: The `EmergencyAccess` (requester, condition, attestation, times and status)
+- `audit_trail`: Its `EmergencyAuditEntry` list, so a patient sees when each requester used the access
+
 ### expire_emergency_accesses
 
 Expires emergency accesses that have passed their expiration time.

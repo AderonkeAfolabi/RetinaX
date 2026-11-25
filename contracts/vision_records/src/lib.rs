@@ -75,7 +75,10 @@ pub use errors::{create_error_context, log_error};
 
 /// Re-export types from submodules used directly in the contract impl.
 pub use audit::{AccessAction, AccessResult};
-pub use emergency::{EmergencyAccess, EmergencyAuditEntry, EmergencyCondition, EmergencyStatus};
+pub use emergency::{
+    EmergencyAccess, EmergencyAccessReport, EmergencyAuditEntry, EmergencyCondition,
+    EmergencyStatus,
+};
 pub use examination::{
     ExaminationVersion, EyeExamination, IntraocularPressure, OptFundusPhotography,
     OptRetinalImaging, OptVisualField, SlitLampFindings, VisualAcuity,
@@ -353,6 +356,9 @@ mod test_occ;
 
 #[cfg(test)]
 mod test_diagnostic_image_metadata;
+
+#[cfg(test)]
+mod test_emergency_report;
 
 #[cfg(test)]
 mod test_empty_record;

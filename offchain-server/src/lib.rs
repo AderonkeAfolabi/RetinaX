@@ -16,7 +16,10 @@ pub mod store;
 use std::sync::Arc;
 
 use axum::{
-    extract::{rejection::QueryRejection, Path, Query, Request, State},
+    extract::{
+        rejection::{PathRejection, QueryRejection},
+        Path, Query, Request, State,
+    },
     http::{header, HeaderMap, StatusCode},
     middleware::{self, Next},
     response::{Html, IntoResponse, Response},
@@ -464,10 +467,12 @@ async fn generate_proof(
 /// Returns `patient_id`'s audit events, newest first.
 async fn get_audit_logs(
     State(state): State<AppState>,
-    Path(patient_id): Path<String>,
+    patient_id: Result<Path<String>, PathRejection>,
     headers: HeaderMap,
     query: Result<Query<AuditLogQuery>, QueryRejection>,
 ) -> Result<Json<AuditLogResponse>, ApiError> {
+    let Path(patient_id) =
+        patient_id.map_err(|err| ApiError::new(err.status(), err.body_text()))?;
     if !is_stellar_address(&patient_id) {
         return Err(ApiError::new(
             StatusCode::BAD_REQUEST,

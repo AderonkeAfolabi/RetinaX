@@ -485,6 +485,34 @@ let verified = client.verify_zk_credential(
 
 ---
 
+### Credential Revocation
+
+Each issuer has its own registry: one bit per credential, addressed by the credential's `revocation_index`. Assign indexes at random and never derive them from the holder, so that a public index does not point to a person.
+
+#### `revoke(env: Env, issuer: Address, index: u64)`
+
+Permanently revoke a credential.
+
+**Parameters:**
+
+- `issuer` - The credential's issuer (must authenticate)
+- `index` - The credential's `revocation_index`
+
+---
+
+#### `is_revoked(env: Env, issuer: Address, index: u64) -> bool`
+
+Check if a credential has been revoked. Anyone can call this.
+
+**Parameters:**
+
+- `issuer` - The credential's issuer
+- `index` - The credential's `revocation_index`
+
+**Returns:** `bool` — true if `issuer` has revoked the credential at `index`
+
+---
+
 ## Data Types
 
 ### Structs

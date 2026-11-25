@@ -13,7 +13,7 @@ use offchain_server::{
     store::{AuditEvent, AuditLogStore, MemoryStore, Page, StoreError},
     AppState, MAX_LIMIT,
 };
-use serde_json::Value;
+use serde_json::{json, Value};
 use tower::ServiceExt;
 
 const TOKEN: &str = "test-token-0123456789abcdef012345";
@@ -323,6 +323,60 @@ async fn database_errors_return_500_without_details() {
     let (status, body) = get(app_with(FailingStore), &uri, Some(TOKEN)).await;
     assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
     assert_eq!(body["error"], "failed to load audit logs");
+}
+
+/// Every error response is `{"error": "<message>"}` and nothing else (#528).
+#[tokio::test]
+async fn every_error_response_has_the_same_json_shape() {
+    let logs = format!("/api/audit-logs/{PATIENT}");
+    let query = |query: &str| format!("{logs}?{query}");
+    let over_limit = format!("limit={}", MAX_LIMIT + 1);
+
+    #[rustfmt::skip]
+    let cases = [
+        ("missing bearer token", logs.clone(), None, StatusCode::UNAUTHORIZED),
+        ("empty bearer token", logs.clone(), Some(""), StatusCode::UNAUTHORIZED),
+        ("invalid bearer token", logs.clone(), Some("wrong-token"), StatusCode::UNAUTHORIZED),
+        ("invalid patient id", "/api/audit-logs/not-an-address".into(), Some(TOKEN), StatusCode::BAD_REQUEST),
+        ("non-UTF-8 patient id", "/api/audit-logs/%FF".into(), Some(TOKEN), StatusCode::BAD_REQUEST),
+        ("zero limit", query("limit=0"), Some(TOKEN), StatusCode::BAD_REQUEST),
+        ("limit over the maximum", query(&over_limit), Some(TOKEN), StatusCode::BAD_REQUEST),
+        ("negative limit", query("limit=-1"), Some(TOKEN), StatusCode::BAD_REQUEST),
+        ("non-numeric limit", query("limit=abc"), Some(TOKEN), StatusCode::BAD_REQUEST),
+        ("zero before", query("before=0"), Some(TOKEN), StatusCode::BAD_REQUEST),
+        ("negative before", query("before=-5"), Some(TOKEN), StatusCode::BAD_REQUEST),
+        ("non-numeric before", query("before=abc"), Some(TOKEN), StatusCode::BAD_REQUEST),
+        ("zero cursor", query("cursor=0"), Some(TOKEN), StatusCode::BAD_REQUEST),
+        ("negative cursor", query("cursor=-5"), Some(TOKEN), StatusCode::BAD_REQUEST),
+        ("non-numeric cursor", query("cursor=abc"), Some(TOKEN), StatusCode::BAD_REQUEST),
+        ("database error", logs.clone(), Some(TOKEN), StatusCode::INTERNAL_SERVER_ERROR),
+    ];
+
+    for (name, uri, token, expected) in cases {
+        let app = if expected == StatusCode::INTERNAL_SERVER_ERROR {
+            app_with(FailingStore)
+        } else {
+            app()
+        };
+        let mut request = Request::get(uri);
+        if let Some(token) = token {
+            request = request.header(header::AUTHORIZATION, format!("Bearer {token}"));
+        }
+        let response = app
+            .oneshot(request.body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(response.status(), expected, "{name}: status");
+
+        let bytes = response.into_body().collect().await.unwrap().to_bytes();
+        let text = String::from_utf8_lossy(&bytes);
+        let body: Value = serde_json::from_slice(&bytes)
+            .unwrap_or_else(|err| panic!("{name}: {text:?} is not JSON: {err}"));
+        let message = body["error"].as_str().unwrap_or_default();
+        assert!(!message.is_empty(), "{name}: no error message in {text}");
+        assert_eq!(body, json!({ "error": message }), "{name}: other fields");
+        assert!(!text.contains("secret detail"), "{name}: {text} leaks");
+    }
 }
 
 #[tokio::test]

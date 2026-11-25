@@ -11,6 +11,8 @@
 
 use soroban_sdk::{contracttype, symbol_short, Address, Env, Symbol};
 
+use crate::history::{self, UsageHistory, UsageHistoryPage};
+
 // ── Storage key prefixes ─────────────────────────────────────────────────────
 
 pub const QUOTA_KEY: Symbol = symbol_short!("QUOTA");
@@ -57,6 +59,14 @@ pub struct QuotaUsage {
 }
 
 impl QuotaUsage {
+    const ZERO: Self = QuotaUsage {
+        read_used: 0,
+        write_used: 0,
+        compute_used: 0,
+        storage_used: 0,
+        burst_used: 0,
+    };
+
     /// Total gas across all non-burst buckets.
     pub fn total(&self) -> u64 {
         self.read_used
@@ -64,6 +74,15 @@ impl QuotaUsage {
             .saturating_add(self.compute_used)
             .saturating_add(self.storage_used)
     }
+}
+
+/// A tenant's current-cycle counters and usage history. They share one ledger entry so that
+/// recording an operation is a single write.
+#[contracttype]
+#[derive(Clone)]
+struct UsageRecord {
+    usage: QuotaUsage,
+    history: UsageHistory,
 }
 
 // ── Storage helpers ───────────────────────────────────────────────────────────
@@ -106,43 +125,51 @@ pub fn remove_quota(env: &Env, tenant: &Address) {
     env.storage().persistent().remove(&quota_key(tenant));
 }
 
-/// Read current usage for a tenant (returns zeroed struct if no data yet).
-pub fn get_usage(env: &Env, tenant: &Address) -> QuotaUsage {
+fn load_record(env: &Env, tenant: &Address) -> UsageRecord {
     let key = usage_key(tenant);
-    let usage: Option<QuotaUsage> = env.storage().persistent().get(&key);
-    if let Some(u) = usage {
+    let record: Option<UsageRecord> = env.storage().persistent().get(&key);
+    if let Some(r) = record {
         extend_ttl(env, &key);
-        u
+        r
     } else {
-        QuotaUsage {
-            read_used: 0,
-            write_used: 0,
-            compute_used: 0,
-            storage_used: 0,
-            burst_used: 0,
+        UsageRecord {
+            usage: QuotaUsage::ZERO,
+            history: UsageHistory::new(env),
         }
     }
 }
 
-/// Persist updated usage for a tenant.
-pub fn set_usage(env: &Env, tenant: &Address, usage: &QuotaUsage) {
+fn store_record(env: &Env, tenant: &Address, mut record: UsageRecord) {
+    record.history.trim(history::cap(env));
     let key = usage_key(tenant);
-    env.storage().persistent().set(&key, usage);
+    env.storage().persistent().set(&key, &record);
     extend_ttl(env, &key);
 }
 
+/// Read current usage for a tenant (returns zeroed struct if no data yet).
+pub fn get_usage(env: &Env, tenant: &Address) -> QuotaUsage {
+    load_record(env, tenant).usage
+}
+
+/// Read one page of a tenant's usage history (empty if no data yet).
+pub fn get_usage_history(
+    env: &Env,
+    tenant: &Address,
+    limit: u32,
+    before: Option<u64>,
+) -> UsageHistoryPage {
+    let mut history = load_record(env, tenant).history;
+    // A lowered cap holds at once, even for entries stored under the old one.
+    history.trim(history::cap(env));
+    history.page(env, limit, before)
+}
+
 /// Reset usage counters for a tenant (called at the start of each billing cycle).
+/// The usage history is kept.
 pub fn reset_usage(env: &Env, tenant: &Address) {
-    let key = usage_key(tenant);
-    let zeroed = QuotaUsage {
-        read_used: 0,
-        write_used: 0,
-        compute_used: 0,
-        storage_used: 0,
-        burst_used: 0,
-    };
-    env.storage().persistent().set(&key, &zeroed);
-    extend_ttl(env, &key);
+    let mut record = load_record(env, tenant);
+    record.usage = QuotaUsage::ZERO;
+    store_record(env, tenant, record);
 }
 
 /// Check whether adding `delta` units to a specific bucket would breach
@@ -189,14 +216,15 @@ pub fn check_quota(
     Err(QuotaError::QuotaExceeded)
 }
 
-/// Apply gas consumption to a tenant's usage counters.
+/// Apply gas consumption to a tenant's usage counters and add it to their usage history.
 /// If the regular bucket is exhausted, overflow spills into `burst_used`.
 ///
 /// # Panics
 /// This function does not panic; overflows are capped with saturating arithmetic.
 pub fn consume_quota(env: &Env, tenant: &Address, op_type: &super::OperationType, delta: u64) {
     let quota_opt = get_quota(env, tenant);
-    let mut usage = get_usage(env, tenant);
+    let mut record = load_record(env, tenant);
+    let usage = &mut record.usage;
 
     let burst_draw = if let Some(ref quota) = quota_opt {
         let (bucket_used, bucket_limit) = match op_type {
@@ -230,7 +258,10 @@ pub fn consume_quota(env: &Env, tenant: &Address, op_type: &super::OperationType
     }
     usage.burst_used = usage.burst_used.saturating_add(burst_draw);
 
-    set_usage(env, tenant, &usage);
+    record
+        .history
+        .push(op_type, delta, env.ledger().timestamp());
+    store_record(env, tenant, record);
 }
 
 // ── Errors ────────────────────────────────────────────────────────────────────
