@@ -17,6 +17,16 @@ pub struct VaultPolicy {
     pub shard_count: u32,
     pub emergency_threshold: u32,
     pub inactivity_timeout_secs: u64,
+    pub grace_period_secs: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LegacyVaultPolicy {
+    pub threshold: u32,
+    pub shard_count: u32,
+    pub emergency_threshold: u32,
+    pub inactivity_timeout_secs: u64,
 }
 
 #[contracttype]
@@ -25,6 +35,18 @@ pub struct VaultRecord {
     pub owner: Address,
     pub epoch: u32,
     pub policy: VaultPolicy,
+    pub data_ref_hash: String,
+    pub created_at: u64,
+    pub last_activity_at: u64,
+    pub deadman_release_at: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LegacyVaultRecord {
+    pub owner: Address,
+    pub epoch: u32,
+    pub policy: LegacyVaultPolicy,
     pub data_ref_hash: String,
     pub created_at: u64,
     pub last_activity_at: u64,

@@ -21,10 +21,9 @@ use soroban_sdk::{
 };
 
 use crate::{
-    delegation,
     proposal::{ProposalAction, ProposalPhase, ProposalType},
     voting::{compute_vote_power, isqrt, loyalty_multiplier_scaled, VoteChoice, SCALE},
-    ContractError, GovernorContract, GovernorContractClient,
+    GovernorContract, GovernorContractClient,
 };
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
@@ -34,7 +33,7 @@ fn create_env() -> Env {
 }
 
 fn register_governor(env: &Env) -> (Address, GovernorContractClient<'_>) {
-    let contract_id = env.register_contract(None, GovernorContract);
+    let contract_id = env.register(GovernorContract, ());
     let client = GovernorContractClient::new(env, &contract_id);
     (contract_id, client)
 }
@@ -623,4 +622,111 @@ fn test_execute_proposal_is_not_replayable() {
     // Replay attempt: executing again must fail (proposal no longer in Execution phase).
     let res = client.try_execute_proposal(&executor, &id);
     assert!(res.is_err());
+}
+
+#[test]
+fn test_emergency_veto_guardian() {
+    let env = create_env();
+    env.mock_all_auths();
+    let (contract_id, client) = register_governor(&env);
+    let admin = Address::generate(&env);
+    let staking = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    client.initialize(&admin, &staking, &treasury, &500i128);
+
+    let guardian = Address::generate(&env);
+    let attacker = Address::generate(&env);
+
+    client.set_guardian(&admin, &guardian);
+    assert_eq!(client.get_guardian(), Some(guardian.clone()));
+
+    let proposer = Address::generate(&env);
+    let voter = Address::generate(&env);
+    set_mock_stake(&env, &contract_id, &proposer, 5_000);
+    set_mock_stake(&env, &contract_id, &voter, 10_000);
+
+    let target = Address::generate(&env);
+    let actions = single_action(&env, &target);
+
+    let id = client.create_proposal(
+        &proposer,
+        &ProposalType::ParameterChange,
+        &String::from_str(&env, "Malicious proposal to veto"),
+        &actions,
+    );
+
+    // Cannot veto while in Draft phase
+    let res = client.try_veto(&guardian, &id);
+    assert!(matches!(res, Err(Ok(crate::ContractError::WrongPhase))));
+
+    // Advance to Voting
+    client.advance_phase(&proposer, &id);
+    advance_time(&env, 3 * 24 * 3600 + 1);
+    client.advance_phase(&voter, &id);
+
+    // Vote FOR and advance to Timelock
+    let salt = BytesN::from_array(&env, &[1u8; 32]);
+    let choice = VoteChoice::For;
+    let commitment = compute_commitment(&env, id, &choice, &salt);
+    client.commit_vote(&voter, &id, &commitment);
+    client.reveal_vote(&voter, &id, &choice, &salt);
+
+    advance_time(&env, 5 * 24 * 3600 + 1);
+    let phase = client.advance_phase(&voter, &id);
+    assert!(matches!(phase, ProposalPhase::Timelock));
+
+    // Attacker cannot veto
+    let res = client.try_veto(&attacker, &id);
+    assert!(matches!(res, Err(Ok(crate::ContractError::Unauthorized))));
+
+    // Guardian vetoes during timelock
+    client.veto(&guardian, &id);
+
+    let proposal = client.get_proposal(&id).unwrap();
+    assert!(matches!(proposal.phase, ProposalPhase::Rejected));
+}
+
+#[test]
+fn test_proposal_category_config() {
+    let env = create_env();
+    env.mock_all_auths();
+    let (contract_id, client) = register_governor(&env);
+    default_init(&env, &client);
+
+    let admin = Address::generate(&env);
+    env.as_contract(&contract_id, || {
+        env.storage().instance().set(&crate::ADMIN, &admin)
+    });
+
+    // Configure ContractUpgrade category with 35% quorum and 66% threshold
+    client.set_category_config(
+        &admin,
+        &crate::proposal::ProposalCategory::ContractUpgrade,
+        &3_500u32,
+        &6_600u32,
+    );
+
+    let cfg = client.get_category_config(&crate::proposal::ProposalCategory::ContractUpgrade);
+    assert_eq!(cfg.quorum_bps, 3_500u32);
+    assert_eq!(cfg.pass_threshold_bps, 6_600u32);
+
+    let proposer = Address::generate(&env);
+    set_mock_stake(&env, &contract_id, &proposer, 5_000);
+
+    let target = Address::generate(&env);
+    let actions = single_action(&env, &target);
+
+    let id = client.create_proposal_with_category(
+        &proposer,
+        &ProposalType::ContractUpgrade,
+        &crate::proposal::ProposalCategory::ContractUpgrade,
+        &String::from_str(&env, "Major contract upgrade"),
+        &actions,
+    );
+
+    let summary = client.get_proposal_summary(&id).unwrap();
+    assert_eq!(
+        summary.category,
+        crate::proposal::ProposalCategory::ContractUpgrade
+    );
 }

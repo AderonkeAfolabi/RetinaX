@@ -4,6 +4,22 @@
 
 Handles interoperability between different Electronic Medical Record (EMR) systems. Manages provider registration, data format mapping, and synchronization between heterogeneous healthcare systems (EHR, HL7, FHIR).
 
+## Architecture at a Glance
+
+```mermaid
+flowchart LR
+    Admin[Admin] -->|register_provider| Registry[EMR provider registry]
+    Client[Client] -->|sync_record| Bridge[EMR Bridge]
+    Registry --> Bridge
+    Bridge --> Mapper{Source format}
+    Mapper -->|HL7v2| HL7[HL7 mapper]
+    Mapper -->|FHIR| FHIR[FHIR mapper]
+    HL7 --> Normalized[Normalized record]
+    FHIR --> Normalized
+    Normalized --> Target[Target EMR system]
+    Bridge --> Events[Sync events]
+```
+
 ## Initialization
 
 ### `initialize(env: Env, admin: Address) -> Result<(), EmrBridgeError>`
@@ -434,6 +450,6 @@ pub struct SyncVerification {
 ## Related Documentation
 
 - [FHIR Integration](./fhir.md)
-- [EMR Integration Guide](../docs/emr-integration.md)
-- [Data Portability](../docs/data-portability.md)
-- [Interoperability](../docs/integrators.md)
+- [EMR Integration Guide](../emr-integration.md)
+- [Data Portability](../data-portability.md)
+- [Interoperability](../integrators.md)

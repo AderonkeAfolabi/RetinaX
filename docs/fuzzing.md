@@ -24,6 +24,8 @@ cargo +nightly fuzz run vision_records
 - **`vision_records`**: Explores `VisionRecordsContract`, looking at data parsing errors, hashing bugs, or access control panic flows under unpredictable conditions.
 - **`staking`**: Aggressively stakes and unstakes varying parameters, ensuring there are no arithmetic panics unhandled by contract.
 - **`audit`**: Tests audit logging and compliance features under random input conditions.
+- **`identity_fuzz`**: Tests `IdentityContract` DID registration, updates, deactivation, guardian additions/removals, threshold updates, and social recovery lifecycles.
+- **`key_manager_fuzz`**: Tests `KeyManagerContract` hierarchical key derivations, key usage limits, rotation, revocation, and guardian-based recovery lifecycles.
 
 ## Corpus Management
 
@@ -36,7 +38,9 @@ fuzz/
 │   │   ├── record_access/
 │   │   └── emergency_scenarios/
 │   ├── staking/
-│   └── audit/
+│   ├── audit/
+│   ├── identity/
+│   └── key_manager/
 └── artifacts/
     ├── crashes/
     └── hangs/

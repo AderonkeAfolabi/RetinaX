@@ -6,6 +6,7 @@ pub mod events;
 pub mod rollback;
 pub mod transaction;
 pub mod validation;
+pub mod workflow;
 
 use common::transaction::{
     generate_transaction_id, get_default_timeout_config, get_transaction_log,
@@ -19,10 +20,12 @@ use deadlock::DeadlockDetector;
 use events::EventPublisher;
 use rollback::RollbackManager;
 use transaction::TransactionManager;
+use workflow::{WorkflowStep, WorkflowTemplate};
 
 /// Storage keys for the orchestrator contract
 const ADMIN: Symbol = symbol_short!("ADMIN");
 const INITIALIZED: Symbol = symbol_short!("INIT");
+const GOVERNANCE: Symbol = symbol_short!("GOV");
 
 /// Main orchestrator contract for cross-contract atomic transactions
 #[contract]
@@ -41,7 +44,9 @@ impl OrchestratorContract {
         }
 
         env.storage().instance().set(&ADMIN, &admin);
+        env.storage().instance().set(&GOVERNANCE, &admin);
         env.storage().instance().set(&INITIALIZED, &true);
+        workflow::install_built_ins(&env);
 
         let config = timeout_config.unwrap_or_else(|| get_default_timeout_config(&env));
         env.storage().instance().set(&TIMEOUT_CONFIG, &config);
@@ -291,6 +296,84 @@ impl OrchestratorContract {
         Ok(config)
     }
 
+    /// Designate the account allowed to publish and deploy custom workflows.
+    pub fn set_workflow_governance(
+        env: Env,
+        admin: Address,
+        governance: Address,
+    ) -> Result<(), TransactionError> {
+        Self::require_initialized(&env)?;
+        Self::require_admin(&env, &admin)?;
+        admin.require_auth();
+        env.storage().instance().set(&GOVERNANCE, &governance);
+        Ok(())
+    }
+
+    /// Publish a new immutable version of a custom workflow template.
+    pub fn create_workflow_template(
+        env: Env,
+        governance: Address,
+        id: String,
+        name: String,
+        steps: Vec<WorkflowStep>,
+    ) -> Result<u32, TransactionError> {
+        Self::require_initialized(&env)?;
+        Self::require_governance(&env, &governance)?;
+        let previous = workflow::latest(&env, &id).unwrap_or(0);
+        if previous != 0 {
+            if workflow::get(&env, &id, 1)
+                .ok_or(TransactionError::InvalidInput)?
+                .built_in
+            {
+                return Err(TransactionError::Unauthorized);
+            }
+            if previous == u32::MAX {
+                return Err(TransactionError::InvalidInput);
+            }
+        }
+        let version = previous + 1;
+        let template = WorkflowTemplate {
+            id,
+            name,
+            version,
+            steps,
+            built_in: false,
+        };
+        workflow::validate(&template)?;
+        workflow::save(&env, &template);
+        Ok(version)
+    }
+
+    /// Validate a saved version and make it the active version.
+    pub fn deploy_workflow_template(
+        env: Env,
+        governance: Address,
+        id: String,
+        version: u32,
+    ) -> Result<(), TransactionError> {
+        Self::require_initialized(&env)?;
+        Self::require_governance(&env, &governance)?;
+        let template =
+            workflow::get(&env, &id, version).ok_or(TransactionError::TransactionNotFound)?;
+        workflow::validate(&template)?;
+        workflow::deploy(&env, &id, version);
+        Ok(())
+    }
+
+    pub fn get_workflow_template(
+        env: Env,
+        id: String,
+        version: u32,
+    ) -> Result<WorkflowTemplate, TransactionError> {
+        Self::require_initialized(&env)?;
+        workflow::get(&env, &id, version).ok_or(TransactionError::TransactionNotFound)
+    }
+
+    pub fn get_deployed_workflow_version(env: Env, id: String) -> Result<u32, TransactionError> {
+        Self::require_initialized(&env)?;
+        workflow::deployed(&env, &id).ok_or(TransactionError::TransactionNotFound)
+    }
+
     // Helper functions
 
     fn require_initialized(env: &Env) -> Result<(), TransactionError> {
@@ -313,6 +396,19 @@ impl OrchestratorContract {
         } else {
             Err(TransactionError::Unauthorized)
         }
+    }
+
+    fn require_governance(env: &Env, caller: &Address) -> Result<(), TransactionError> {
+        let governance: Address = env
+            .storage()
+            .instance()
+            .get(&GOVERNANCE)
+            .ok_or(TransactionError::Unauthorized)?;
+        if governance != *caller {
+            return Err(TransactionError::Unauthorized);
+        }
+        caller.require_auth();
+        Ok(())
     }
 
     fn acquire_resource_locks(

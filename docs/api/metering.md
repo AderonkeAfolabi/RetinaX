@@ -4,6 +4,21 @@
 
 Tracks per-tenant resource consumption and enforces quotas across a hierarchy of organizations, clinics, providers, and patients. Enables fair cost allocation and prevents resource abuse in multi-tenant healthcare systems.
 
+## Architecture at a Glance
+
+```mermaid
+flowchart TD
+    Admin[Admin] -->|register_tenant| Hierarchy[Tenant hierarchy]
+    Hierarchy --> Org[Organization]
+    Org --> Clinic[Clinic]
+    Clinic --> Provider[Provider]
+    Provider --> Patient[Patient]
+    Contract[Contract call] -->|record_gas| Meter[Metering ledger]
+    Meter --> Quota{Quota available?}
+    Quota -- Yes --> Allow[Allow operation]
+    Quota -- No --> Deny[Rate-limit error]
+```
+
 ## Initialization
 
 ### `initialize(env: Env, admin: Address) -> Result<(), MeteringError>`
@@ -324,7 +339,29 @@ Retrieve usage statistics for a tenant.
 
 ---
 
+### Pricing Plans (#462)
+
+A plan bundles the quota a tenant gets and the base charge for a billing cycle. The admin manages the registry and
+assigns registered tenants to plans.
+
+- `set_plan(caller, plan_id, plan: Plan)`: admin only. Creates or replaces a plan. `plan_id` must be non-zero.
+- `get_plan(plan_id) -> Option<Plan>`
+- `assign_plan(caller, tenant, plan_id)`: admin only. Sets the tenant's quota to the plan's quota at once. Assigning
+  another plan is an upgrade or a downgrade. Usage already recorded in the current cycle is kept, so a downgrade below
+  current usage blocks the tenant until the next cycle.
+- `get_tenant_plan(tenant) -> Option<u32>`
+
+`price_per_cycle` is added to the postpaid invoice of every cycle the tenant is on the plan, even when the tenant used
+no gas. Prepaid tenants keep paying for gas from their balance, and the base charge does not change that.
+
 ## Data Types
+
+### Plan
+
+| Field             | Type         | Description                                                    |
+| ----------------- | ------------ | -------------------------------------------------------------- |
+| `quota`           | `TenantQuota`| Limits applied to a tenant on this plan, per billing cycle.     |
+| `price_per_cycle` | `u64`        | Base charge per billing cycle, in gas-cost units.              |
 
 ### TenantLevel
 
@@ -423,6 +460,7 @@ pub struct QuotaUsage {
 | `NoCycleOpen`         | 10   | No active billing cycle      |
 | `InvoiceNotFound`     | 11   | Invoice not found            |
 | `AlreadySettled`      | 12   | Invoice already paid         |
+| `PlanNotFound`        | 17   | No pricing plan with that id |
 
 ---
 
@@ -458,6 +496,6 @@ All ancestors' usage counters are incremented, enabling top-down quota enforceme
 
 ## Related Documentation
 
-- [Rate Limiting](../docs/rate-limiting.md)
-- [Cost Allocation](../docs/operations.md#cost-allocation)
-- [Governance](../docs/governance.md)
+- [Rate Limiting](../security/rate-limiting.md)
+- [Cost Allocation](../operations.md#cost-allocation)
+- [Governance](../governance.md)

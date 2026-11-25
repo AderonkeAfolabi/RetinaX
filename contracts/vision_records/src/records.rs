@@ -15,7 +15,7 @@ impl VisionRecordsContract {
         record_type: RecordType,
         data_hash: String,
     ) -> Result<u64, ContractError> {
-        let _guard = teye_common::ReentrancyGuard::new(&env);
+        let _guard = retinax_common::ReentrancyGuard::new(&env);
         circuit_breaker::require_not_paused(
             &env,
             &circuit_breaker::PauseScope::Function(symbol_short!("ADD_REC")),
@@ -94,18 +94,27 @@ impl VisionRecordsContract {
                 .persistent()
                 .get::<(Symbol, String), String>(&(ENC_KEY, ver.clone()))
             {
+                let hex = soroban_str_to_std(&sv);
+                if let Some(bytes) = hex_to_bytes(&hex) {
                 let hex = sv.to_string();
-                if let Some(bytes) = teye_common::hex_to_bytes(&hex) {
+                if let Some(bytes) = retinax_common::hex_to_bytes(&hex) {
                     master_bytes = bytes;
                 }
             }
         }
         // Build KeyManager and encrypt the provided data_hash
         let km = KeyManager::new(master_bytes);
-        let plaintext: StdString = data_hash.to_string();
+        let plaintext: StdString = soroban_str_to_std(&data_hash);
         let ciphertext = km.encrypt(None, &plaintext);
         let stored_hash = String::from_str(&env, &ciphertext);
         let key_version = current_version;
+
+        let retention_period = retention::get_retention_period(&env, &record_type);
+        let retain_until = if retention_period > 0 {
+            Some(env.ledger().timestamp().saturating_add(retention_period))
+        } else {
+            None
+        };
 
         let record = VisionRecord {
             id: record_id,
@@ -116,12 +125,13 @@ impl VisionRecordsContract {
             key_version,
             created_at: env.ledger().timestamp(),
             updated_at: env.ledger().timestamp(),
+            retain_until,
         };
 
         let key = (symbol_short!("RECORD"), record_id);
         env.storage().persistent().set(&key, &record);
         extend_ttl_u64_key(&env, &key);
-        teye_common::concurrency::init_record_version(&env, record_id, 0);
+        retinax_common::concurrency::init_record_version(&env, record_id, 0);
 
         // Meter: write operation for the provider.
         Self::meter_op(&env, &provider, MeteringOpType::Write);
@@ -139,7 +149,7 @@ impl VisionRecordsContract {
             .set(&patient_key, &patient_records);
 
         // Initialize OCC version tracking
-        teye_common::concurrency::init_record_version(&env, record_id, 1);
+        retinax_common::concurrency::init_record_version(&env, record_id, 1);
 
         let _ = lineage::create_node(&env, record_id, provider.clone(), "VisionRecord", None);
         let _ = lineage::add_edge(
@@ -235,8 +245,10 @@ impl VisionRecordsContract {
                 .persistent()
                 .get::<(Symbol, String), String>(&(ENC_KEY, ver.clone()))
             {
+                let hex = soroban_str_to_std(&sv);
+                if let Some(bytes) = hex_to_bytes(&hex) {
                 let hex = sv.to_string();
-                if let Some(bytes) = teye_common::hex_to_bytes(&hex) {
+                if let Some(bytes) = retinax_common::hex_to_bytes(&hex) {
                     master_bytes_batch = bytes;
                 }
             }
@@ -257,9 +269,16 @@ impl VisionRecordsContract {
 
             // Encrypt input.data_hash with master bytes
             let km = KeyManager::new(master_bytes);
-            let plaintext: StdString = input.data_hash.to_string();
+            let plaintext: StdString = soroban_str_to_std(&input.data_hash);
             let ciphertext = km.encrypt(None, &plaintext);
             let stored_hash = String::from_str(&env, &ciphertext);
+
+            let retention_period = retention::get_retention_period(&env, &input.record_type);
+            let retain_until = if retention_period > 0 {
+                Some(env.ledger().timestamp().saturating_add(retention_period))
+            } else {
+                None
+            };
 
             let record = VisionRecord {
                 id: current_id,
@@ -270,11 +289,12 @@ impl VisionRecordsContract {
                 key_version,
                 created_at: env.ledger().timestamp(),
                 updated_at: env.ledger().timestamp(),
+                retain_until,
             };
 
             let key = (symbol_short!("RECORD"), current_id);
             env.storage().persistent().set(&key, &record);
-            teye_common::concurrency::init_record_version(&env, current_id, 0);
+            retinax_common::concurrency::init_record_version(&env, current_id, 0);
 
             let patient_key = (symbol_short!("PAT_REC"), input.patient.clone());
             let mut patient_records: Vec<u64> = env
@@ -297,7 +317,7 @@ impl VisionRecordsContract {
 
             record_ids.push_back(current_id);
             // Initialize OCC version tracking
-            teye_common::concurrency::init_record_version(&env, current_id, 1);
+            retinax_common::concurrency::init_record_version(&env, current_id, 1);
 
             let _ = lineage::create_node(&env, current_id, provider.clone(), "VisionRecord", None);
             let _ = lineage::add_edge(
@@ -382,6 +402,24 @@ impl VisionRecordsContract {
                     return Err(ContractError::RecordArchived);
                 }
 
+                // Expired records are inaccessible per data class retention policy.
+                if let Some(retain_until) = record.retain_until {
+                    if env.ledger().timestamp() > retain_until {
+                        let audit_entry = audit::create_audit_entry(
+                            &env,
+                            caller.clone(),
+                            record.patient.clone(),
+                            Some(record_id),
+                            AccessAction::Read,
+                            AccessResult::Denied,
+                            Some(String::from_str(&env, "Record has expired per retention policy")),
+                        );
+                        audit::add_audit_entry(&env, &audit_entry);
+                        events::publish_audit_log_entry(&env, &audit_entry);
+                        return Err(ContractError::RecordExpired);
+                    }
+                }
+
                 // Log successful access
                 let audit_entry = audit::create_audit_entry(
                     &env,
@@ -412,8 +450,10 @@ impl VisionRecordsContract {
                         .persistent()
                         .get::<(Symbol, String), String>(&(ENC_KEY, ver.clone()))
                     {
+                        let hex = soroban_str_to_std(&sv);
+                        if let Some(bytes) = hex_to_bytes(&hex) {
                         let hex = sv.to_string();
-                        if let Some(bytes) = teye_common::hex_to_bytes(&hex) {
+                        if let Some(bytes) = retinax_common::hex_to_bytes(&hex) {
                             master_bytes = bytes;
                         }
                     }
@@ -421,7 +461,7 @@ impl VisionRecordsContract {
 
                 if !master_bytes.is_empty() || out_record.key_version.is_none() {
                     let km = KeyManager::new(master_bytes);
-                    let ciphertext = out_record.data_hash.to_string();
+                    let ciphertext = soroban_str_to_std(&out_record.data_hash);
                     if let Some(plain) = km.decrypt(None, &ciphertext) {
                         out_record.data_hash = String::from_str(&env, &plain);
                     }
@@ -587,18 +627,18 @@ impl VisionRecordsContract {
             );
         }
 
-        teye_common::concurrency::set_resolution_strategy(&env, record_id, &strategy);
+        retinax_common::concurrency::set_resolution_strategy(&env, record_id, &strategy);
         Ok(())
     }
 
     /// Retrieve conflicts for a specific record.
     pub fn get_record_conflicts(env: Env, record_id: u64) -> Vec<ConflictEntry> {
-        teye_common::concurrency::get_record_conflicts(&env, record_id)
+        retinax_common::concurrency::get_record_conflicts(&env, record_id)
     }
 
     /// Retrieve all pending conflicts.
     pub fn get_pending_conflicts(env: Env) -> Vec<ConflictEntry> {
-        teye_common::concurrency::get_pending_conflicts(&env)
+        retinax_common::concurrency::get_pending_conflicts(&env)
     }
 
     /// Resolve a conflict by marking it handled.
@@ -643,7 +683,7 @@ impl VisionRecordsContract {
             }
         }
 
-        if !teye_common::concurrency::resolve_conflict(&env, conflict_id, &caller) {
+        if !retinax_common::concurrency::resolve_conflict(&env, conflict_id, &caller) {
             return Err(ContractError::RecordNotFound);
         }
 
@@ -661,7 +701,7 @@ impl VisionRecordsContract {
             .unwrap_or(Vec::new(&env));
         let mut active = Vec::new(&env);
         for id in all.iter() {
-            if !archive::is_archived(&env, id) {
+            if !archive::is_archived(&env, id) && !retention::is_record_expired(&env, id) {
                 active.push_back(id);
             }
         }
@@ -679,7 +719,7 @@ impl VisionRecordsContract {
         let mut records: Vec<VisionRecord> = Vec::new(&env);
         for i in 0..ids.len() {
             let record_id = ids.get(i).unwrap();
-            if archive::is_archived(&env, record_id) {
+            if archive::is_archived(&env, record_id) || retention::is_record_expired(&env, record_id) {
                 continue;
             }
             let key = (symbol_short!("RECORD"), record_id);
@@ -845,5 +885,143 @@ impl VisionRecordsContract {
             portability::PortabilityFormat::Csv => portability::render_csv(&export),
         };
         Ok(Bytes::from_slice(&env, rendered.as_bytes()))
+    }
+
+    /// Cursor-based export of a patient's data (issue #446).
+    ///
+    /// The export is one linear sequence: the patient's records, then their prescriptions, then their access grants.
+    /// `cursor` is an index into that sequence, and `limit` (capped at [`portability::MAX_EXPORT_PAGE_SIZE`]) is the
+    /// number of items one page carries. Each page is a complete FHIR bundle or CSV document for the items it holds.
+    /// Start at `cursor = 0`, then follow `next_cursor` until it is `None`. Unlike `export_patient_data`, prescriptions
+    /// and grants are paged too, so no list size makes the export fail.
+    pub fn export_patient_data_page(
+        env: Env,
+        caller: Address,
+        patient: Address,
+        format: portability::PortabilityFormat,
+        cursor: u32,
+        limit: u32,
+    ) -> Result<portability::ExportPage, ContractError> {
+        caller.require_auth();
+        Self::enforce_rate_limit(&env, &caller)?;
+
+        let allowed = caller == patient
+            || Self::check_access(env.clone(), patient.clone(), caller.clone())
+                != AccessLevel::None
+            || Self::has_permission_unified(&env, &caller, &Permission::SystemAdmin);
+        if !allowed {
+            return Self::access_denied(&env, &caller, "export_patient_data_page", "ActiveGrant");
+        }
+
+        let page_size = limit.min(portability::MAX_EXPORT_PAGE_SIZE);
+        if page_size == 0 {
+            return Err(ContractError::InvalidInput);
+        }
+
+        let record_ids = Self::get_patient_records(env.clone(), patient.clone());
+        let history = prescription::get_patient_history(&env, patient.clone());
+        let grantees: Vec<Address> = env
+            .storage()
+            .persistent()
+            .get(&(symbol_short!("ACC_LST"), patient.clone()))
+            .unwrap_or(Vec::new(&env));
+
+        let records_end = record_ids.len();
+        let prescriptions_end = records_end.saturating_add(history.len());
+        let total = prescriptions_end.saturating_add(grantees.len());
+        if cursor > total {
+            return Err(ContractError::InvalidInput);
+        }
+
+        let page_end = cursor.saturating_add(page_size).min(total);
+        let mut entries = alloc::vec::Vec::new();
+        let mut prescriptions = alloc::vec::Vec::new();
+        let mut grants = alloc::vec::Vec::new();
+        for index in cursor..page_end {
+            if index < records_end {
+                let Some(record_id) = record_ids.get(index) else {
+                    continue;
+                };
+                let record = Self::get_record_raw(&env, record_id)?;
+                let exam = if matches!(record.record_type, RecordType::Examination) {
+                    examination::get_examination(&env, record_id)
+                } else {
+                    None
+                };
+                entries.push(portability::ExportEntry { record, exam });
+            } else if index < prescriptions_end {
+                let Some(rx_id) = history.get(index - records_end) else {
+                    continue;
+                };
+                if let Some(rx) = prescription::get_prescription(&env, rx_id) {
+                    prescriptions.push(rx);
+                }
+            } else {
+                let Some(grantee) = grantees.get(index - prescriptions_end) else {
+                    continue;
+                };
+                let key = (symbol_short!("ACCESS"), patient.clone(), grantee);
+                if let Some(grant) = env.storage().persistent().get::<_, AccessGrant>(&key) {
+                    grants.push(grant);
+                }
+            }
+        }
+
+        let next_cursor = if page_end < total {
+            Some(page_end)
+        } else {
+            None
+        };
+        let export = portability::PatientExport {
+            now: env.ledger().timestamp(),
+            entries,
+            prescriptions,
+            grants,
+        };
+        let rendered = match format {
+            portability::PortabilityFormat::FhirJson => portability::render_fhir_bundle(&export),
+            portability::PortabilityFormat::Csv => portability::render_csv(&export),
+        };
+        Ok(portability::ExportPage {
+            data: Bytes::from_slice(&env, rendered.as_bytes()),
+            next_cursor,
+            total,
+        })
+    }
+
+    /// Set retention duration in seconds for a specific data class (RecordType).
+    pub fn set_retention_period(
+        env: Env,
+        admin: Address,
+        record_type: RecordType,
+        retention_seconds: u64,
+    ) -> Result<(), ContractError> {
+        retention::set_retention_period(&env, &admin, &record_type, retention_seconds)
+    }
+
+    /// Get retention duration in seconds for a specific data class (RecordType).
+    pub fn get_retention_period(env: Env, record_type: RecordType) -> u64 {
+        retention::get_retention_period(&env, &record_type)
+    }
+
+    /// Purges an expired record according to retention policy (coordinates with Issue #325).
+    pub fn purge_expired_record(env: Env, record_id: u64) -> bool {
+        retention::purge_expired_record(&env, record_id)
+    }
+
+    /// Compatibility alias for bulk/cron cleaners.
+    pub fn purge_expired_records(env: Env, record_id: u64) -> bool {
+        retention::purge_expired_record(&env, record_id)
+    }
+
+    /// Purges a batch of expired records. Returns the number of records successfully purged.
+    pub fn purge_expired_records_batch(env: Env, record_ids: Vec<u64>) -> u32 {
+        let mut purged_count = 0;
+        for id in record_ids.iter() {
+            if retention::purge_expired_record(&env, id) {
+                purged_count += 1;
+            }
+        }
+        purged_count
     }
 }

@@ -42,6 +42,14 @@ pub enum SyncStatus {
     PartialSuccess,
 }
 
+/// Retry metadata stored separately from the existing exchange record.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RetryRecord {
+    pub attempts: u32,
+    pub due_at: u64,
+}
+
 /// Registered EMR provider
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -56,7 +64,7 @@ pub struct EmrProvider {
     pub registered_at: u64,
 }
 
-/// Field mapping between EMR system fields and Teye internal fields
+/// Field mapping between EMR system fields and RetinaX internal fields
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FieldMapping {

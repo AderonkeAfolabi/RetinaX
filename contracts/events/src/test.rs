@@ -30,7 +30,7 @@ fn publish_test_event(
 ) -> u64 {
     let topic_str = String::from_str(env, topic);
     let payload_str = String::from_str(env, payload);
-    client.publish_event(admin, &topic_str, &schema_version, &payload_str)
+    client.publish_event(admin, &topic_str, &schema_version, &payload_str, &None)
 }
 
 fn register_schema(
@@ -180,7 +180,7 @@ fn test_publish_without_schema_fails() {
     let topic = String::from_str(&env, "records.vision.create");
     let payload = String::from_str(&env, "payload");
 
-    let result = client.try_publish_event(&admin, &topic, &1, &payload);
+    let result = client.try_publish_event(&admin, &topic, &1, &payload, &None);
     match result {
         Err(Ok(e)) => assert_eq!(e, EventError::SchemaNotFound),
         _ => panic!("Expected SchemaNotFound error"),
@@ -196,7 +196,7 @@ fn test_publish_unauthorized_fails() {
     let topic = String::from_str(&env, "records.vision.create");
     let payload = String::from_str(&env, "payload");
 
-    let result = client.try_publish_event(&outsider, &topic, &1, &payload);
+    let result = client.try_publish_event(&outsider, &topic, &1, &payload, &None);
     match result {
         Err(Ok(e)) => assert_eq!(e, EventError::Unauthorized),
         _ => panic!("Expected Unauthorized error"),
@@ -573,7 +573,7 @@ fn test_replay_with_limit() {
     for _i in 0..5 {
         let payload = String::from_str(&env, "p");
         let topic = String::from_str(&env, "records.vision.create");
-        client.publish_event(&admin, &topic, &1, &payload);
+        client.publish_event(&admin, &topic, &1, &payload, &None);
     }
 
     let events = client.replay_events(&1, &3);
@@ -713,6 +713,35 @@ fn test_retry_invalid_index_fails() {
         Err(Ok(e)) => assert_eq!(e, EventError::InvalidInput),
         _ => panic!("Expected InvalidInput error"),
     }
+}
+
+#[test]
+fn test_dlq_capacity_eviction() {
+    let (env, client, admin) = setup();
+    register_schema(&env, &client, &admin, "records.vision.create", 1);
+
+    let event_id1 = publish_test_event(&env, &client, &admin, "records.vision.create", 1, "p1");
+    let event_id2 = publish_test_event(&env, &client, &admin, "records.vision.create", 1, "p2");
+    let event_id3 = publish_test_event(&env, &client, &admin, "records.vision.create", 1, "p3");
+
+    let sub1 = Address::generate(&env);
+    let sub2 = Address::generate(&env);
+    let sub3 = Address::generate(&env);
+
+    // Set DLQ capacity to 2
+    client.set_dlq_capacity(&admin, &2);
+    assert_eq!(client.get_dlq_capacity(), 2);
+
+    client.push_dead_letter(&admin, &event_id1, &sub1, &String::from_str(&env, "fail1"));
+    client.push_dead_letter(&admin, &event_id2, &sub2, &String::from_str(&env, "fail2"));
+    assert_eq!(client.get_dead_letters().len(), 2);
+
+    // Third entry triggers eviction of oldest entry (event_id1)
+    client.push_dead_letter(&admin, &event_id3, &sub3, &String::from_str(&env, "fail3"));
+    let dlq = client.get_dead_letters();
+    assert_eq!(dlq.len(), 2);
+    assert_eq!(dlq.get(0).unwrap().event_id, event_id2);
+    assert_eq!(dlq.get(1).unwrap().event_id, event_id3);
 }
 
 // ── Integration: subscription dispatch with events ───────────────────────────
@@ -895,7 +924,7 @@ fn test_consumer_group_offset_consistency_under_rapid_publishes() {
     for i in 0..25u32 {
         let payload = String::from_str(&env, "p");
         let topic = String::from_str(&env, "records.vision.create");
-        let _ = client.publish_event(&admin, &topic, &1, &payload);
+        let _ = client.publish_event(&admin, &topic, &1, &payload, &None);
         // Each publish should advance group offset by 1 via dispatch.
         let group = client.get_consumer_group(&gid);
         assert_eq!(group.offset, (i as u64) + 1);

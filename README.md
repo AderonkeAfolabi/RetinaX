@@ -3,7 +3,7 @@
 [![Rust](https://img.shields.io/badge/Rust-1.78%2B-orange.svg)](https://www.rust-lang.org/)
 [![Soroban SDK](https://img.shields.io/badge/soroban--sdk-25.0.0-blue.svg)](https://soroban.stellar.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![CI](https://github.com/RetinaX-Org/RetinaX/actions/workflows/ci.yml/badge.svg)](https://github.com/RetinaX-Org/RetinaX/actions)
+[![CI](https://github.com/RetinaX-Org/RetinaX/actions/workflows/cargo-test.yml/badge.svg)](https://github.com/RetinaX-Org/RetinaX/actions)
 
 RetinaX is a decentralized smart contract system for secure, encrypted, and role-based management of vision care and optometry records on the Stellar blockchain using Soroban and Rust. The project enables eye care providers and patients to maintain control over sensitive vision data while ensuring privacy, immutability, and auditability. Built specifically for optometry clinics, ophthalmology practices, and vision research institutions transitioning to blockchain-based record keeping.
 
@@ -64,7 +64,7 @@ RetinaX transforms vision care record management by leveraging Stellar's blockch
 Before you begin, ensure you have the following installed:
 
 - **Rust 1.78.0+** - [Install Rust](https://www.rust-lang.org/tools/install)
-- **Soroban CLI** - [Install Soroban](https://soroban.stellar.org/docs/getting-started/installation) (contracts target `soroban-sdk` 25.0.0)
+- **Soroban CLI** - [Install Soroban](https://developers.stellar.org/docs/tools/cli/install-cli) (contracts target `soroban-sdk` 25.0.0)
 - **Git** - For version control
 - **Make** - For using the provided Makefile (optional but recommended)
 
@@ -238,7 +238,8 @@ RetinaX/
 ├── scripts/                    # Deployment, release & monitoring scripts
 │   └── monitor/                # Prometheus/Grafana stack and health check
 ├── website/                    # Project website (GitHub Pages)
-├── docs/                       # Architecture, API, onboarding, runbooks, compliance
+├── docs/                       # Documentation landing page, architecture, API, onboarding, runbooks, compliance
+│   └── README.md               # Documentation index grouped by audience
 │
 ├── .github/workflows/          # CI workflows
 ├── setup.sh                    # Automated setup script
@@ -344,6 +345,7 @@ make deploy-mainnet
 | `key-manager-ci.yml` | Push/PR touching `key_manager` | Key Manager contract build, lint & tests |
 | `zk-verifier-ci.yml` | Push/PR touching `zk_verifier` | ZK Verifier contract build, lint & tests |
 | `frontend-lint.yml` | Push/PR touching `website/` | ESLint/Prettier checks for the website |
+| `markdown-links.yml` | Push/PR touching `**/*.md` | Lychee link check for docs and README |
 | `pages.yml` | Push to `main` | Deploy the website to GitHub Pages |
 
 ### Deployment Scripts
@@ -362,10 +364,11 @@ make deploy-mainnet
 
 ### Documentation
 
+- [Documentation Index](docs/README.md) - Landing page for all RetinaX guides
 - [API Reference](docs/api.md)
 - [Architecture Overview](docs/architecture.md)
 - [Data Flow Diagrams](docs/data-flows.md)
-- [Security Model](docs/security.md)
+- [Security Model](docs/security/overview.md)
 - [Production Runbook](docs/runbook/README.md)
 - [Compliance Documentation](docs/compliance/README.md) - HIPAA compliance and regulatory requirements
 
@@ -453,7 +456,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Support
 
 - **Issues**: [GitHub Issues](https://github.com/RetinaX-Org/RetinaX/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/RetinaX-Org/RetinaX/discussions)
+- **Discussions**: [GitHub Discussions](https://github.com/RetinaX-Org/RetinaX/issues)
 - **Discord**: [Join our Discord](https://discord.gg/stellar-retinax)
 
 ---

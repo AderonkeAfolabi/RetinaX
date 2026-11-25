@@ -1,5 +1,5 @@
 use soroban_sdk::{contracttype, symbol_short, Address, Env, Symbol};
-use teye_common::{ChannelStatus, CommonError};
+use retinax_common::{ChannelStatus, CommonError};
 
 #[contracttype]
 #[derive(Clone, Debug)]
@@ -41,6 +41,23 @@ pub fn open(
 
     let key = (symbol_short!("CHAN"), id);
     env.storage().persistent().set(&key, &channel);
+    Ok(id)
+}
+
+pub fn open_with_timeout(
+    env: &Env,
+    patient: Address,
+    provider: Address,
+    capacity: u64,
+    dispute_window: u64,
+) -> Result<u64, CommonError> {
+    if dispute_window == 0 {
+        return Err(CommonError::InvalidInput);
+    }
+    let id = open(env, patient, provider, capacity)?;
+    env.storage()
+        .persistent()
+        .set(&(symbol_short!("CH_WIN"), id), &dispute_window);
     Ok(id)
 }
 

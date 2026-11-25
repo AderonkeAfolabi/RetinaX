@@ -13,13 +13,19 @@ pub use permissions::*;
 pub use types::*;
 pub use whitelist::*;
 
-use soroban_sdk::{contract, contractimpl, Address, Env, Symbol, Vec};
+use soroban_sdk::{Address, Env, Symbol, Vec};
 
 /// AccessControl micro-contract for decentralized role-based and attribute-based permissions.
-#[contract]
+#[cfg_attr(
+    not(all(target_family = "wasm", feature = "library")),
+    soroban_sdk::contract
+)]
 pub struct AccessControlContract;
 
-#[contractimpl]
+#[cfg_attr(
+    not(all(target_family = "wasm", feature = "library")),
+    soroban_sdk::contractimpl
+)]
 impl AccessControlContract {
     /// Initializes the AccessControl micro-contract with an initial administrator.
     ///
@@ -71,6 +77,11 @@ impl AccessControlContract {
     /// * `AccessControlError::Unauthorized` - If `new_admin` is not the nominated pending administrator.
     pub fn accept_admin(env: Env, new_admin: Address) -> Result<(), AccessControlError> {
         admin::accept_admin(&env, &new_admin)
+    }
+
+    /// Pauses or resumes administrative operations.
+    pub fn set_paused(env: Env, caller: Address, paused: bool) -> Result<(), AccessControlError> {
+        admin::set_paused(&env, &caller, paused)
     }
 
     // ── Whitelist Management ────────────────────────────────────────────────
@@ -176,11 +187,7 @@ impl AccessControlContract {
     /// * `limit` - The maximum number of entries to return.
     ///
     /// Returns a tuple `(Vec<Address>, u32)` containing the paginated slice and total count.
-    pub fn get_whitelisted_addresses(
-        env: Env,
-        offset: u32,
-        limit: u32,
-    ) -> (Vec<Address>, u32) {
+    pub fn get_whitelisted_addresses(env: Env, offset: u32, limit: u32) -> (Vec<Address>, u32) {
         whitelist::get_whitelisted_addresses(&env, offset, limit)
     }
 
@@ -234,11 +241,7 @@ impl AccessControlContract {
     ///
     /// # Errors
     /// * `AccessControlError::Unauthorized` - If `caller` lacks `Permission::ManageUsers` and is not admin.
-    pub fn revoke_role(
-        env: Env,
-        caller: Address,
-        user: Address,
-    ) -> Result<(), AccessControlError> {
+    pub fn revoke_role(env: Env, caller: Address, user: Address) -> Result<(), AccessControlError> {
         permissions::revoke_role(&env, &caller, &user)
     }
 
@@ -560,4 +563,17 @@ impl AccessControlContract {
     ) -> bool {
         permissions::evaluate_access_policy(&env, policy_id, &user, record_id, current_time)
     }
+}
+
+#[cfg(all(target_family = "wasm", feature = "library"))]
+#[soroban_sdk::contractclient(name = "AccessControlContractClient")]
+#[allow(dead_code)]
+pub trait AccessControlInterface {
+    fn has_permission(env: Env, user: Address, permission: Permission) -> bool;
+    fn has_delegated_permission(
+        env: Env,
+        delegator: Address,
+        delegatee: Address,
+        permission: Permission,
+    ) -> bool;
 }

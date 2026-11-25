@@ -5,8 +5,8 @@ extern crate std;
 use soroban_sdk::{testutils::Address as _, Address, Env, String};
 
 use crate::{
-    AiIntegrationContract, AiIntegrationContractClient, ProviderStatus, RequestStatus,
-    VerificationState,
+    AiIntegrationContract, AiIntegrationContractClient, AiIntegrationError, ProviderStatus,
+    RequestStatus, VerificationState,
 };
 
 fn setup() -> (Env, AiIntegrationContractClient<'static>, Address, Address) {
@@ -362,7 +362,10 @@ fn test_provider_score_calculation_via_confidence() {
     assert_eq!(status2, RequestStatus::Flagged);
 
     let flagged = client.get_flagged_requests();
-    assert!(flagged.contains(&r2), "high-anomaly request must appear in flagged list");
+    assert!(
+        flagged.contains(&r2),
+        "high-anomaly request must appear in flagged list"
+    );
 }
 
 #[test]
@@ -385,27 +388,37 @@ fn test_anomaly_threshold_boundary() {
 
     // Exactly at threshold → Flagged
     let r_at = client.submit_analysis_request(
-        &requester, &30, &patient, &20,
+        &requester,
+        &30,
+        &patient,
+        &20,
         &String::from_str(&env, "sha256:at"),
         &String::from_str(&env, "task"),
     );
     let status_at = client.store_analysis_result(
-        &operator, &r_at,
+        &operator,
+        &r_at,
         &String::from_str(&env, "sha256:out-at"),
-        &5_000, &7_000, // anomaly == threshold
+        &5_000,
+        &7_000, // anomaly == threshold
     );
     assert_eq!(status_at, RequestStatus::Flagged);
 
     // One below threshold → Completed
     let r_below = client.submit_analysis_request(
-        &requester, &30, &patient, &21,
+        &requester,
+        &30,
+        &patient,
+        &21,
         &String::from_str(&env, "sha256:below"),
         &String::from_str(&env, "task"),
     );
     let status_below = client.store_analysis_result(
-        &operator, &r_below,
+        &operator,
+        &r_below,
         &String::from_str(&env, "sha256:out-below"),
-        &5_000, &6_999, // one below threshold
+        &5_000,
+        &6_999, // one below threshold
     );
     assert_eq!(status_below, RequestStatus::Completed);
 }
@@ -428,21 +441,28 @@ fn test_verified_result_cannot_be_overwritten() {
     );
 
     let r = client.submit_analysis_request(
-        &requester, &40, &patient, &30,
+        &requester,
+        &40,
+        &patient,
+        &30,
         &String::from_str(&env, "sha256:once"),
         &String::from_str(&env, "task"),
     );
     client.store_analysis_result(
-        &operator, &r,
+        &operator,
+        &r,
         &String::from_str(&env, "sha256:first"),
-        &8_000, &1_000,
+        &8_000,
+        &1_000,
     );
 
     // Second attempt must fail
     let result = client.try_store_analysis_result(
-        &operator, &r,
+        &operator,
+        &r,
         &String::from_str(&env, "sha256:second"),
-        &8_000, &1_000,
+        &8_000,
+        &1_000,
     );
     assert!(result.is_err(), "duplicate result store must be rejected");
 }
@@ -464,18 +484,25 @@ fn test_non_admin_cannot_verify_result() {
     );
 
     let r = client.submit_analysis_request(
-        &requester, &50, &patient, &40,
+        &requester,
+        &50,
+        &patient,
+        &40,
         &String::from_str(&env, "sha256:img-auth"),
         &String::from_str(&env, "task"),
     );
     client.store_analysis_result(
-        &operator, &r,
+        &operator,
+        &r,
         &String::from_str(&env, "sha256:out-auth"),
-        &8_000, &1_000,
+        &8_000,
+        &1_000,
     );
 
     let result = client.try_verify_analysis_result(
-        &non_admin, &r, &true,
+        &non_admin,
+        &r,
+        &true,
         &String::from_str(&env, "sha256:qa-nonauth"),
     );
     assert!(result.is_err(), "non-admin must not verify a result");
@@ -487,7 +514,10 @@ fn test_set_anomaly_threshold_requires_admin() {
     let non_admin = Address::generate(&env);
 
     let result = client.try_set_anomaly_threshold(&non_admin, &5_000);
-    assert!(result.is_err(), "non-admin must not change anomaly threshold");
+    assert!(
+        result.is_err(),
+        "non-admin must not change anomaly threshold"
+    );
 }
 
 #[test]
@@ -497,4 +527,115 @@ fn test_anomaly_threshold_above_max_bps_rejected() {
     // 10_001 exceeds MAX_BPS (10_000)
     let result = client.try_set_anomaly_threshold(&admin, &10_001);
     assert!(result.is_err(), "threshold above MAX_BPS must be rejected");
+}
+
+// ── Model version pinning (#465) ───────────────────────────────────────────────
+
+fn register_retina_provider(
+    env: &Env,
+    client: &AiIntegrationContractClient,
+    admin: &Address,
+    operator: &Address,
+) {
+    client.register_provider(
+        admin,
+        &1,
+        operator,
+        &String::from_str(env, "Provider M"),
+        &String::from_str(env, "retina-v1"),
+        &String::from_str(env, "sha256:endpoint"),
+    );
+}
+
+#[test]
+fn pinned_request_is_accepted_and_records_the_version_on_its_result() {
+    let (env, client, admin, operator) = setup();
+    register_retina_provider(&env, &client, &admin, &operator);
+    let requester = Address::generate(&env);
+    let patient = Address::generate(&env);
+
+    assert_eq!(client.get_provider(&1).model_version, 1);
+    let request_id = client.submit_pinned_analysis_request(
+        &requester,
+        &1,
+        &patient,
+        &7,
+        &String::from_str(&env, "sha256:input"),
+        &String::from_str(&env, "fundus"),
+        &1,
+    );
+
+    let request = client.get_analysis_request(&request_id);
+    assert_eq!(request.model_version, 1);
+    assert_eq!(request.pinned_model_version, Some(1));
+
+    client.store_analysis_result(
+        &operator,
+        &request_id,
+        &String::from_str(&env, "sha256:output"),
+        &9_000,
+        &100,
+    );
+    assert_eq!(client.get_analysis_result(&request_id).model_version, 1);
+}
+
+#[test]
+fn pinned_request_for_another_version_is_refused_until_the_provider_moves_to_it() {
+    let (env, client, admin, operator) = setup();
+    register_retina_provider(&env, &client, &admin, &operator);
+    let requester = Address::generate(&env);
+    let patient = Address::generate(&env);
+    let input = String::from_str(&env, "sha256:input");
+    let task = String::from_str(&env, "fundus");
+
+    let stale =
+        client.try_submit_pinned_analysis_request(&requester, &1, &patient, &7, &input, &task, &2);
+    assert_eq!(stale, Err(Ok(AiIntegrationError::ModelVersionMismatch)));
+
+    client.set_model_version(&admin, &1, &2);
+    assert_eq!(client.get_provider(&1).model_version, 2);
+    let request_id =
+        client.submit_pinned_analysis_request(&requester, &1, &patient, &7, &input, &task, &2);
+    assert_eq!(client.get_analysis_request(&request_id).model_version, 2);
+
+    // The version a request was made against stays on it after the provider moves on.
+    client.set_model_version(&admin, &1, &3);
+    assert_eq!(client.get_analysis_request(&request_id).model_version, 2);
+}
+
+#[test]
+fn unpinned_requests_still_work_and_record_the_current_version() {
+    let (env, client, admin, operator) = setup();
+    register_retina_provider(&env, &client, &admin, &operator);
+    client.set_model_version(&admin, &1, &5);
+    let requester = Address::generate(&env);
+    let patient = Address::generate(&env);
+
+    let request_id = client.submit_analysis_request(
+        &requester,
+        &1,
+        &patient,
+        &7,
+        &String::from_str(&env, "sha256:input"),
+        &String::from_str(&env, "fundus"),
+    );
+
+    let request = client.get_analysis_request(&request_id);
+    assert_eq!(request.model_version, 5);
+    assert_eq!(request.pinned_model_version, None);
+}
+
+#[test]
+fn model_version_changes_require_the_admin_and_a_positive_version() {
+    let (env, client, admin, operator) = setup();
+    register_retina_provider(&env, &client, &admin, &operator);
+
+    let zero = client.try_set_model_version(&admin, &1, &0);
+    assert_eq!(zero, Err(Ok(AiIntegrationError::InvalidInput)));
+    let missing = client.try_set_model_version(&admin, &99, &2);
+    assert_eq!(missing, Err(Ok(AiIntegrationError::ProviderNotFound)));
+    let stranger = Address::generate(&env);
+    let not_admin = client.try_set_model_version(&stranger, &1, &2);
+    assert_eq!(not_admin, Err(Ok(AiIntegrationError::Unauthorized)));
+    assert_eq!(client.get_provider(&1).model_version, 1);
 }

@@ -1,0 +1,375 @@
+{
+  "_meta": {
+    "language": "fr",
+    "name": "Français",
+    "direction": "ltr",
+    "fallback": "en",
+    "version": 1
+  },
+  "meta": {
+    "title": "RetinaX — Dossiers de vision décentralisés et protocole de diagnostic IA sur Stellar",
+    "description": "RetinaX est un protocole de santé visuelle préservant la vie privée, contrôlé par le patient, construit sur les contrats intelligents Soroban de Stellar. Sécurisez les dossiers de réfraction, vérifiez les preuves ZK et consultez les oracles de diagnostic IA avec une finalité de 5 secondes."
+  },
+  "nav": {
+    "skip": "Passer au contenu principal",
+    "brandAria": "Accueil du protocole RetinaX",
+    "brandBadgeAria": "Version du protocole Soroban v23",
+    "mainNavigation": "Navigation principale",
+    "overview": "Aperçu",
+    "overviewAria": "Aller à la section aperçu",
+    "privacy": "Confidentialité ZK",
+    "privacyAria": "Aller à la section confidentialité ZK",
+    "aiOracle": "Oracle IA",
+    "aiOracleAria": "Aller à la section oracle IA",
+    "playground": "Bac à sable",
+    "playgroundAria": "Aller au bac à sable interactif",
+    "contracts": "Contrats",
+    "contractsAria": "Aller au registre des contrats",
+    "languageLabel": "Langue",
+    "languageSelector": "Sélectionner la langue",
+    "themeDark": "🌙 Mode sombre",
+    "themeLight": "☀️ Mode clair",
+    "themeToggleToDark": "Passer au mode sombre",
+    "themeToggleToLight": "Passer au mode clair",
+    "networkStatus": "État du réseau : Stellar Testnet",
+    "network": "Stellar Testnet",
+    "connectWallet": "Connecter le portefeuille",
+    "connectWalletAria": "Connecter le portefeuille Stellar",
+    "githubOrg": "Organisation GitHub",
+    "githubAria": "Voir RetinaX sur GitHub (ouvre un nouvel onglet)"
+  },
+  "hero": {
+    "tagHealthcare": "Infrastructure de santé",
+    "tagStellar": "Stellar Soroban",
+    "title": "Dossiers de soins visuels décentralisés et diagnostics IA vérifiables",
+    "subtitle": "RetinaX remplace les silos fragmentés de dossiers médicaux électroniques (DME) par une infrastructure de données de santé contrôlée par le patient et préservant la vie privée. Avec preuves sans connaissance, conformité FHIR v4 et rotation automatisée des oracles de diagnostic IA sur Soroban.",
+    "ctaPlayground": "Lancer le bac à sable en direct",
+    "ctaRepository": "Explorer le dépôt",
+    "imageAlt": "Optométriste utilisant un scanner d'examen oculaire numérique",
+    "imageCaption": "🏥 Vérification de la pratique clinique",
+    "imageAudit": "Audit en temps réel Stellar",
+    "statFinality": "Finalité du registre",
+    "statFee": "Frais moyens par transaction",
+    "statSovereignty": "Souveraineté des données du patient",
+    "statContracts": "Contrats intelligents WASM"
+  },
+  "privacy": {
+    "tag": "Architecture sans connaissance",
+    "title": "Confidentialité contrôlée par le patient et vérification anonyme",
+    "body": "RetinaX intègre des vérificateurs zk-SNARK Groth16 sur Soroban, permettant aux patients de prouver leur éligibilité médicale — comme répondre aux normes d'acuité visuelle pour le permis de conduire — sans révéler leurs ordonnances privées ni leur identité personnelle.",
+    "bullet1": "Chiffrement AES côté client pour toutes les données médicales avant le stockage sur IPFS.",
+    "bullet2": "Révocation granulaire instantanée : le patient contrôle la durée d'accès pour les médecins.",
+    "bullet3": "Règles strictes de délimitation de transfert de données conformes à l'art. 25 du RGPD et à la HIPAA.",
+    "cta": "Explorer le vérificateur ZK",
+    "imageAlt": "Diagramme de l'architecture de confidentialité sans connaissance"
+  },
+  "aiOracle": {
+    "tag": "Oracles d'inférence IA",
+    "title": "Surveillance des SLA et basculement automatique des oracles",
+    "body": "Le contrat ai_integration gère un registre décentralisé de modèles de diagnostic d'imagerie rétinienne. Si un nœud d'oracle principal dépasse son SLA de latence de 500 ms, le protocole bascule instantanément vers un fournisseur de secours vérifié sans interruption de service.",
+    "bullet1": "Surveillance sur la chaîne de la latence, de la disponibilité et de la conformité aux SLA des oracles.",
+    "bullet2": "Rotation automatisée de basculement vers des fournisseurs de secours vérifiés en cas de dépassement de délai.",
+    "bullet3": "Format de rapport de diagnostic conforme aux normes LOINC pour les affections rétiniennes.",
+    "cta": "Tester la rotation d'oracles",
+    "imageAlt": "Visualisation du réseau de nœuds d'oracles IA"
+  },
+  "faq": {
+    "title": "Questions fréquemment posées",
+    "desc": "Questions courantes sur l'architecture, la sécurité et la conformité clinique de RetinaX.",
+    "q1": "Comment RetinaX protège-t-il les données de santé des patients ?",
+    "a1": "RetinaX utilise le chiffrement AES côté client avant que toute donnée ne quitte l'appareil du patient. Les dossiers médicaux sont stockés sous forme de données chiffrées sur IPFS, avec uniquement le hachage du contenu enregistré sur la blockchain Stellar. Les preuves sans connaissance (zk-SNARKs Groth16) permettent aux patients de prouver leur éligibilité médicale sans révéler d'informations de santé personnelles.",
+    "q2": "Quelle technologie blockchain alimente RetinaX ?",
+    "a2": "RetinaX est construit sur le réseau Stellar en utilisant des contrats intelligents Soroban compilés en WebAssembly (WASM). Stellar offre une finalité de registre d'environ 5 secondes et des frais de transaction inférieurs à 0,0001 $, ce qui le rend idéal pour les opérations de dossiers cliniques à haute fréquence.",
+    "q3": "RetinaX est-il conforme aux réglementations de santé comme HIPAA et GDPR ?",
+    "a3": "Oui. RetinaX met en œuvre une gestion des données conforme à la HIPAA grâce à son contrat intelligent de conformité, incluant le suivi du consentement, la classification des données et les pistes d'audit. Le protocole applique également les principes de protection des données dès la conception de l'article 25 du RGPD et génère des dossiers cliniques interopérables FHIR v4 avec des rapports de diagnostic codés LOINC.",
+    "q4": "Comment fonctionne le système d'oracles de diagnostic IA ?",
+    "a4": "Le contrat d'intégration IA gère un registre de fournisseurs d'oracles de diagnostic qui analysent les scans rétiniens pour des affections comme la rétinopathie diabétique et le glaucome. La surveillance des SLA sur la chaîne suit les temps de réponse des fournisseurs et le système bascule automatiquement vers des oracles de secours lorsqu'un fournisseur dépasse les seuils de latence."
+  },
+  "repo": {
+    "title": "Dépôt GitHub et statut du code",
+    "desc": "Suivez les dernières validations, la couverture des tests et les métriques de sécurité."
+  },
+  "common": {
+    "processing": "Traitement en cours...",
+    "closeNotification": "Fermer la notification",
+    "pending": "EN ATTENTE",
+    "confirmed": "CONFIRMÉ",
+    "failed": "ÉCHOUÉ",
+    "copied": "Copié",
+    "copyFailed": "Échec de la copie",
+    "copyContractAddress": "Copier l'adresse du contrat",
+    "contractAddressCopied": "Adresse du contrat copiée dans le presse-papiers",
+    "copyContractAddressFailed": "Impossible de copier l'adresse du contrat"
+  },
+  "wallet": {
+    "title": "Connecter le portefeuille",
+    "freighter": "Freighter Wallet",
+    "recommended": "Recommandé",
+    "albedo": "Albedo",
+    "xbull": "xBull Wallet",
+    "newToStellar": "Nouveau sur Stellar ?",
+    "learnMore": "En savoir plus sur les portefeuilles Stellar",
+    "infoTitle": "Détails du protocole RetinaX",
+    "infoBody": "RetinaX standardise les dossiers cliniques de vision sur Stellar en utilisant des contrats intelligents WASM et des preuves sans connaissance Groth16.",
+    "loinc": "Norme LOINC : 28886-0 | Version FHIR : v4.0.1",
+    "connectedAria": "Portefeuille connecté : {address}",
+    "network": "Réseau",
+    "testnet": "Stellar Testnet",
+    "mainnet": "Stellar Mainnet",
+    "networkStatus": "État du réseau : {network}",
+    "notInstalled": "Freighter n'a pas été détecté dans ce navigateur.",
+    "install": "Installer Freighter",
+    "connecting": "Approuvez la connexion dans Freighter...",
+    "connectFailed": "Impossible de connecter Freighter",
+    "disconnected": "Portefeuille déconnecté",
+    "mismatch": "Freighter est configuré sur un autre réseau. Basculez-le sur {network} dans l'extension."
+  },
+  "footer": {
+    "brandDesc": "Protocole décentralisé de dossiers de vision préservant la vie privée et écosystème de vérification diagnostique par IA sur Stellar.",
+    "protocolTitle": "Protocole",
+    "overview": "Aperçu",
+    "overviewAria": "Aller à la section aperçu",
+    "privacy": "Confidentialité ZK",
+    "privacyAria": "Aller à la section confidentialité ZK",
+    "aiOracle": "Oracle IA",
+    "aiOracleAria": "Aller à la section oracle IA",
+    "playground": "Bac à sable",
+    "playgroundAria": "Aller à la section de démonstration du bac à sable",
+    "ecosystemTitle": "Écosystème",
+    "githubOrg": "Organisation GitHub",
+    "githubOrgAria": "Organisation GitHub (ouvre un nouvel onglet)",
+    "discussions": "Discussions communautaires",
+    "grantfox": "Subventions GrantFox",
+    "grantfoxAria": "Subventions GrantFox (ouvre un nouvel onglet)",
+    "soroban": "Stellar Soroban",
+    "sorobanAria": "Documentation de Stellar Soroban (ouvre un nouvel onglet)",
+    "openSourceTitle": "Open Source",
+    "license": "Licence MIT",
+    "licenseAria": "Licence MIT (ouvre un nouvel onglet)",
+    "contributing": "Guide de contribution",
+    "contributingAria": "Guide de contribution (ouvre un nouvel onglet)",
+    "roadmap": "Feuille de route et tickets",
+    "roadmapAria": "Feuille de route et tickets sur GitHub (ouvre un nouvel onglet)",
+    "copyright": "© {year} Protocole RetinaX. Sous licence MIT.",
+    "copyrightPrefix": "©",
+    "copyrightSuffix": "Protocole RetinaX. Sous licence MIT.",
+    "builtWith": "Construit avec ❤️ sur Stellar & Soroban"
+  },
+  "contracts": {
+    "title": "Modules de contrats intelligents principaux",
+    "desc": "L'ensemble des 24 contrats de l'espace de travail compilés en Rust pour Soroban, avec statut de déploiement, adresses de testnet et liens directs vers les sources.",
+    "filterLabel": "Filtrer les contrats par catégorie",
+    "all": "Tous",
+    "core": "Noyau",
+    "security": "Sécurité",
+    "governance": "Gouvernance",
+    "clinical": "Clinique",
+    "infrastructure": "Infrastructure",
+    "showing": "{count} contrats affichés",
+    "statusDeployed": "Déployé",
+    "statusNotDeployed": "Non déployé",
+    "statusDemo": "Adresse de démonstration",
+    "demoAddress": "Adresse de démonstration (non déployée)",
+    "testnetAddress": "Adresse de testnet",
+    "noAddress": "Aucune adresse de testnet configurée",
+    "sourceLink": "Voir le code source",
+    "docsLink": "Lire la documentation",
+    "categoryCore": "Flux centraux du protocole",
+    "categorySecurity": "Identité, accès et vérification de preuves",
+    "categoryGovernance": "Gouvernance et trésorerie du protocole",
+    "categoryClinical": "Données cliniques et interopérabilité",
+    "categoryInfrastructure": "Services partagés et coordination",
+    "noscript": "Activez JavaScript pour parcourir le registre complet des contrats.",
+    "items": {
+      "access_control": {
+        "name": "Contrôle d'accès",
+        "description": "Contrôle d'accès basé sur les rôles et attributs, délégations, groupes ACL et listes blanches."
+      },
+      "ai_integration": {
+        "name": "Intégration IA",
+        "description": "Registre des fournisseurs d'IA, surveillance des SLA et rotation automatique en cas de panne."
+      },
+      "analytics": {
+        "name": "Analytique",
+        "description": "Métriques agrégées préservant la vie privée et analyse des tendances cliniques."
+      },
+      "audit": {
+        "name": "Piste d'audit",
+        "description": "Journaux d'audit inviolables et chaînés par hachage pour les accès et preuves de conformité."
+      },
+      "clinical_records": {
+        "name": "Dossiers cliniques",
+        "description": "Examens oculaires, pression intraoculaire, lampe à fente, champs visuels, imagerie et ordonnances."
+      },
+      "common": {
+        "name": "Bibliothèque commune",
+        "description": "Erreurs partagées, niveaux d'administration, autorisation progressive et utilitaires réutilisables."
+      },
+      "compliance": {
+        "name": "Conformité",
+        "description": "Application des politiques RGPD et HIPAA, suivi du consentement et classification des données."
+      },
+      "cross_chain": {
+        "name": "Passerelle inter-chaînes",
+        "description": "Validation de messages inter-chaînes avec preuves de Merkle et flux de règlement sécurisés."
+      },
+      "delegation": {
+        "name": "Délégation",
+        "description": "Délégation d'accès délégué dans le temps avec portée d'autorisation granulaire."
+      },
+      "emr_bridge": {
+        "name": "Passerelle DME",
+        "description": "Conversion bidirectionnelle FHIR v4 / HL7 et passerelle de synchronisation avec les DME hospitaliers."
+      },
+      "events": {
+        "name": "Gestionnaire d'événements",
+        "description": "Émission et indexation structurées des événements du protocole pour les auditeurs et indexeurs hors chaîne."
+      },
+      "fhir": {
+        "name": "Interopérabilité FHIR",
+        "description": "Validation du schéma de ressources FHIR v4 DiagnosticReport et Observation sur la chaîne."
+      },
+      "governor": {
+        "name": "Gouverneur",
+        "description": "Gouvernance décentralisée sur la chaîne, propositions et verrouillage temporel pour les mises à niveau."
+      },
+      "identity": {
+        "name": "Identité décentralisée",
+        "description": "Identifiants décentralisés (DID) pour les patients, praticiens et organismes de santé vérifiés."
+      },
+      "key_manager": {
+        "name": "Gestionnaire de clés",
+        "description": "Dérivation de clés, rotation et échange sécurisé de clés de chiffrement de dossiers médicaux."
+      },
+      "metering": {
+        "name": "Tarification et quotas",
+        "description": "Suivi de l'utilisation des calculs et gestion des quotas pour les accès tiers à l'API."
+      },
+      "orchestrator": {
+        "name": "Orchestrateur",
+        "description": "Coordination inter-contrats pour l'enregistrement, l'examen et la vérification des patients."
+      },
+      "staking": {
+        "name": "Mise en jeu et pénalités",
+        "description": "Dépôts de garantie des praticiens et des oracles avec pénalités en cas de violation des SLA."
+      },
+      "state_channel": {
+        "name": "Canal d'état",
+        "description": "Canaux d'état bilatéraux hors chaîne pour les transactions médicales fréquentes et confidentielles."
+      },
+      "treasury": {
+        "name": "Trésorerie",
+        "description": "Gestion des fonds du protocole, distribution des subventions et récompenses d'oracles."
+      },
+      "vault": {
+        "name": "Coffre-fort multi-actifs",
+        "description": "Garde multi-actifs sécurisée pour les paiements de soins et les garanties d'assurance santé."
+      },
+      "vision_records": {
+        "name": "Dossiers de vision",
+        "description": "Examens d'acuité visuelle, diagnostics et enregistrement de données chiffrées sur IPFS."
+      },
+      "zk_verifier": {
+        "name": "Vérificateur ZK",
+        "description": "Vérification sur la chaîne de preuves d'acuité visuelle Groth16 sans divulgation de données."
+      },
+      "zk_voting": {
+        "name": "Vote anonyme ZK",
+        "description": "Vote anonyme préservant la vie privée pour les décisions de gouvernance clinique du protocole."
+      }
+    }
+  },
+  "demo": {
+    "title": "Bac à sable interactif de contrats",
+    "desc": "Testez les flux de travail Soroban directement dans votre navigateur.",
+    "tablistAria": "Modules interactifs du bac à sable",
+    "tabRbac": "Contrôle d'accès RBAC",
+    "tabRbacAria": "Module de contrôle d'accès basé sur les rôles",
+    "tabZk": "Générateur de preuves ZK",
+    "tabZkAria": "Module de génération de preuves d'acuité ZK",
+    "tabAi": "Rotation d'oracles IA",
+    "tabAiAria": "Module de rotation d'oracles IA",
+    "tabFhir": "Convertisseur FHIR v4",
+    "tabFhirAria": "Module de conversion FHIR v4",
+    "tabFetch": "Récupération IPFS",
+    "tabFetchAria": "Module de récupération de données",
+    "rbacTitle": "Simulation de contrôle d'accès RBAC",
+    "rbacDesc": "Interrogez ou attribuez des rôles sur le contrat access_control.",
+    "rbacFormAria": "Formulaire de simulation de contrôle d'accès RBAC",
+    "rbacAction": "Action",
+    "rbacActionGetRole": "Obtenir le rôle de l'adresse (get_role)",
+    "rbacActionAssign": "Attribuer un rôle (assign_role)",
+    "rbacActionCheck": "Vérifier la permission (has_permission)",
+    "rbacUserAddress": "Adresse de l'utilisateur",
+    "rbacRole": "Rôle",
+    "rbacPermission": "Permission",
+    "rbacExpires": "Expiration",
+    "hours": "{hours} heures",
+    "rbacExecute": "Exécuter l'appel au contrat",
+    "rbacConsoleTitle": "JOURNAL DU CONTRAT ACCESS_CONTROL",
+    "consoleLive": "DIRECT",
+    "rbacReady": "PRÊT",
+    "rbacLoading": "Exécution de l'invocation du contrat...",
+    "rbacSuccess": "Appel au contrat réussi — Transaction confirmée sur Stellar Testnet",
+    "rbacSucceeded": "SUCCÈS",
+    "rbacPending": "EN COURS",
+    "rbacError": "Échec de l'appel au contrat",
+    "rbacFailed": "ÉCHOUÉ",
+    "zkTitle": "Générateur de preuves médicales sans connaissance",
+    "zkDesc": "Générez une preuve groth16 pour les normes d'acuité visuelle du permis de conduire sans révéler l'identité du patient.",
+    "acuityLabel": "Acuité visuelle (Échelle LogMAR)",
+    "thresholdLabel": "Seuil d'acuité",
+    "thresholdValue": "20/40 (Exigence légale)",
+    "generateProof": "Générer et vérifier la preuve ZK",
+    "zkConsoleTitle": "JOURNAL DU VÉRIFICATEUR ZK",
+    "zkConsoleStatus": "PREUVE PRÊTE",
+    "zkLoading": "Génération de la preuve Groth16...",
+    "zkSuccess": "Preuve vérifiée comme valide — Confirmation reçue sur la chaîne",
+    "zkError": "Échec de la vérification de la preuve ZK",
+    "zkVerified": "✅ Preuve vérifiée comme valide !",
+    "aiTitle": "Rotation des fournisseurs d'oracles IA",
+    "aiDesc": "Simulez un dépassement de délai SLA sur le nœud d'oracle principal pour vérifier le basculement automatique.",
+    "aiStatusLabel": "Statut du nœud d'oracle principal",
+    "aiHealthy": "Oracle principal (Actif — 100% de disponibilité)",
+    "aiTimeout": "Échec de l'oracle principal (Dépassement du délai de 500 ms)",
+    "simulateDiagnostic": "Simuler une demande de diagnostic",
+    "aiConsoleTitle": "JOURNAL DE ROTATION AI_INTEGRATION",
+    "aiConsoleStatus": "SLA SURVEILLÉ",
+    "aiLoading": "Évaluation des oracles de diagnostic...",
+    "aiSuccess": "Diagnostic terminé — Réponse de l'oracle IA confirmée",
+    "aiError": "Échec de l'appel à l'oracle IA",
+    "aiPartial": "Échec partiel : délai dépassé sur l'oracle principal, mais basculement réussi.",
+    "fhirTitle": "Convertisseur de dossiers cliniques FHIR v4",
+    "fhirDesc": "Transformez les structures des contrats Soroban en enregistrements JSON internationaux FHIR v4.",
+    "recordType": "Type de dossier",
+    "recordRefraction": "Examen optométrique de réfraction",
+    "recordIop": "Pression intraoculaire (PIO)",
+    "generateFhir": "Générer la charge FHIR v4",
+    "fhirConsoleTitle": "JSON DU CONVERTISSEUR FHIR_V4",
+    "fhirConsoleStatus": "LOINC VALIDÉ",
+    "fhirLoading": "Conversion en JSON FHIR v4...",
+    "fhirSuccess": "Charge FHIR v4 générée — Réponse du contrat confirmée",
+    "fhirError": "Échec de la conversion FHIR",
+    "fhirMapped": "✅ Converti en FHIR v4 !",
+    "fetchTitle": "Récupération des données cliniques",
+    "fetchDesc": "Simulez la récupération des données du patient depuis le réseau de stockage décentralisé.",
+    "queryCid": "Interroger le CID du patient",
+    "fetchButton": "Récupérer les données cliniques",
+    "fetchConsoleIdle": "RÉCUPÉRATION INACTIVE",
+    "fetchConsoleAwaiting": "EN ATTENTE DE DEMANDE",
+    "fetchHint": "Cliquez sur « Récupérer les données cliniques » pour simuler une récupération sur le réseau décentralisé...",
+    "fetchLoading": "Récupération depuis IPFS...",
+    "fetchProgress": "RÉCUPÉRATION EN COURS",
+    "fetchCid": "RÉCUPÉRATION_CID",
+    "fetchSuccess": "Données cliniques récupérées — Déchiffrement terminé",
+    "fetchError": "Échec de la récupération des données",
+    "fetchSuccessStatus": "RÉCUPÉRATION RÉUSSIE",
+    "fetchDecrypted": "CHARGE_DÉCHIFFRÉE",
+    "fetchFailedStatus": "RÉCUPÉRATION ÉCHOUÉE",
+    "fetchRetry": "RÉESSAI DISPONIBLE",
+    "fetchPartial": "Données partiellement récupérées : certains dossiers peuvent être incomplets. Réessai recommandé.",
+    "statusVerified": "Vérifié",
+    "statusSyncing": "Synchronisation",
+    "statusArchived": "Archivé"
+  }
+}

@@ -21,13 +21,23 @@ name = "consent_management_test"
 path = "tests/consent_management_test.rs"
 
 [dependencies]
-soroban-sdk = { workspace = true }
+soroban-sdk = { workspace = true, features = ["alloc"] }
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
 teye-common = { path = "../common", package = "common", features = ["std", "full"] }
+soroban-sdk = { workspace = true }
+retinax-common = { path = "../common", package = "common", features = ["std", "full"] }
 audit = { path = "../audit" }
 clinical_records = { path = "../clinical_records" }
 key_manager = { path = "../key_manager" }
 access_control = { path = "../access_control" }
 
+[target.'cfg(target_family = "wasm")'.dependencies]
+teye-common = { path = "../common", package = "common", features = ["full"] }
+audit = { path = "../audit", features = ["library"] }
+clinical_records = { path = "../clinical_records", features = ["library"] }
+key_manager = { path = "../key_manager", features = ["library"] }
+access_control = { path = "../access_control", features = ["library"] }
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
 proptest = { workspace = true }

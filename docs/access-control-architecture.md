@@ -762,4 +762,4 @@ Combine with the system's rate limiting to prevent abuse of access checks or del
 
 - [RBAC Quick Reference](rbac-quick-reference.md)
 - [contracts/vision_records/src/rbac.rs](../contracts/vision_records/src/rbac.rs) - Implementation
-- [contracts/vision_records/tests/test_rbac.rs](../contracts/vision_records/tests/test_rbac.rs) - Test suite
+- [contracts/vision_records/tests/rbac.rs](../contracts/vision_records/tests/rbac.rs) - Test suite

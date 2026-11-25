@@ -471,9 +471,9 @@ fn test_hipaa_audit_compliance() {
 - [HIPAA Requirements Mapping](hipaa-mapping.md)
 
 ### Regulatory References
-- [HIPAA Security Rule § 164.312(b)](https://www.hhs.gov/hipaa/for-professionals/security/)
+- [HIPAA Security Rule § 164.312(b)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C/section-164.312)
 - [NIST SP 800-92](https://csrc.nist.gov/publications/detail/sp/800-92/final)
-- [ISO 27001:2013](https://www.iso.org/isoiec-27001-information-security.html)
+- ISO/IEC 27001:2013, Information security management systems
 
 ### Security References
 - [Security Architecture](../security/overview.md)

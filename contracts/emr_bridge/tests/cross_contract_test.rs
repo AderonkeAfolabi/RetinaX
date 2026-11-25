@@ -20,18 +20,22 @@ use soroban_sdk::{testutils::Address as _, Address, Env, String, Vec};
 
 struct MockExternalEmrContract {
     available: bool,
+    provider_id: String,
 }
 
 impl MockExternalEmrContract {
-    fn new(_env: &Env, _provider_id: &str, available: bool) -> Self {
-        Self { available }
+    fn new(_env: &Env, provider_id: &String, available: bool) -> Self {
+        Self {
+            available,
+            provider_id: provider_id.clone(),
+        }
     }
 
-    fn simulate_call(&self) -> Result<&str, &str> {
+    fn simulate_call(&self) -> Result<String, &str> {
         if !self.available {
             return Err("External contract unavailable");
         }
-        Ok("response_from_external_contract")
+        Ok(self.provider_id.clone())
     }
 }
 
@@ -69,7 +73,7 @@ fn register_and_activate_provider(
 
     client.activate_provider(admin, &provider_id_str);
 
-    provider_id_str.to_string()
+    provider_id_str
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -107,7 +111,7 @@ fn test_cross_contract_successful_exchange_with_external_emr() {
     let record = client.record_data_exchange(
         &admin,
         &exchange_id,
-        &String::from_str(&env, &provider_id),
+        &provider_id,
         &patient_id,
         &ExchangeDirection::Import,
         &DataFormat::FhirR4,
@@ -152,7 +156,7 @@ fn test_cross_contract_graceful_failure_when_external_unavailable() {
     let record = client.record_data_exchange(
         &admin,
         &exchange_id,
-        &String::from_str(&env, &provider_id),
+        &provider_id,
         &patient_id,
         &ExchangeDirection::Export,
         &DataFormat::Hl7V2,
@@ -166,7 +170,7 @@ fn test_cross_contract_graceful_failure_when_external_unavailable() {
     // Bridge should allow updating to failure state
     client.update_exchange_status(&admin, &exchange_id, &SyncStatus::PartialSuccess);
 
-    let updated_record = client.get_exchange(&exchange_id).expect("record exists");
+    let updated_record = client.get_exchange(&exchange_id);
     assert_eq!(updated_record.status, SyncStatus::PartialSuccess);
 }
 
@@ -206,7 +210,7 @@ fn test_cross_contract_multiple_external_providers_sequential() {
     let record1 = client.record_data_exchange(
         &admin,
         &ex1,
-        &String::from_str(&env, &provider1),
+        &provider1,
         &pat_id,
         &ExchangeDirection::Import,
         &DataFormat::FhirR4,
@@ -217,7 +221,7 @@ fn test_cross_contract_multiple_external_providers_sequential() {
     let record2 = client.record_data_exchange(
         &admin,
         &ex2,
-        &String::from_str(&env, &provider2),
+        &provider2,
         &pat_id,
         &ExchangeDirection::Import,
         &DataFormat::Hl7V2,
@@ -254,7 +258,7 @@ fn test_cross_contract_data_consistency_verification() {
     let record = client.record_data_exchange(
         &admin,
         &exchange_id,
-        &String::from_str(&env, &provider_id),
+        &provider_id,
         &patient_id,
         &ExchangeDirection::Import,
         &DataFormat::FhirR4,
@@ -268,6 +272,7 @@ fn test_cross_contract_data_consistency_verification() {
     let verification_id = String::from_str(&env, "verify-001");
     let discrepancies = Vec::new(&env);
 
+    client.update_exchange_status(&admin, &exchange_id, &SyncStatus::InProgress);
     let verification = client.verify_sync(
         &admin,
         &verification_id,
@@ -280,7 +285,7 @@ fn test_cross_contract_data_consistency_verification() {
     // After verification with matching hashes, exchange should be completed
     assert!(verification.is_consistent);
 
-    let updated_record = client.get_exchange(&exchange_id).expect("record exists");
+    let updated_record = client.get_exchange(&exchange_id);
     assert_eq!(updated_record.status, SyncStatus::Completed);
 }
 
@@ -306,7 +311,7 @@ fn test_cross_contract_detects_data_inconsistency() {
     client.record_data_exchange(
         &admin,
         &exchange_id,
-        &String::from_str(&env, &provider_id),
+        &provider_id,
         &patient_id,
         &ExchangeDirection::Import,
         &DataFormat::Hl7V2,
@@ -324,6 +329,7 @@ fn test_cross_contract_detects_data_inconsistency() {
     ));
 
     let verification_id = String::from_str(&env, "verify-002");
+    client.update_exchange_status(&admin, &exchange_id, &SyncStatus::InProgress);
     let verification = client.verify_sync(
         &admin,
         &verification_id,
@@ -338,7 +344,7 @@ fn test_cross_contract_detects_data_inconsistency() {
     assert_eq!(verification.discrepancies.len(), 1);
 
     // Exchange status should be PartialSuccess (not fully synced)
-    let updated_record = client.get_exchange(&exchange_id).expect("record exists");
+    let updated_record = client.get_exchange(&exchange_id);
     assert_eq!(updated_record.status, SyncStatus::PartialSuccess);
 }
 
@@ -384,7 +390,7 @@ fn test_cross_contract_provider_state_transitions() {
     );
 
     // Verify provider is active before cross-contract call
-    let provider = client.get_provider(&String::from_str(&env, &provider_id));
+    let provider = client.get_provider(&provider_id);
     assert_eq!(provider.status, ProviderStatus::Active);
 
     // Simulate successful external call
@@ -401,7 +407,7 @@ fn test_cross_contract_provider_state_transitions() {
     let _record = client.record_data_exchange(
         &admin,
         &exchange_id,
-        &String::from_str(&env, &provider_id),
+        &provider_id,
         &patient_id,
         &ExchangeDirection::Import,
         &DataFormat::FhirR4,
@@ -410,7 +416,7 @@ fn test_cross_contract_provider_state_transitions() {
     );
 
     // Provider should still be active
-    let updated_provider = client.get_provider(&String::from_str(&env, &provider_id));
+    let updated_provider = client.get_provider(&provider_id);
     assert_eq!(updated_provider.status, ProviderStatus::Active);
 }
 
@@ -437,14 +443,14 @@ fn test_cross_contract_field_mapping_validation() {
     let mapping = client.create_field_mapping(
         &admin,
         &mapping_id,
-        &String::from_str(&env, &provider_id),
+        &provider_id,
         &source_field,
         &target_field,
         &transform_rule,
     );
 
     assert_eq!(mapping.mapping_id, mapping_id);
-    assert_eq!(mapping.provider_id, String::from_str(&env, &provider_id));
+    assert_eq!(mapping.provider_id, provider_id);
 
     // Verify mapping is retrievable for cross-contract data transformation
     let retrieved = client.get_field_mapping(&mapping_id);
@@ -478,7 +484,7 @@ fn test_cross_contract_retry_failed_external_call() {
     let record = client.record_data_exchange(
         &admin,
         &exchange_id,
-        &String::from_str(&env, &provider_id),
+        &provider_id,
         &patient_id,
         &ExchangeDirection::Import,
         &DataFormat::Hl7V2,
@@ -519,7 +525,7 @@ fn test_cross_contract_audit_trail_via_exchanges() {
         client.record_data_exchange(
             &admin,
             &exchange_id,
-            &String::from_str(&env, &provider_id),
+            &provider_id,
             &patient_id,
             &ExchangeDirection::Import,
             &DataFormat::FhirR4,
@@ -536,8 +542,8 @@ fn test_cross_contract_audit_trail_via_exchanges() {
 
     // Verify each exchange can be retrieved independently
     for ex_id in exchange_ids.iter() {
-        let record = client.get_exchange(ex_id).expect("Exchange should exist");
+        let record = client.get_exchange(&ex_id);
         assert_eq!(record.patient_id, patient_id);
-        assert_eq!(record.provider_id, String::from_str(&env, &provider_id));
+        assert_eq!(record.provider_id, provider_id);
     }
 }

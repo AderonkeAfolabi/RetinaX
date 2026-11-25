@@ -18,6 +18,7 @@ zk_verifier = { path = "../zk_verifier" }
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
 zk_verifier = { path = "../zk_verifier", features = ["testutils"] }
+proptest = { workspace = true }
 
 [features]
 testutils = ["soroban-sdk/testutils", "zk_verifier/testutils"]

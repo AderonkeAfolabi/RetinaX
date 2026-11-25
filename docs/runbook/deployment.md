@@ -152,7 +152,7 @@ Key environment assumptions:
 - Soroban identity `default` exists and is funded for network
 - `target/wasm32-unknown-unknown/release/<contract>.wasm` buildable
 
-### `scripts/deploy_testnet.sh`
+### Testnet deployment
 
 Purpose:
 - Testnet-only orchestrated deployment with descriptor backup and verification.
@@ -160,12 +160,12 @@ Purpose:
 Usage:
 
 ```bash
-./scripts/deploy_testnet.sh [contract]
+./scripts/deploy.sh testnet [contract]
 ```
 
 Behavior:
 - Backs up `deployments/testnet_<contract>.json`
-- Calls `scripts/deploy.sh testnet <contract>`
+- Consolidates deployment, descriptor backup, and verification in `scripts/deploy.sh`
 - Performs contract verification (currently contract-specific)
 - Restores backup on failure
 
@@ -177,15 +177,15 @@ Purpose:
 Usage examples:
 
 ```bash
-TEYE_CONTRACT_ID=C... ./scripts/migrate.sh status --network testnet
-TEYE_CONTRACT_ID=C... ./scripts/migrate.sh dry-run --to 3 --network testnet
-TEYE_CONTRACT_ID=C... ./scripts/migrate.sh forward --to 3 --network testnet
-TEYE_CONTRACT_ID=C... ./scripts/migrate.sh rollback --to 2 --network testnet
-TEYE_CONTRACT_ID=C... ./scripts/migrate.sh canary --pct 10 --version 3
+RETINAX_CONTRACT_ID=C... ./scripts/migrate.sh status --network testnet
+RETINAX_CONTRACT_ID=C... ./scripts/migrate.sh dry-run --to 3 --network testnet
+RETINAX_CONTRACT_ID=C... ./scripts/migrate.sh forward --to 3 --network testnet
+RETINAX_CONTRACT_ID=C... ./scripts/migrate.sh rollback --to 2 --network testnet
+RETINAX_CONTRACT_ID=C... ./scripts/migrate.sh canary --pct 10 --version 3
 ```
 
 Key environment variables:
-- `TEYE_CONTRACT_ID` (required unless `--contract` is passed)
+- `RETINAX_CONTRACT_ID` (required unless `--contract` is passed)
 - `SOROBAN_RPC_URL` (optional override)
 
 ### `scripts/build_release_artifacts.sh`

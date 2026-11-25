@@ -58,13 +58,21 @@
 
 extern crate alloc;
 
+// The WASM library target still needs the SDK allocator and panic handler.
+#[cfg(all(target_family = "wasm", feature = "library"))]
+extern crate soroban_sdk as _;
+
 pub mod consistency;
+#[cfg(not(all(target_family = "wasm", feature = "library")))]
 pub mod contract;
 pub mod merkle_log;
 pub mod search;
 pub mod types;
 
 // Re-export contract types for external use
+#[cfg(not(all(target_family = "wasm", feature = "library")))]
 pub use contract::AuditContract;
+#[cfg(not(all(target_family = "wasm", feature = "library")))]
 pub use contract::AuditContractClient;
+#[cfg(not(all(target_family = "wasm", feature = "library")))]
 pub use contract::AuditContractError;

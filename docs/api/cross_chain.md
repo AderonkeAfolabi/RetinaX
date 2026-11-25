@@ -4,6 +4,23 @@
 
 Manages cross-chain message validation and relay. Enables secure identity and credential verification across different blockchain networks using merkle proofs and verified state roots.
 
+## Architecture at a Glance
+
+```mermaid
+sequenceDiagram
+    participant Admin
+    participant Bridge as Cross-Chain Contract
+    participant Relayer
+    participant Source as Source Chain
+
+    Admin->>Bridge: add_relayer
+    Source->>Relayer: Emit message and state root
+    Relayer->>Bridge: process_message with merkle proof
+    Bridge->>Bridge: verify relayer and state root
+    Bridge->>Bridge: verify merkle proof and mark message processed
+    Bridge-->>Relayer: Message accepted event
+```
+
 ## Initialization
 
 ### `initialize(env: Env, admin: Address) -> Result<(), CrossChainError>`
@@ -356,6 +373,6 @@ This contract typically integrates with:
 
 ## Related Documentation
 
-- [Cross-Chain Design](../docs/cross_chain.md)
-- [Merkle Proof Verification](../docs/ZK_INTEGRATION.md#merkle-proofs)
-- [Data Portability](../docs/data-portability.md)
+- [Cross-Chain Design](../cross_chain.md)
+- [Merkle Proof Verification](../ZK_INTEGRATION.md#merkle-proofs)
+- [Data Portability](../data-portability.md)

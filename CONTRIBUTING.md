@@ -8,7 +8,7 @@ Smart contract contributors should also read the [Smart Contract Developer Contr
 ## 🚀 Getting Started
 
 1. **Fork** the repository
-2. **Clone** your fork: `git clone https://github.com/YOUR_USERNAME/RetinaX-Contracts.git`
+2. **Clone** your fork: `git clone https://github.com/YOUR_USERNAME/RetinaX.git`
 3. **Setup** the development environment: `./setup.sh`
 4. **Create** a feature branch: `git checkout -b feature/issue-number-description`
 
@@ -84,7 +84,7 @@ Include:
 
 ## 🔒 Branch Protection on `main`
 
-Nobody pushes to `main` directly, maintainers included. Every change lands through a pull request that meets these rules:
+Nobody pushes to `main` directly, maintainers included. All contributions must be submitted from a feature branch as a pull request; direct commits and pushes to `main` are not accepted.
 
 | Rule | What it means for you |
 |------|-----------------------|
@@ -252,7 +252,7 @@ Contributors are recognized in:
 
 ## ❓ Questions?
 
-- Open a [Discussion](https://github.com/RetinaX-Org/RetinaX/discussions)
+- Open a [Discussion](https://github.com/RetinaX-Org/RetinaX/issues)
 - Join our Discord community
 - Tag maintainers in issues
 

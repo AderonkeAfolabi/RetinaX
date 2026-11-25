@@ -1,6 +1,6 @@
 use crate::errors::ContractError;
-use access_control::{AccessControlContractClient, Permission};
-use soroban_sdk::{symbol_short, Address, Env, Symbol};
+use crate::Permission;
+use soroban_sdk::{symbol_short, Address, Env, IntoVal, Symbol};
 
 pub const ADMIN: Symbol = symbol_short!("ADMIN");
 pub const INITIALIZED: Symbol = symbol_short!("INIT");
@@ -146,8 +146,11 @@ pub fn check_permission(
     permission: Permission,
 ) -> Result<bool, ContractError> {
     if let Some(ac_addr) = get_access_control_contract(env) {
-        let client = AccessControlContractClient::new(env, &ac_addr);
-        Ok(client.has_permission(caller, &permission))
+        Ok(env.invoke_contract(
+            &ac_addr,
+            &Symbol::new(env, "has_permission"),
+            (caller.clone(), permission).into_val(env),
+        ))
     } else {
         // Backwards compatibility when access_control is not configured: admin has all permissions
         let admin = get_admin(env)?;

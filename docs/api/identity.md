@@ -4,6 +4,24 @@
 
 Manages user identity recovery and social recovery mechanisms through guardian-based multi-signature approval. Enables secure identity ownership transfer and ZK credential verification without exposing sensitive credentials on-chain.
 
+## Architecture at a Glance
+
+```mermaid
+sequenceDiagram
+    participant Owner
+    participant Identity as Identity Contract
+    participant Guardians
+    participant Verifier as ZK Verifier
+
+    Owner->>Identity: add_guardian
+    Owner->>Identity: initiate_recovery
+    Guardians->>Identity: approve_recovery
+    Identity->>Identity: execute_recovery after threshold and cooldown
+    Owner->>Identity: verify_zk_credential
+    Identity->>Verifier: verify_access
+    Verifier-->>Identity: proof result
+```
+
 ## Initialization
 
 ### `initialize(env: Env, owner: Address) -> Result<(), RecoveryError>`
@@ -313,6 +331,92 @@ Check if an address is an active identity owner.
 
 ---
 
+### DID Documents
+
+A `did:retinax:*` identifier is created by its controller with `create_did`, then extended with verification keys and service endpoints. `resolve_did_document` assembles that on-chain state into a W3C DID Core-style document. The full field mapping is in [DID Resolution](../did-resolution.md).
+
+#### `add_did_key(env: Env, owner: Address, did: String, key_id: String, key_type: DidKeyType, public_key: Bytes, purposes: u32) -> Result<(), RecoveryError>`
+
+Register a verification key. The key's DID URL is `<did>#<key_id>`.
+
+**Parameters:**
+
+- `owner` - The DID controller (must authenticate and be an active owner)
+- `did` - The DID to modify
+- `key_id` - Fragment, 1-32 characters of `[A-Za-z0-9._-]`, unique across the DID's keys and services
+- `key_type` - `Ed25519` (32 bytes), `X25519` (32 bytes) or `Secp256k1` (33-byte compressed key)
+- `public_key` - Raw public key bytes
+- `purposes` - Bitmask of `PURPOSE_AUTHENTICATION` (1), `PURPOSE_ASSERTION_METHOD` (2), `PURPOSE_KEY_AGREEMENT` (4), `PURPOSE_CAPABILITY_INVOCATION` (8), `PURPOSE_CAPABILITY_DELEGATION` (16). `X25519` keys must use exactly `PURPOSE_KEY_AGREEMENT`; signing keys must not use it.
+
+**Errors:**
+
+- `InvalidInput` - Bad fragment, key length, compressed-key prefix or purposes
+- `AlreadyExists` - Fragment already used by a key or service on this DID
+- `LimitExceeded` - The DID already has 10 keys
+- `Unauthorized` - Caller is not the active owner or not the DID's controller
+- `RecordNotFound` - DID does not exist
+- `OwnerDeactivated` - DID is deactivated
+
+**Events:** `("STREAM", "ID_DIDKY")` with `DidKeyChangedEvent { added: true }`
+
+---
+
+#### `remove_did_key(env: Env, owner: Address, did: String, key_id: String) -> Result<(), RecoveryError>`
+
+Remove a verification key. Same authorization rules as `add_did_key`. Returns `RecordNotFound` if the key does not exist.
+
+**Events:** `("STREAM", "ID_DIDKY")` with `DidKeyChangedEvent { added: false }`
+
+---
+
+#### `add_did_service(env: Env, owner: Address, did: String, service_id: String, service_type: String, endpoint: String) -> Result<(), RecoveryError>`
+
+Register a service endpoint. The service's DID URL is `<did>#<service_id>`.
+
+**Parameters:**
+
+- `service_id` - Fragment, same rules as `key_id`
+- `service_type` - 1-64 alphanumeric characters (e.g. `LinkedDomains`, `RetinaXRecords`)
+- `endpoint` - 1-256 visible ASCII characters with a URI scheme (e.g. `https://...`, `did:...`)
+
+**Errors:** as `add_did_key`; `LimitExceeded` at 10 services.
+
+**Events:** `("STREAM", "ID_DIDSV")` with `DidServiceChangedEvent { added: true }`
+
+---
+
+#### `remove_did_service(env: Env, owner: Address, did: String, service_id: String) -> Result<(), RecoveryError>`
+
+Remove a service endpoint. Returns `RecordNotFound` if the service does not exist.
+
+**Events:** `("STREAM", "ID_DIDSV")` with `DidServiceChangedEvent { added: false }`
+
+---
+
+#### `get_did_keys(env: Env, did: String) -> Vec<DidKey>` / `get_did_services(env: Env, did: String) -> Vec<DidService>`
+
+Raw stored keys and services, in insertion order.
+
+---
+
+#### `resolve_did_document(env: Env, did: String) -> Result<DidResolution, RecoveryError>`
+
+Resolve a DID to a W3C-style `ResolvedDidDocument` plus `DidDocumentMetadata`. A deactivated DID resolves with `metadata.deactivated = true` and no verification methods, relationships or services.
+
+**Errors:**
+
+- `InvalidInput` - Not a `did:retinax:*` identifier, or longer than 128 bytes
+- `RecordNotFound` - DID does not exist
+
+**Example:**
+
+```rust
+let res = client.resolve_did_document(&String::from_str(&env, "did:retinax:patient-42"));
+let auth_key_id = res.did_document.authentication.get(0); // "did:retinax:patient-42#key-1"
+```
+
+---
+
 ### ZK Credential Verification
 
 #### `set_zk_verifier(env: Env, caller: Address, verifier_id: Address) -> Result<(), RecoveryError>`
@@ -588,6 +692,10 @@ The contract utilizes Soroban's tiered storage model (`Instance`, `Persistent`, 
 | `(Symbol("REC_THR"), Address)` | Persistent | `u32` | Extended on write | M-of-N threshold required to execute identity recovery. |
 | `(Symbol("REC_REQ"), Address)` | Persistent | `RecoveryRequest` | Extended on write | Active in-flight recovery request for an identity owner. |
 | `(Symbol("HLD_BIND"), Address)` | Persistent | `Vec<BytesN<32>>` | Persistent | List of 32-byte credential IDs bound to this identity DID. |
+| `(Symbol("DID_DOC"), String)` / `(Symbol("DID_DOC"), Address)` | Persistent | `DidDocument` | Persistent | DID record, indexed by DID and by controller. |
+| `(Symbol("DID_KEYS"), String)` | Persistent | `Vec<DidKey>` | Persistent | Verification keys for a DID (max 10). |
+| `(Symbol("DID_SVCS"), String)` | Persistent | `Vec<DidService>` | Persistent | Service endpoints for a DID (max 10). |
+| `(Symbol("DID_CRT"), String)` | Persistent | `u64` | Persistent | DID creation timestamp, reported as `metadata.created`. |
 | `(Symbol("PREP_ADD_GUARD"), Address, Address)` | Temporary | `PrepareGuardianAddition` | Transaction lifetime | Staged 2PC state for adding a guardian. |
 | `(Symbol("PREP_REM_GUARD"), Address, Address)` | Temporary | `PrepareGuardianRemoval` | Transaction lifetime | Staged 2PC state for removing a guardian. |
 | `(Symbol("PREP_SET_THRESH"), Address)` | Temporary | `PrepareThresholdChange` | Transaction lifetime | Staged 2PC state for modifying recovery threshold. |
@@ -616,7 +724,11 @@ Contract errors associated with identity initialization, social recovery, and gu
 | `AlreadyApproved` | `12` | Guardian has already submitted approval for the active recovery proposal. |
 | `InsufficientApprovals`| `13` | Number of guardian approvals has not reached the required M-of-N threshold. |
 | `CooldownNotExpired` | `14` | The 48-hour recovery cooldown period has not elapsed yet. |
-| `OwnerDeactivated` | `15` | Target owner account has been deactivated following a completed recovery. |
+| `OwnerDeactivated` | `15` | Target owner account has been deactivated following a completed recovery, or the DID is deactivated. |
+| `InvalidInput` | `16` | A DID identifier, key, service or other DID document value is invalid. |
+| `AlreadyExists` | `17` | The DID, or a key/service fragment within it, already exists. |
+| `RecordNotFound` | `18` | The DID, key or service was not found. |
+| `LimitExceeded` | `19` | The DID already has the maximum number of keys or services (10 each). |
 
 ---
 
@@ -644,6 +756,8 @@ Contract errors associated with Zero-Knowledge (ZK) credential verification oper
 | `("STREAM", "ID_REXEC")` | `RecoveryExecutedEvent` | Emitted when recovery is executed after cooldown and threshold approvals. |
 | `("STREAM", "ID_RCNCL")` | `RecoveryCancelledEvent` | Emitted when the active owner cancels a pending recovery proposal. |
 | `("STREAM", "ID_ZKCRD")` | `ZkCredentialVerifiedEvent` | Emitted when a ZK credential proof is verified via cross-contract call. |
+| `("STREAM", "ID_DIDKY")` | `DidKeyChangedEvent` | Emitted when a DID verification key is added (`added: true`) or removed (`added: false`). |
+| `("STREAM", "ID_DIDSV")` | `DidServiceChangedEvent` | Emitted when a DID service endpoint is added (`added: true`) or removed (`added: false`). |
 | `("CRD_BIND", caller)` | `credential_id: BytesN<32>` | Emitted when an owner binds a credential ID to their identity DID. |
 | `("CRD_UBND", caller)` | `credential_id: BytesN<32>` | Emitted when an owner unbinds a credential ID from their identity DID. |
 
@@ -651,6 +765,7 @@ Contract errors associated with Zero-Knowledge (ZK) credential verification oper
 
 ## Related Documentation
 
+- [DID Resolution](../did-resolution.md)
 - [ZK Verifier Integration Guide](../ZK_INTEGRATION.md)
 - [ZK Architecture](../zk-architecture.md)
 - [Access Control Architecture](../access-control-architecture.md)

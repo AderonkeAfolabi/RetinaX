@@ -91,7 +91,7 @@ fn test_publish_event_empty_topic_rejected() {
     let empty_topic = String::from_str(&env, "");
     let payload = String::from_str(&env, "payload");
 
-    let result = client.try_publish_event(&admin, &empty_topic, &1, &payload);
+    let result = client.try_publish_event(&admin, &empty_topic, &1, &payload, &None);
     assert_eq!(result, Err(Ok(EventError::InvalidInput)));
 }
 
@@ -102,7 +102,7 @@ fn test_publish_event_schema_version_zero_rejected() {
     let payload = String::from_str(&env, "payload");
 
     // No schema registered at version 0
-    let result = client.try_publish_event(&admin, &topic, &0, &payload);
+    let result = client.try_publish_event(&admin, &topic, &0, &payload, &None);
     assert_eq!(result, Err(Ok(EventError::SchemaNotFound)));
 }
 
@@ -114,7 +114,7 @@ fn test_publish_event_empty_payload_hash_accepted() {
     let empty_payload = String::from_str(&env, "");
 
     // payload_hash is a content-addressable hash; contract does not validate it
-    let event_id = client.publish_event(&admin, &topic, &1, &empty_payload);
+    let event_id = client.publish_event(&admin, &topic, &1, &empty_payload, &None);
     assert_eq!(event_id, 1);
 }
 
@@ -308,7 +308,7 @@ fn test_replay_events_from_id_zero_returns_all() {
     register_schema(&env, &client, &admin, "records.vision.create", 1);
     let topic = String::from_str(&env, "records.vision.create");
     let payload = String::from_str(&env, "p1");
-    client.publish_event(&admin, &topic, &1, &payload);
+    client.publish_event(&admin, &topic, &1, &payload, &None);
 
     let events = client.replay_events(&0, &10);
     assert_eq!(events.len(), 1);
@@ -449,7 +449,7 @@ fn test_operations_before_initialize_rejected() {
     let topic = String::from_str(&env, "records.vision.create");
     let payload = String::from_str(&env, "payload");
     assert_eq!(
-        client.try_publish_event(&caller, &topic, &1, &payload),
+        client.try_publish_event(&caller, &topic, &1, &payload, &None),
         Err(Ok(EventError::NotInitialized))
     );
 
