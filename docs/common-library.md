@@ -734,6 +734,8 @@ fn concurrent_update(
 - Vector clocks scale linearly with # replicas; for 100+ replicas, consider alternatives
 - Causality is not guaranteed across ledger resets
 - Conflict resolution is **irreversible**; audit trail recommended
+- The OCC conflict queue is a single persistent entry, so it is capped at `MAX_CONFLICT_QUEUE_SIZE = 64` with oldest-first eviction to stay under Soroban's 64 KiB entry limit. Drain it with `resolve_conflict` and read conflicts from events or indexers if you need longer history
+- `VectorClock::increment` refuses new nodes beyond `MAX_VECTOR_CLOCK_NODES` (returns `0`), but `merge` keeps every observed entry
 
 ---
 
@@ -1003,7 +1005,11 @@ fn check_record_access(
 
 - Policy evaluation is **not** persisted; re-evaluate on each access
 - Attribute names/values are strings; case-sensitive
-- Complex policies (deep nesting) may hit computational limits
+- Complex policies (deep nesting) may hit computational limits. As a reference point, a 256-leaf balanced AND/OR tree evaluates in well under half the 100M-instruction transaction budget (`perf_*` tests in `policy_dsl_test.rs`); `And`/`Or` short-circuit, so put cheap, selective conditions first
+- `policy_dsl` and `policy_engine` are only compiled with the `policy` (or `full`) feature
+- There is no dedicated credential node: surface credential claims (type, status, issuer, level) as subject attributes, and use `DelegationCheck` for delegated credentials
+- `Gte`/`Lte` compare strings lexicographically, so numeric levels must be zero-padded to a fixed width (`"09"` < `"10"`, but `"9"` > `"10"`)
+- `evaluate_cached` keys results only by the caller's hint and the policy generation, not by timestamp: do not cache results of time-based policies under a long-lived hint
 
 ---
 

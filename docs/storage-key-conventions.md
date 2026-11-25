@@ -55,6 +55,34 @@ Located in: `contracts/orchestrator/src/lib.rs`
 | `ADMIN` | `symbol_short!("ADMIN")` | Admin address |
 | `INIT` | `symbol_short!("INIT")` | Initialization flag |
 
+### Vault Contract
+Located in: `contracts/vault/src/`
+
+| Key | Symbol | Purpose | Defined In |
+|-----|--------|---------|------------|
+| `ADMIN` | `symbol_short!("ADMIN")` | Admin address | `lib.rs` |
+| `IDENTITY` | `symbol_short!("IDENTITY")` | Identity contract reference | `lib.rs` |
+| `INIT` | `symbol_short!("INIT")` | Initialization flag | `lib.rs` |
+| `VAULT` | `symbol_short!("VAULT")` | Vault record per owner | `lib.rs` |
+| `SHARE` | `symbol_short!("SHARE")` | Guardian share per owner/epoch | `lib.rs` |
+| `EM_APR` | `symbol_short!("EM_APR")` | Emergency approvals | `lib.rs` |
+| `AST_REG` | `symbol_short!("AST_REG")` | Supported asset registry | `accounting.rs` |
+| `BAL` | `symbol_short!("BAL")` | Per-owner, per-asset balance | `accounting.rs` |
+| `V_ASSETS` | `symbol_short!("V_ASSETS")` | Assets held by a vault | `accounting.rs` |
+| `AST_TOT` | `symbol_short!("AST_TOT")` | Per-asset total of all vault balances | `accounting.rs` |
+| `ACC_SEQ` | `symbol_short!("ACC_SEQ")` | Audit trail length per vault | `accounting.rs` |
+| `ACC_LOG` | `symbol_short!("ACC_LOG")` | Audit trail entries | `accounting.rs` |
+
+### Identity Contract (DID)
+Located in: `contracts/identity/src/`
+
+| Key | Symbol | Purpose | Defined In |
+|-----|--------|---------|------------|
+| `DID_DOC` | `Symbol::new("DID_DOC")` | DID record by DID and by controller | `lib.rs` |
+| `DID_KEYS` | `Symbol::new("DID_KEYS")` | DID verification keys | `did.rs` |
+| `DID_SVCS` | `Symbol::new("DID_SVCS")` | DID service endpoints | `did.rs` |
+| `DID_CRT` | `Symbol::new("DID_CRT")` | DID creation timestamp | `did.rs` |
+
 ## Collision Analysis
 
 ### Potential Collisions Identified

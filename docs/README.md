@@ -71,9 +71,11 @@ Welcome to the RetinaX documentation. This index groups every guide by the audie
 - [FHIR API](api/fhir.md) — FHIR resource registration and validation API reference.
 - [Governor API](api/governor.md) — Proposal, voting, and execution API reference.
 - [Identity API](api/identity.md) — DID, credential, and recovery API reference.
+- [DID Resolution](did-resolution.md) — How on-chain DID state maps to W3C DID documents.
 - [Metering API](api/metering.md) — Metering and rate-limit API reference.
 - [Staking API](api/staking.md) — Staking, rewards, and tier API reference.
 - [Treasury API](api/treasury.md) — Treasury transfer and multisig API reference.
+- [Vault API](api/vault.md) — Key custody and multi-asset vault accounting API reference.
 - [ZK Verifier API](api/zk_verifier.md) — Proof verification and verifier management API reference.
 - [ZK Voting API](api/zk_voting.md) — Private voting and proof verification API reference.
 - [SDK Home](sdk/README.md) — Overview of available RetinaX SDK packages.

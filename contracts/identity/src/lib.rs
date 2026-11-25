@@ -12,13 +12,16 @@
 //! - **Credential Binding**: Links off-chain/on-chain credentials to identity addresses.
 
 pub mod credential;
+pub mod did;
 pub mod events;
 pub mod recovery;
 
 use credential::CredentialError;
+use did::{DidKey, DidKeyType, DidResolution, DidService};
 use recovery::{RecoveryError, RecoveryRequest};
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, String, Symbol, Vec,
+    contract, contractimpl, contracttype, symbol_short, Address, Bytes, BytesN, Env, String,
+    Symbol, Vec,
 };
 
 /// Preparation data for two-phase commit (2PC) guardian addition.
@@ -139,6 +142,7 @@ impl IdentityContract {
         };
         env.storage().persistent().set(&did_key, &document);
         env.storage().persistent().set(&owner_key, &document);
+        did::set_created(&env, &did, document.updated_at);
         Ok(())
     }
 
@@ -204,13 +208,137 @@ impl IdentityContract {
         Ok(())
     }
 
+    // ── W3C DID document resolution (#449) ──────────────────────────────────
+
+    /// Register a verification key on a DID. `key_id` is the fragment used in
+    /// the key's DID URL (`<did>#<key_id>`); `purposes` is a bitmask of
+    /// `did::PURPOSE_*` verification relationships. Controller only.
+    pub fn add_did_key(
+        env: Env,
+        owner: Address,
+        did: String,
+        key_id: String,
+        key_type: DidKeyType,
+        public_key: Bytes,
+        purposes: u32,
+    ) -> Result<(), RecoveryError> {
+        let document = Self::load_controlled_did(&env, &owner, &did)?;
+        did::add_key(&env, &did, key_id.clone(), key_type, public_key, purposes)?;
+        Self::touch_did(&env, document);
+        events::emit_did_key_changed(&env, did, key_id, true);
+        Ok(())
+    }
+
+    /// Remove a verification key from a DID. Controller only.
+    pub fn remove_did_key(
+        env: Env,
+        owner: Address,
+        did: String,
+        key_id: String,
+    ) -> Result<(), RecoveryError> {
+        let document = Self::load_controlled_did(&env, &owner, &did)?;
+        did::remove_key(&env, &did, &key_id)?;
+        Self::touch_did(&env, document);
+        events::emit_did_key_changed(&env, did, key_id, false);
+        Ok(())
+    }
+
+    /// Register a service endpoint on a DID. Controller only.
+    pub fn add_did_service(
+        env: Env,
+        owner: Address,
+        did: String,
+        service_id: String,
+        service_type: String,
+        endpoint: String,
+    ) -> Result<(), RecoveryError> {
+        let document = Self::load_controlled_did(&env, &owner, &did)?;
+        did::add_service(&env, &did, service_id.clone(), service_type, endpoint)?;
+        Self::touch_did(&env, document);
+        events::emit_did_service_changed(&env, did, service_id, true);
+        Ok(())
+    }
+
+    /// Remove a service endpoint from a DID. Controller only.
+    pub fn remove_did_service(
+        env: Env,
+        owner: Address,
+        did: String,
+        service_id: String,
+    ) -> Result<(), RecoveryError> {
+        let document = Self::load_controlled_did(&env, &owner, &did)?;
+        did::remove_service(&env, &did, &service_id)?;
+        Self::touch_did(&env, document);
+        events::emit_did_service_changed(&env, did, service_id, false);
+        Ok(())
+    }
+
+    /// Verification keys registered on a DID, in insertion order.
+    pub fn get_did_keys(env: Env, did: String) -> Vec<DidKey> {
+        did::get_keys(&env, &did)
+    }
+
+    /// Service endpoints registered on a DID, in insertion order.
+    pub fn get_did_services(env: Env, did: String) -> Vec<DidService> {
+        did::get_services(&env, &did)
+    }
+
+    /// Resolve a DID to a W3C-style DID document plus document metadata.
+    /// See `docs/did-resolution.md` for the field mapping.
+    pub fn resolve_did_document(env: Env, did: String) -> Result<DidResolution, RecoveryError> {
+        if !Self::valid_retinax_did(&env, &did) {
+            return Err(RecoveryError::InvalidInput);
+        }
+        let record: DidDocument = env
+            .storage()
+            .persistent()
+            .get(&(Symbol::new(&env, DID_PREFIX), did))
+            .ok_or(RecoveryError::RecordNotFound)?;
+        Ok(did::resolve(&env, &record))
+    }
+
+    /// Loads a DID record the caller controls and may still modify.
+    fn load_controlled_did(
+        env: &Env,
+        owner: &Address,
+        did: &String,
+    ) -> Result<DidDocument, RecoveryError> {
+        owner.require_auth();
+        Self::require_active_owner(env, owner)?;
+        let document: DidDocument = env
+            .storage()
+            .persistent()
+            .get(&(Symbol::new(env, DID_PREFIX), did.clone()))
+            .ok_or(RecoveryError::RecordNotFound)?;
+        if document.controller != *owner {
+            return Err(RecoveryError::Unauthorized);
+        }
+        if document.deactivated {
+            return Err(RecoveryError::OwnerDeactivated);
+        }
+        Ok(document)
+    }
+
+    /// Bumps `updated_at` on both copies of a DID record.
+    fn touch_did(env: &Env, mut document: DidDocument) {
+        document.updated_at = env.ledger().timestamp();
+        env.storage().persistent().set(
+            &(Symbol::new(env, DID_PREFIX), document.did.clone()),
+            &document,
+        );
+        env.storage().persistent().set(
+            &(Symbol::new(env, DID_PREFIX), document.controller.clone()),
+            &document,
+        );
+    }
+
     fn valid_retinax_did(_env: &Env, did: &String) -> bool {
         const PREFIX: &[u8] = b"did:retinax:";
-        if did.len() as usize <= PREFIX.len() {
+        if did.len() as usize <= PREFIX.len() || did.len() > did::MAX_DID_LEN {
             return false;
         }
-        let mut bytes = [0u8; 128];
-        let len = (did.len() as usize).min(bytes.len());
+        let mut bytes = [0u8; did::MAX_DID_LEN as usize];
+        let len = did.len() as usize;
         did.copy_into_slice(&mut bytes[..len]);
         &bytes[..PREFIX.len()] == PREFIX
     }
