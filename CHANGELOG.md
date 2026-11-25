@@ -112,10 +112,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* **vault:** multi-asset support and accounting. The admin approves token contracts with `add_supported_asset`. Owners `deposit`, `withdraw` and `transfer_between_vaults` per asset. Balances are tracked per vault and per asset, `get_total_balance` lets custody be reconciled, and every balance change is written to an audit trail paged with `get_ledger_entries` (#337).
-* **identity:** W3C-style DID document resolution through `resolve_did_document`, built from verification keys (`add_did_key`) and service endpoints (`add_did_service`) stored on-chain. The mapping is in `docs/did-resolution.md` (#449).
-* **common:** evaluation tests for the policy DSL and engine, covering simple, compound, credential and time-based policies and the cost of large policy trees (#339).
-* **common:** consistency tests for vector clocks and optimistic concurrency, covering multi-actor causality, merging, conflict detection and concurrent writers (#340).
+* **vision_records:** preserve amended eye examinations as hash-linked versions and expose `get_record_history`
 * **docs:** ADR-0013 — research spike on Ethereum header/receipt verification on Soroban (light client vs optimistic vs ZK) (#469)
 * **ai_integration:** model version pinning per request. Providers record `model_version`, `submit_pinned_analysis_request` refuses a version other than the one pinned, and results carry the version they were made against (#465).
 * **vision_records:** cursor-based bulk patient export through `export_patient_data_page`. Records, prescriptions and grants are paged together, so long lists no longer fail the export (#446).
