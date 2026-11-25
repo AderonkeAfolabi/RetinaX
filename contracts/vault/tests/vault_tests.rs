@@ -13,8 +13,7 @@ use soroban_sdk::{
     Address, BytesN, Env, String, Vec,
 };
 use vault::{
-    sss, VaultContract, VaultContractClient, VaultError, VaultPolicy, VaultRecord, VaultShare,
-    VaultSnapshot,
+    sss, VaultContract, VaultContractClient, VaultError, VaultRecord, VaultShare, VaultSnapshot,
 };
 
 fn setup_vault(
@@ -150,12 +149,11 @@ fn test_configure_vault_validation_matrix() {
         Err(Ok(VaultError::InvalidConfig))
     );
 
-    // Shard count exceeding registered guardians count
-    let other_owner = Address::generate(&env);
-    identity.initialize(&other_owner);
-    add_guardians(&env, &identity, &other_owner, 2);
+    // Shard count exceeding registered guardians count (owner has 5).
+    // The identity contract is single-owner, so this reuses `owner` rather
+    // than initializing it a second time.
     assert_eq!(
-        vault.try_configure_vault(&other_owner, &2, &4, &3, &3600, &data_ref, &seed, &None),
+        vault.try_configure_vault(&owner, &2, &6, &3, &3600, &data_ref, &seed),
         Err(Ok(VaultError::InvalidConfig))
     );
 }

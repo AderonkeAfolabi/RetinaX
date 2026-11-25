@@ -277,7 +277,8 @@ impl CrossChainContract {
             return Err(CrossChainError::Unauthorized);
         }
 
-        relay::anchor_state_root(&env, root.to_array(), chain_id);
+        relay::anchor_state_root(&env, root.to_array(), chain_id.clone());
+        bridge::anchor_root(&env, root, chain_id);
         Ok(())
     }
 

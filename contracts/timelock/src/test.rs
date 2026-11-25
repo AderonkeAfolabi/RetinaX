@@ -211,3 +211,29 @@ fn test_guardian_veto_tx() {
     let res = client.try_get_tx(&tx_id);
     assert_eq!(res, Err(Ok(TimelockError::TxNotFound)));
 }
+
+#[test]
+fn test_uninitialized_contract_returns_not_initialized() {
+    let env = Env::default();
+    let contract_id = env.register(TimelockContract, ());
+    let client = TimelockContractClient::new(&env, &contract_id);
+
+    let caller = Address::generate(&env);
+    let tx_id = create_tx_id(&env, 1);
+    let err = TimelockError::NotInitialized;
+
+    env.mock_all_auths();
+
+    // Every entry point that depends on initialization must report it
+    assert_eq!(client.try_get_admin(), Err(Ok(err)));
+    assert_eq!(client.try_get_min_delay(), Err(Ok(err)));
+    assert_eq!(client.try_get_queue(), Err(Ok(err)));
+    assert_eq!(client.try_get_tx(&tx_id), Err(Ok(err)));
+    assert_eq!(client.try_get_guardian(), Err(Ok(err)));
+    assert_eq!(client.try_queue_tx(&caller, &tx_id, &100), Err(Ok(err)));
+    assert_eq!(client.try_prioritize_tx(&caller, &tx_id), Err(Ok(err)));
+    assert_eq!(client.try_execute_tx(&caller, &tx_id), Err(Ok(err)));
+    assert_eq!(client.try_set_guardian(&caller, &caller), Err(Ok(err)));
+    assert_eq!(client.try_cancel_tx(&caller, &tx_id), Err(Ok(err)));
+    assert_eq!(client.try_veto_tx(&caller, &tx_id), Err(Ok(err)));
+}

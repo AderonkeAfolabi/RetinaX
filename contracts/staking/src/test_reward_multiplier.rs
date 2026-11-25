@@ -105,6 +105,15 @@ mod tests {
     // Lock-up period: unstake request timelock
     // -----------------------------------------------------------------------
 
+    fn with_contract<F, R>(f: F) -> R
+    where
+        F: FnOnce(&Env) -> R,
+    {
+        let env = Env::default();
+        let contract_id = env.register(crate::StakingContract, ());
+        env.as_contract(&contract_id, || f(&env))
+    }
+
     #[test]
     fn test_unstake_request_stored_and_retrieved() {
         let env = Env::default();

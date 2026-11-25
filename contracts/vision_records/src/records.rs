@@ -109,6 +109,13 @@ impl VisionRecordsContract {
         let stored_hash = String::from_str(&env, &ciphertext);
         let key_version = current_version;
 
+        let retention_period = retention::get_retention_period(&env, &record_type);
+        let retain_until = if retention_period > 0 {
+            Some(env.ledger().timestamp().saturating_add(retention_period))
+        } else {
+            None
+        };
+
         let record = VisionRecord {
             id: record_id,
             patient: patient.clone(),
@@ -118,6 +125,7 @@ impl VisionRecordsContract {
             key_version,
             created_at: env.ledger().timestamp(),
             updated_at: env.ledger().timestamp(),
+            retain_until,
         };
 
         let key = (symbol_short!("RECORD"), record_id);
@@ -265,6 +273,13 @@ impl VisionRecordsContract {
             let ciphertext = km.encrypt(None, &plaintext);
             let stored_hash = String::from_str(&env, &ciphertext);
 
+            let retention_period = retention::get_retention_period(&env, &input.record_type);
+            let retain_until = if retention_period > 0 {
+                Some(env.ledger().timestamp().saturating_add(retention_period))
+            } else {
+                None
+            };
+
             let record = VisionRecord {
                 id: current_id,
                 patient: input.patient.clone(),
@@ -274,6 +289,7 @@ impl VisionRecordsContract {
                 key_version,
                 created_at: env.ledger().timestamp(),
                 updated_at: env.ledger().timestamp(),
+                retain_until,
             };
 
             let key = (symbol_short!("RECORD"), current_id);
@@ -384,6 +400,24 @@ impl VisionRecordsContract {
                     audit::add_audit_entry(&env, &audit_entry);
                     events::publish_audit_log_entry(&env, &audit_entry);
                     return Err(ContractError::RecordArchived);
+                }
+
+                // Expired records are inaccessible per data class retention policy.
+                if let Some(retain_until) = record.retain_until {
+                    if env.ledger().timestamp() > retain_until {
+                        let audit_entry = audit::create_audit_entry(
+                            &env,
+                            caller.clone(),
+                            record.patient.clone(),
+                            Some(record_id),
+                            AccessAction::Read,
+                            AccessResult::Denied,
+                            Some(String::from_str(&env, "Record has expired per retention policy")),
+                        );
+                        audit::add_audit_entry(&env, &audit_entry);
+                        events::publish_audit_log_entry(&env, &audit_entry);
+                        return Err(ContractError::RecordExpired);
+                    }
                 }
 
                 // Log successful access
@@ -658,7 +692,7 @@ impl VisionRecordsContract {
             .unwrap_or(Vec::new(&env));
         let mut active = Vec::new(&env);
         for id in all.iter() {
-            if !archive::is_archived(&env, id) {
+            if !archive::is_archived(&env, id) && !retention::is_record_expired(&env, id) {
                 active.push_back(id);
             }
         }
@@ -676,7 +710,7 @@ impl VisionRecordsContract {
         let mut records: Vec<VisionRecord> = Vec::new(&env);
         for i in 0..ids.len() {
             let record_id = ids.get(i).unwrap();
-            if archive::is_archived(&env, record_id) {
+            if archive::is_archived(&env, record_id) || retention::is_record_expired(&env, record_id) {
                 continue;
             }
             let key = (symbol_short!("RECORD"), record_id);
@@ -944,5 +978,41 @@ impl VisionRecordsContract {
             next_cursor,
             total,
         })
+    }
+
+    /// Set retention duration in seconds for a specific data class (RecordType).
+    pub fn set_retention_period(
+        env: Env,
+        admin: Address,
+        record_type: RecordType,
+        retention_seconds: u64,
+    ) -> Result<(), ContractError> {
+        retention::set_retention_period(&env, &admin, &record_type, retention_seconds)
+    }
+
+    /// Get retention duration in seconds for a specific data class (RecordType).
+    pub fn get_retention_period(env: Env, record_type: RecordType) -> u64 {
+        retention::get_retention_period(&env, &record_type)
+    }
+
+    /// Purges an expired record according to retention policy (coordinates with Issue #325).
+    pub fn purge_expired_record(env: Env, record_id: u64) -> bool {
+        retention::purge_expired_record(&env, record_id)
+    }
+
+    /// Compatibility alias for bulk/cron cleaners.
+    pub fn purge_expired_records(env: Env, record_id: u64) -> bool {
+        retention::purge_expired_record(&env, record_id)
+    }
+
+    /// Purges a batch of expired records. Returns the number of records successfully purged.
+    pub fn purge_expired_records_batch(env: Env, record_ids: Vec<u64>) -> u32 {
+        let mut purged_count = 0;
+        for id in record_ids.iter() {
+            if retention::purge_expired_record(&env, id) {
+                purged_count += 1;
+            }
+        }
+        purged_count
     }
 }
